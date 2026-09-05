@@ -2,7 +2,15 @@ import assert from 'node:assert/strict';
 const base=process.argv[2]||'http://localhost:3000';
 let passed=0;
 const ok=(name,condition)=>{assert.ok(condition,name);passed++;console.log('✓ '+name);};
-function client(cookie=''){return {cookie,async request(method,payload){const r=await fetch(base+'/api/game'+(method==='GET'&&payload?'?room='+payload:''),{method,headers:{...(this.cookie?{cookie:this.cookie}:{}),...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:JSON.stringify(payload)}:{})});const set=r.headers.get('set-cookie');if(set)this.cookie=set.split(';')[0];return {status:r.status,data:await r.json(),headers:r.headers};}};}
+function client(cookie=''){
+ const jar=new Map(cookie.split(';').map(c=>c.trim()).filter(Boolean).map(c=>{const i=c.indexOf('=');return [c.slice(0,i),c.slice(i+1)];}));
+ return {get cookie(){return [...jar].map(([k,v])=>k+'='+v).join('; ');},async request(method,payload){
+  const r=await fetch(base+'/api/game'+(method==='GET'&&payload?'?room='+payload:''),{method,headers:{...(this.cookie?{cookie:this.cookie}:{}),...(method==='POST'?{'Content-Type':'application/json',Origin:base,'Sec-Fetch-Site':'same-origin'}:{})},...(method==='POST'?{body:JSON.stringify(payload)}:{})});
+  // Hosting may refresh its own cookies independently of the player's identity.
+  for(const value of r.headers.getSetCookie()){const pair=value.split(';')[0],i=pair.indexOf('=');jar.set(pair.slice(0,i),pair.slice(i+1));}
+  return {status:r.status,data:await r.json(),headers:r.headers};
+ }};
+}
 const red=client(),black=client(),watcher=client();
 const session=await red.request('GET');ok('初始化匿名身份',session.status===200&&red.cookie.length>40);ok('身份 Cookie 禁止脚本读取',session.headers.get('set-cookie')?.includes('HttpOnly'));
 let result=await red.request('POST',{action:'create',name:'联机测试红方',clockMinutes:0});assert.equal(result.status,200,JSON.stringify(result.data));let state=result.data;const id=state.id;

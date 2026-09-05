@@ -13,7 +13,9 @@
     "format": "oxfmt",
     "db:generate": "drizzle-kit generate",
     "test": "esbuild tests/rules.test.ts --bundle --platform=node --format=esm --outfile=work/rules.test.mjs && node work/rules.test.mjs",
-    "test:online": "node tests/online.test.mjs"
+    "test:online": "node tests/online.test.mjs",
+    "build:pages": "vite build --config vite.pages.config.ts",
+    "test:pages": "esbuild tests/pages.test.ts --bundle --platform=node --format=esm --outfile=work/pages.test.mjs && node work/pages.test.mjs"
   },
   "dependencies": {
     "react": "19.2.6",

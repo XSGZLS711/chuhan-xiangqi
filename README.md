@@ -26,3 +26,15 @@
 - `npx tsc --noEmit`：类型检查。
 
 棋局没有公开列表；持有棋室链接者可以进入或观战。保留原浏览器数据可恢复座位。重开前可导出棋谱；重开会替换当前棋谱。
+
+## GitHub Pages
+
+网页发布在 `https://xsgzls711.github.io/chuhan-xiangqi/`。真实的 React 界面及静态资源由 GitHub Pages 托管，联机服务和棋局数据库保留在原 Sites 后台。
+
+- `npm run build:pages` 生成 `dist-pages/`。
+- `.github/workflows/pages.yml` 在 `main` 推送后自动验证并发布网页。
+- 后台代码更新仍需通过原 Sites 项目发布；GitHub Actions 不持有后台发布凭证。
+- `npm run test:pages` 检查路径、身份和跨域权限。
+- `node tests/pages-online.test.mjs BACKEND_ORIGIN` 验证 GitHub 来源的双人联机流程。
+
+GitHub Pages 玩家身份保存在当前浏览器；请求以专属随机座位凭证连接后台，不依赖第三方 Cookie。旧域名的座位仍保留在原浏览器身份中；新域名是独立身份。分享新的 GitHub 对局链接即可邀请朋友，棋局数据不会迁移或删除。

@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import { randomBytes } from 'node:crypto';
+const base=process.argv[2]||'https://chuhan-friends-xiangqi.zhanglushan1.chatgpt.site';
+const origin='https://xsgzls711.github.io';
+let checks=0;
+const ok=(label,condition)=>{assert.ok(condition,label);checks++;console.log('✓ '+label);};
+async function preflight(method,headers){const res=await fetch(base+'/api/game',{method:'OPTIONS',headers:{Origin:origin,'Access-Control-Request-Method':method,'Access-Control-Request-Headers':headers}});assert.equal(res.status,204);assert.equal(res.headers.get('access-control-allow-origin'),origin);assert(res.headers.get('access-control-allow-methods')?.includes(method));}
+function client(token=randomBytes(32).toString('hex')){return {token,async request(method,payload){const res=await fetch(base+'/api/game'+(method==='GET'&&payload?'?room='+payload:''),{method,headers:{Origin:origin,'Sec-Fetch-Site':'cross-site','X-Chuhan-Session':token,...(method==='POST'?{'Content-Type':'application/json'}:{})},...(method==='POST'?{body:JSON.stringify(payload)}:{})});assert.equal(res.headers.get('access-control-allow-origin'),origin,'Every cross-origin response must be readable by Pages');return {status:res.status,data:await res.json()};}};}
+await preflight('GET','x-chuhan-session');ok('GitHub 网页可预检读取棋局',true);
+await preflight('POST','content-type,x-chuhan-session');ok('GitHub 网页可预检发送操作',true);
+const red=client(),black=client(),viewer=client();
+let response=await red.request('GET');ok('GitHub 玩家不依赖第三方 Cookie 连接',response.status===200&&response.data.ready);
+response=await red.request('POST',{action:'create',name:'GitHub 红方',clockMinutes:0});assert.equal(response.status,200,JSON.stringify(response.data));let state=response.data;const room=state.id;
+ok('GitHub 网页可创建棋室',state.you==='red');
+const act=async(c,action,extra={})=>{const r=await c.request('POST',{action,room,version:state.version,...extra});if(r.status===200)state=r.data;return r;};
+response=await black.request('GET',room);ok('邀请链接可打开同一棋室',response.status===200&&response.data.you===null);
+response=await act(black,'join',{name:'GitHub 黑方'});ok('好友从 GitHub 页面入座',response.status===200&&state.you==='black');
+response=await red.request('GET',room);ok('入座同步至另一位 GitHub 玩家',response.data.players.black.name==='GitHub 黑方'&&response.data.you==='red');
+response=await act(red,'move',{from:54,to:45});ok('红方跨域落子',response.status===200&&state.history.length===1);
+response=await act(black,'move',{from:27,to:36});ok('黑方跨域落子',response.status===200&&state.history.length===2);
+response=await act(red,'undo');ok('红方可直接撤回对手一步',response.status===200&&state.history.length===1);
+response=await act(black,'undo');ok('黑方可直接撤回对手一步',response.status===200&&state.history.length===0);
+response=await client(red.token).request('GET',room);ok('页面刷新恢复原座位',response.data.you==='red');
+response=await viewer.request('GET',room);ok('第三位来访者只能观战',response.data.you===null);
+response=await act(viewer,'undo');ok('跨域观战者不能悔棋',response.status===403);
+await act(red,'offer-draw');response=await act(black,'respond',{accept:true});ok('GitHub 双方提和成功',response.status===200&&state.result.winner==='draw');
+await act(red,'offer-rematch');response=await act(black,'respond',{accept:true});ok('GitHub 再来一局并换边',response.status===200&&state.round===2&&state.you==='red');
+response=await act(red,'resign');ok('GitHub 玩家认输正常',response.status===200&&state.result.winner==='red');
+const unknown=await fetch(base+'/api/game',{method:'OPTIONS',headers:{Origin:'https://unrelated.github.io','Access-Control-Request-Method':'POST'}});ok('仅你自己的 GitHub 域名获得跨域访问',unknown.status===403&&!unknown.headers.get('access-control-allow-origin'));
+console.log(`\n${checks} live GitHub-origin checks passed. Room ${room}`);
