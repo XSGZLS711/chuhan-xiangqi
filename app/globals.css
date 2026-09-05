@@ -1853,3 +1853,731 @@ html {
     scale: 1;
   }
 }
+
+@font-face {
+  font-family: 'Chuhan Pieces';
+  src: url('../assets/chuhan-pieces.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+.piece,
+.mini-piece {
+  font-family: 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
+  font-weight: 400;
+  font-synthesis: none;
+}
+.piece > span {
+  padding-bottom: 0;
+}
+.effect-inscription strong {
+  font-family: 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
+  font-weight: 400;
+}
+.mobile-dock,
+.mobile-offer-bar {
+  display: none;
+}
+.player-avatar {
+  position: relative;
+  flex-shrink: 0;
+}
+.player-avatar .avatar {
+  width: 100%;
+  height: 100%;
+}
+.player-avatar {
+  width: 42px;
+  height: 42px;
+}
+.avatar-bubble {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: -2px;
+  width: max-content;
+  max-width: min(240px, 62vw);
+  padding: 9px 12px;
+  background: var(--popover);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 12px 12px 12px 2px;
+  font-size: 14px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+  box-shadow: 0 4px 18px #0002;
+  z-index: 25;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  animation: speech-arrive 180ms ease-out;
+}
+@keyframes speech-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+.player-seat {
+  position: relative;
+  z-index: 3;
+}
+.board-stage {
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+.endgame-panel {
+  padding: 12px 0 4px;
+  animation: endgame-enter 320ms ease-out;
+}
+.endgame-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.endgame-caption strong {
+  font-size: 16px;
+  color: var(--emphasis);
+}
+.endgame-caption span {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.endgame-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.endgame-buttons button {
+  padding: 10px 5px;
+  min-height: 48px;
+  font-size: 15px;
+}
+.endgame-buttons .steam-button {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+.steam-button small {
+  font-size: 11px;
+  font-weight: 400;
+  opacity: 0.8;
+}
+@keyframes endgame-enter {
+  from {
+    opacity: 0;
+    transform: translateY(22px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.record-sheet-actions {
+  display: none;
+}
+
+/* The sheets reuse the same game history and commands as the desktop panel. */
+.game-sheet {
+  border-radius: 22px 22px 0 0;
+  width: min(100%, 620px);
+  margin: 0 auto;
+  max-height: min(78dvh, 680px);
+  padding: 0 16px max(16px, env(safe-area-inset-bottom));
+  gap: 12px;
+  overflow: hidden;
+  transition:
+    translate 280ms cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 220ms !important;
+}
+.game-sheet[data-starting-style],
+.game-sheet[data-ending-style] {
+  translate: 0 100% !important;
+  opacity: 0;
+}
+.sheet-grip {
+  width: 32px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 10px;
+  margin: 10px auto 0;
+  flex-shrink: 0;
+}
+.game-sheet-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.game-sheet-heading [data-slot='sheet-title'] {
+  font-size: 19px;
+  font-family: 'Songti SC', 'STSong', serif;
+  font-weight: 600;
+}
+.game-sheet-heading [data-slot='sheet-description'] {
+  font-size: 12px;
+  line-height: 1.6;
+  margin-top: 5px;
+}
+.sheet-close-button {
+  min-height: 40px;
+  min-width: 40px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: var(--secondary);
+  color: var(--foreground);
+}
+.game-sheet .score-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border: 0;
+  border-radius: 10px;
+}
+.game-sheet .score-panel > [data-slot='tabs'] {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 0;
+}
+.game-sheet [data-slot='tabs-content'] {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.game-sheet .panel-heading {
+  flex-shrink: 0;
+  padding: 10px 12px;
+}
+.game-sheet .panel-heading [data-slot='tabs-trigger'] {
+  font-size: 15px;
+  min-height: 40px;
+}
+.game-sheet .game-record {
+  min-height: 0;
+}
+.game-sheet .move-list {
+  height: clamp(120px, 33dvh, 310px);
+  overflow-y: auto;
+}
+.game-sheet .move-row button {
+  font-size: 15px;
+  min-height: 40px;
+}
+.game-sheet .empty-record {
+  min-height: 150px;
+}
+.game-sheet .chat-list {
+  height: clamp(140px, 35dvh, 320px);
+}
+.game-sheet .chat-form input {
+  font-size: 16px;
+}
+.game-sheet .record-sheet-actions {
+  display: flex;
+  justify-content: center;
+  gap: 9px;
+  padding: 10px;
+  border-top: 1px solid var(--border);
+}
+.game-sheet .replay-nav {
+  padding: 3px 10px;
+}
+.game-sheet .replay-nav button {
+  min-height: 40px;
+  min-width: 40px;
+}
+.game-menu-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 3px 0;
+}
+.game-menu-grid button,
+.game-menu-grid a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 76px;
+  padding: 9px 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--foreground);
+  background: var(--card);
+  font-size: 14px;
+}
+.game-menu-grid svg {
+  width: 22px;
+  height: 22px;
+  color: var(--muted-foreground);
+}
+.game-menu-grid small {
+  font-size: 11px;
+  color: var(--muted-foreground);
+  margin-top: -5px;
+}
+.game-menu-grid a {
+  color: var(--emphasis);
+}
+.cancel-invite {
+  flex-shrink: 0;
+}
+
+/* A mobile game occupies exactly the visible viewport, including keyboard changes. */
+@media (max-width: 660px), (max-height: 500px) and (pointer: coarse) {
+  html:has(.app-shell.in-room),
+  body:has(.app-shell.in-room) {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  .app-shell.in-room {
+    position: fixed;
+    inset: 0 0 auto;
+    top: var(--game-top, 0px);
+    height: var(--game-height, 100dvh);
+    width: 100%;
+    max-width: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding: env(safe-area-inset-top) max(8px, env(safe-area-inset-right)) 0
+      max(8px, env(safe-area-inset-left));
+    margin: 0;
+  }
+  .in-room .site-header,
+  .in-room .room-column,
+  .in-room .table-heading,
+  .in-room .table-tools,
+  .in-room .desktop-game-actions,
+  .in-room .mobile-game-actions,
+  .in-room > footer {
+    display: none;
+  }
+  .in-room .mobile-room-nav {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 3px;
+    min-height: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+  }
+  .in-room .mobile-room-title {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .in-room .mobile-room-title strong {
+    font-size: 14px;
+  }
+  .in-room .mobile-room-title small {
+    font-size: 11px;
+    color: var(--muted-foreground);
+  }
+  .in-room .mobile-room-status {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--emphasis);
+  }
+  .mobile-connect,
+  .in-room .mobile-invite {
+    min-height: 36px;
+    min-width: 30px;
+    padding: 6px;
+    border: 0;
+    background: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .in-room .mobile-invite {
+    color: var(--muted-foreground);
+    font-size: 12px;
+  }
+  .in-room .mobile-invite > span {
+    display: none;
+  }
+  .in-room .workspace {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    width: 100%;
+    margin: 0;
+    gap: 0;
+  }
+  .in-room .play-column {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    min-height: 0;
+    width: 100%;
+  }
+  .in-room .board-stage {
+    flex: 1 1 0;
+    min-height: 0;
+    width: 100%;
+    container-type: size;
+    display: grid;
+    place-items: center;
+  }
+  .in-room .board-stage .board-frame {
+    width: min(100cqw, calc(90cqh - 2px));
+    padding: 6px;
+    margin: 0 auto;
+    transition: width 320ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  }
+  .in-room.game-ended .board-stage .board-frame {
+    width: min(94cqw, calc(84.6cqh - 2px));
+  }
+  .in-room .chess-board {
+    touch-action: manipulation;
+  }
+  .in-room .piece {
+    font-size: 6.65cqw;
+  }
+  .in-room .piece > span {
+    width: 84%;
+    height: 84%;
+    border-width: 1px;
+  }
+  .in-room .player-seat {
+    flex: 0 0 auto;
+    padding: 3px 4px;
+  }
+  .in-room .player-bar {
+    padding: 3px 0 2px;
+    gap: 8px;
+    min-height: 34px;
+  }
+  .in-room .player-avatar {
+    width: 30px;
+    height: 30px;
+  }
+  .in-room .avatar {
+    font-size: 21px;
+  }
+  .in-room .player-name-block {
+    flex: 1;
+  }
+  .in-room .player-bar strong {
+    font-size: 13px;
+  }
+  .in-room .player-bar small {
+    font-size: 11px;
+    margin-top: 1px;
+  }
+  .in-room .player-clock {
+    font-size: 12px;
+  }
+  .in-room .player-clock.timed-clock {
+    font-size: 23px;
+  }
+  .in-room .captured-tray {
+    min-height: 22px;
+    height: 22px;
+    flex-wrap: nowrap;
+    padding: 0;
+    gap: 6px;
+  }
+  .in-room .captured-pieces {
+    flex-wrap: nowrap;
+    gap: 5px;
+  }
+  .in-room .captured-label {
+    font-size: 11px;
+  }
+  .in-room .mini-piece {
+    width: 19px;
+    height: 19px;
+    font-size: 16px;
+  }
+  .in-room .captured-empty {
+    font-size: 11px;
+  }
+  .in-room .avatar-bubble {
+    left: 40px;
+    top: -2px;
+    font-size: 14px;
+    max-width: min(230px, 65vw);
+  }
+  .in-room .board-stage + .player-seat .avatar-bubble {
+    top: auto;
+    bottom: 0;
+    border-radius: 12px 12px 12px 2px;
+  }
+  .in-room .notice {
+    position: absolute;
+    z-index: 35;
+    bottom: calc(64px + env(safe-area-inset-bottom));
+    left: 12px;
+    right: 12px;
+    padding: 9px 12px;
+    margin: 0;
+    font-size: 13px;
+    max-height: 25%;
+    overflow: auto;
+    box-shadow: 0 4px 20px #0002;
+  }
+  .in-room .notice button {
+    min-width: 32px;
+    min-height: 32px;
+  }
+  .in-room .analysis-controls {
+    flex: 0 0 auto;
+    min-height: 39px;
+    padding: 3px 6px;
+    gap: 3px;
+    font-size: 12px;
+    margin: 2px 0;
+  }
+  .in-room .analysis-controls button {
+    min-height: 34px;
+    padding: 5px;
+    font-size: 12px;
+  }
+  .in-room .endgame-panel {
+    flex: 0 0 auto;
+    padding: 4px 4px 6px;
+  }
+  .in-room .endgame-caption {
+    margin-bottom: 5px;
+    line-height: 1.4;
+  }
+  .in-room .endgame-caption strong {
+    font-size: 14px;
+  }
+  .in-room .endgame-caption span {
+    font-size: 12px;
+  }
+  .in-room .endgame-buttons {
+    gap: 7px;
+  }
+  .in-room .endgame-buttons button {
+    height: 45px;
+    min-height: 45px;
+    padding: 5px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+  .in-room .steam-button small {
+    font-size: 10px;
+  }
+  .mobile-dock {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 4px;
+    min-height: 58px;
+    padding: 5px 4px max(5px, env(safe-area-inset-bottom));
+    border-top: 1px solid var(--border);
+    background: var(--background);
+  }
+  .dock-button {
+    border: 0;
+    background: none;
+    min-width: 43px;
+    min-height: 46px;
+    padding: 3px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    color: var(--muted-foreground);
+    flex-shrink: 0;
+  }
+  .dock-button span {
+    font-size: 11px;
+    line-height: 1;
+  }
+  .dock-menu {
+    min-width: 37px;
+    color: var(--foreground);
+  }
+  .dock-analysis {
+    min-width: 45px;
+  }
+  .dock-analysis.active {
+    color: var(--emphasis);
+    background: var(--accent);
+    border-radius: 9px;
+  }
+  .dock-chat {
+    flex: 1 1 0;
+    min-width: 0;
+    border-radius: 18px;
+    border: 1px solid var(--border);
+    background: var(--field);
+    display: flex;
+    align-items: center;
+    height: 38px;
+    overflow: hidden;
+  }
+  .dock-chat input {
+    width: 100%;
+    min-width: 0;
+    border: 0;
+    outline: 0;
+    padding: 8px 10px;
+    background: none;
+    color: var(--foreground);
+    font-size: 16px;
+    line-height: 20px;
+  }
+  .dock-chat input::placeholder {
+    font-size: 13px;
+    color: var(--muted-foreground);
+  }
+  .dock-chat:focus-within {
+    border-color: var(--ring);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 15%, transparent);
+  }
+  .dock-chat button {
+    display: grid;
+    place-items: center;
+    border: 0;
+    background: none;
+    color: var(--emphasis);
+    min-width: 36px;
+    height: 36px;
+    padding: 6px;
+  }
+  .mobile-offer-bar {
+    display: flex;
+    flex: 0 0 auto;
+    align-items: center;
+    gap: 6px;
+    min-height: 36px;
+    padding: 3px 7px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--accent);
+    font-size: 12px;
+  }
+  .mobile-offer-bar > span {
+    flex: 1;
+  }
+  .mobile-offer-bar button {
+    background: var(--card);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    min-height: 30px;
+    padding: 4px 9px;
+    font-size: 12px;
+  }
+  .mobile-offer-bar .accept-offer {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff9ef;
+  }
+}
+@media (max-width: 359px) {
+  .in-room .mobile-room-title small {
+    display: none;
+  }
+  .in-room .player-bar .inline-link {
+    font-size: 11px;
+    margin-left: 2px;
+  }
+  .in-room .mini-piece {
+    width: 17px;
+    height: 17px;
+    font-size: 14px;
+  }
+  .in-room .captured-pieces {
+    gap: 4px;
+  }
+  .dock-button {
+    min-width: 36px;
+  }
+  .dock-menu {
+    min-width: 33px;
+  }
+  .dock-chat input {
+    padding-inline: 8px;
+  }
+}
+@media (max-height: 500px) and (pointer: coarse) and (min-width: 661px) {
+  .in-room .play-column {
+    display: grid;
+    grid-template-columns: minmax(130px, 1fr) minmax(0, 2fr) minmax(130px, 1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    gap: 6px;
+  }
+  .in-room .board-stage {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    height: 100%;
+  }
+  .in-room .player-seat:first-child {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: end;
+  }
+  .in-room .player-seat {
+    grid-column: 1;
+    grid-row: 1;
+    align-self: center;
+  }
+  .in-room .board-stage + .player-seat {
+    grid-column: 3;
+    grid-row: 1;
+  }
+  .in-room .endgame-panel,
+  .in-room .analysis-controls {
+    grid-column: 1 / 4;
+    grid-row: 2;
+    z-index: 4;
+  }
+  .in-room.game-ended .board-stage,
+  .in-room.is-analysis .board-stage,
+  .in-room.is-review .board-stage {
+    grid-row: 1;
+  }
+  .in-room .endgame-buttons {
+    max-width: 420px;
+    margin: auto;
+  }
+  .in-room .avatar-bubble {
+    max-width: 150px;
+    left: 0;
+    top: auto;
+    bottom: 38px;
+  }
+  .in-room .board-stage + .player-seat .avatar-bubble {
+    left: auto;
+    right: 0;
+    bottom: 38px;
+  }
+  .mobile-dock {
+    min-height: 50px;
+    padding-top: 1px;
+    padding-bottom: max(1px, env(safe-area-inset-bottom));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

@@ -4,7 +4,7 @@ export type Piece = { side: Side; kind: Kind; id: string };
 export type Board = (Piece | null)[];
 export const opposite = (s: Side): Side => s === 'red' ? 'black' : 'red';
 export const sideLabel = (s: Side) => s === 'red' ? '红方' : '黑方';
-export const label = (p: Piece) => ({red:{k:'帅',a:'仕',e:'相',h:'马',r:'车',c:'炮',p:'兵'},black:{k:'将',a:'士',e:'象',h:'马',r:'车',c:'炮',p:'卒'}})[p.side][p.kind];
+export const label = (p: Piece) => ({red:{k:'帅',a:'仕',e:'相',h:'马',r:'車',c:'炮',p:'兵'},black:{k:'将',a:'士',e:'象',h:'马',r:'車',c:'炮',p:'卒'}})[p.side][p.kind];
 export function initialBoard(): Board {
   const b: Board = Array(90).fill(null);
   const back: Kind[] = ['r','h','e','a','k','a','e','h','r'];

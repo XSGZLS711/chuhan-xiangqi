@@ -16,7 +16,8 @@
     "test:online": "node tests/online.test.mjs",
     "build:pages": "vite build --config vite.pages.config.ts",
     "test:pages": "esbuild tests/pages.test.ts --bundle --platform=node --format=esm --outfile=work/pages.test.mjs && node work/pages.test.mjs",
-    "test:ui": "esbuild tests/presentation.test.ts --bundle --platform=node --format=esm --outfile=work/presentation.test.mjs && node work/presentation.test.mjs"
+    "test:ui": "esbuild tests/presentation.test.ts --bundle --platform=node --format=esm --outfile=work/presentation.test.mjs && node work/presentation.test.mjs",
+    "test:mobile": "esbuild tests/mobile-game.test.ts --bundle --platform=node --format=esm --outfile=work/mobile-game.test.mjs && node work/mobile-game.test.mjs"
   },
   "dependencies": {
     "react": "19.2.6",
