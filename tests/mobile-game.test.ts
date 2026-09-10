@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { nextGameViewport } from '../lib/game-viewport';
 import {
   canPlayLive,
   rematchControl,
@@ -179,5 +180,41 @@ test('旧棋局的车字棋谱兼容显示，不改原有记录', () => {
   assert.equal(displayNotation(text), '前車进一');
   assert.equal(text, '前车进一');
   assert.equal(displayNotation('炮二平五'), '炮二平五');
+});
+test('打字和键盘平移时棋盘保持原来的高度与位置', () => {
+  let layout = nextGameViewport(
+    undefined,
+    { width: 390, height: 780, top: 0 },
+    false,
+  );
+  layout = nextGameViewport(layout, { width: 390, height: 760, top: 0 }, true);
+  layout = nextGameViewport(layout, { width: 390, height: 440, top: 40 }, true);
+  assert.equal(layout.height, 780);
+  assert.equal(layout.top, 0);
+});
+test('关闭聊天后等待键盘收起，随后恢复地址栏尺寸适配', () => {
+  let layout = nextGameViewport(
+    undefined,
+    { width: 390, height: 780, top: 0 },
+    false,
+  );
+  layout = nextGameViewport(layout, { width: 390, height: 440, top: 0 }, true);
+  layout = nextGameViewport(layout, { width: 390, height: 540, top: 0 }, false);
+  assert.equal(layout.height, 780);
+  layout = nextGameViewport(layout, { width: 390, height: 780, top: 0 }, false);
+  assert.equal(layout.locked, false);
+  layout = nextGameViewport(layout, { width: 390, height: 720, top: 0 }, false);
+  assert.equal(layout.height, 720);
+});
+test('横竖屏切换重新适配棋盘，不沿用旧屏幕的高度', () => {
+  let layout = nextGameViewport(
+    undefined,
+    { width: 390, height: 780, top: 0 },
+    false,
+  );
+  layout = nextGameViewport(layout, { width: 390, height: 440, top: 0 }, true);
+  layout = nextGameViewport(layout, { width: 844, height: 350, top: 0 }, false);
+  assert.equal(layout.height, 350);
+  assert.equal(layout.locked, false);
 });
 console.log(`\n${checks} mobile game checks passed`);

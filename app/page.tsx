@@ -42,7 +42,6 @@ import {
   GitBranch,
   Handshake,
   Flag,
-  LogOut,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -120,7 +119,7 @@ export default function Home() {
     [analysis, setAnalysis] = useState<Analysis | null>(null),
     [chat, setChat] = useState(''),
     [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null),
-    [sheet, setSheet] = useState<'menu' | 'record' | null>(null);
+    [sheet, setSheet] = useState<'record' | null>(null);
   const viewportStyle = useGameViewport(!!room);
   const roomRef = useRef<PublicRoom | null>(null),
     nameRef = useRef(name),
@@ -455,10 +454,6 @@ export default function Home() {
     try {
       localStorage.setItem('chuhan-sound', sound ? 'off' : 'on');
     } catch {}
-  }
-  function chooseMenu(callback: () => void) {
-    setSheet(null);
-    callback();
   }
   function startAnalysis() {
     setSheet(null);
@@ -1149,7 +1144,13 @@ export default function Home() {
             participant={participant}
             busy={busy}
             analysis={!!analysis}
-            onMenu={() => setSheet('menu')}
+            canUndo={canAct && (!!historyMoves.length || !!room.result)}
+            canDraw={canAct && !room.result && !room.offer}
+            canResign={canAct && !room.result}
+            viewportStyle={viewportStyle}
+            onUndo={() => void undoAndContinue()}
+            onDraw={() => void action('offer-draw')}
+            onResign={() => setConfirm('resign')}
             onRecord={() => setSheet('record')}
             onAnalysis={analysis ? exitAnalysis : startAnalysis}
             onSend={sendChat}
@@ -1161,92 +1162,6 @@ export default function Home() {
             description={`第 ${room.round} 局 · ${historyMoves.length} 步，点击棋谱可回看局面`}
           >
             {scorePanel()}
-          </GameSheet>
-          <GameSheet
-            open={sheet === 'menu'}
-            onOpenChange={(open) => setSheet(open ? 'menu' : null)}
-            title="对局操作"
-            description="双方可无限悔棋，无需对方同意"
-            variant="menu"
-          >
-            <div className="game-menu-grid">
-              <button
-                disabled={!canAct || (!historyMoves.length && !room.result)}
-                onClick={() => chooseMenu(() => void undoAndContinue())}
-              >
-                <Undo2 />
-                <span>悔棋</span>
-              </button>
-              <button
-                disabled={!canAct || !!room.result || !!room.offer}
-                onClick={() => chooseMenu(() => void action('offer-draw'))}
-              >
-                <Handshake />
-                <span>提和</span>
-              </button>
-              <button
-                disabled={!canAct || !!room.result}
-                onClick={() => chooseMenu(() => setConfirm('resign'))}
-              >
-                <Flag />
-                <span>认输</span>
-              </button>
-              <button
-                disabled={rematchButton?.disabled}
-                onClick={() => chooseMenu(rematch)}
-              >
-                <RefreshCw />
-                <span>{rematchButton?.label ?? '再来一局'}</span>
-              </button>
-              <button
-                onClick={() =>
-                  chooseMenu(() => {
-                    setFlipped(!flipped);
-                    setSelected(null);
-                  })
-                }
-              >
-                <RotateCw />
-                <span>翻转棋盘</span>
-              </button>
-              <button onClick={toggleSound}>
-                {sound ? <Volume2 /> : <VolumeX />}
-                <span>{sound ? '关闭音效' : '开启音效'}</span>
-              </button>
-              <button onClick={() => chooseMenu(copyInvite)}>
-                <Users />
-                <span>邀请好友</span>
-              </button>
-              <button onClick={() => chooseMenu(() => setModal('rules'))}>
-                <BookOpen />
-                <span>对局规则</span>
-              </button>
-              <a href="./">
-                <LogOut />
-                <span>离开棋室</span>
-                <small>保留本局</small>
-              </a>
-            </div>
-            {room.offer?.side === room.you && (
-              <button
-                className="secondary-button cancel-invite"
-                disabled={busy}
-                onClick={() => chooseMenu(() => void action('cancel-offer'))}
-              >
-                撤回{room.offer.kind === 'draw' ? '提和' : '重开邀请'}
-              </button>
-            )}{' '}
-            {room.offer && room.offer.side !== room.you && participant && (
-              <button
-                className="secondary-button cancel-invite"
-                disabled={busy}
-                onClick={() =>
-                  chooseMenu(() => void action('respond', { accept: false }))
-                }
-              >
-                婉拒{room.offer.kind === 'draw' ? '提和' : '再战邀请'}
-              </button>
-            )}
           </GameSheet>
         </>
       )}

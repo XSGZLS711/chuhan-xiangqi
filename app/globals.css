@@ -2098,48 +2098,99 @@ html {
   min-height: 40px;
   min-width: 40px;
 }
-.game-menu-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+.game-menu-popover {
+  width: 156px;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--card) 94%, transparent);
+  backdrop-filter: blur(16px);
+  box-shadow: 0 8px 30px #0002;
+}
+.game-menu-popover [data-slot='dropdown-menu-item'] {
+  min-height: 46px;
+  padding: 10px 12px;
+  gap: 12px;
+  border-radius: 9px;
+  font-size: 14px;
+}
+.game-menu-popover
+  [data-slot='dropdown-menu-item']
+  + [data-slot='dropdown-menu-item'] {
+  border-top: 1px solid var(--border);
+}
+.game-menu-popover [data-highlighted] {
+  background: var(--accent);
+}
+.game-menu-popover svg {
+  color: var(--muted-foreground);
+}
+.game-sheet.chat-sheet {
+  bottom: var(--game-keyboard-inset, 0px);
+  max-height: calc(var(--game-visible-height, 100dvh) - 12px);
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+  background: color-mix(in srgb, var(--card) 82%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  box-shadow: 0 -8px 36px #0002;
   gap: 8px;
-  min-height: 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 3px 0;
 }
-.game-menu-grid button,
-.game-menu-grid a {
+.chat-sheet .game-sheet-heading {
+  align-items: center;
+}
+.chat-composer {
   display: flex;
   flex-direction: column;
+  gap: 10px;
+}
+.chat-composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 76px;
+  max-height: 112px;
+  resize: none;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: color-mix(in srgb, var(--field) 65%, transparent);
+  color: var(--foreground);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.chat-composer textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--ring) 25%, transparent);
+  outline-offset: 1px;
+  border-color: var(--ring);
+}
+.chat-composer-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+.chat-composer-actions > span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.chat-composer-actions button {
+  display: flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 76px;
-  padding: 9px 4px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  color: var(--foreground);
-  background: var(--card);
+  min-height: 42px;
+  padding: 8px 18px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-size: 14px;
 }
-.game-menu-grid svg {
-  width: 22px;
-  height: 22px;
-  color: var(--muted-foreground);
-}
-.game-menu-grid small {
-  font-size: 11px;
-  color: var(--muted-foreground);
-  margin-top: -5px;
-}
-.game-menu-grid a {
-  color: var(--emphasis);
-}
-.cancel-invite {
-  flex-shrink: 0;
-}
 
-/* A mobile game occupies exactly the visible viewport, including keyboard changes. */
+/* The board stays full size while the keyboard and chat overlay cover it. */
 @media (max-width: 660px), (max-height: 500px) and (pointer: coarse) {
   html:has(.app-shell.in-room),
   body:has(.app-shell.in-room) {
@@ -2430,34 +2481,25 @@ html {
     height: 38px;
     overflow: hidden;
   }
-  .dock-chat input {
-    width: 100%;
-    min-width: 0;
-    border: 0;
-    outline: 0;
+  .dock-chat {
+    text-align: left;
     padding: 8px 10px;
-    background: none;
-    color: var(--foreground);
-    font-size: 16px;
-    line-height: 20px;
-  }
-  .dock-chat input::placeholder {
-    font-size: 13px;
     color: var(--muted-foreground);
   }
-  .dock-chat:focus-within {
-    border-color: var(--ring);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--ring) 15%, transparent);
+  .dock-chat > span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    font-size: 14px;
   }
-  .dock-chat button {
-    display: grid;
-    place-items: center;
-    border: 0;
-    background: none;
-    color: var(--emphasis);
-    min-width: 36px;
-    height: 36px;
-    padding: 6px;
+  .dock-chat:focus-visible,
+  .dock-button:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  .dock-menu[data-popup-open] {
+    background: var(--accent);
+    border-radius: 9px;
   }
   .mobile-offer-bar {
     display: flex;
@@ -2511,7 +2553,7 @@ html {
   .dock-menu {
     min-width: 33px;
   }
-  .dock-chat input {
+  .dock-chat {
     padding-inline: 8px;
   }
 }

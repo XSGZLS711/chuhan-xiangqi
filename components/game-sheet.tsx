@@ -14,21 +14,19 @@ export default function GameSheet({
   title,
   description,
   children,
-  variant = 'record',
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description: string;
   children: ReactNode;
-  variant?: 'record' | 'menu';
 }) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="bottom"
         showCloseButton={false}
-        className={`game-sheet ${variant}-sheet`}
+        className="game-sheet record-sheet"
       >
         <div className="sheet-grip" aria-hidden="true" />
         <div className="game-sheet-heading">
