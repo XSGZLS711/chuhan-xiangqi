@@ -41,7 +41,6 @@ import {
   Undo2,
   GitBranch,
   Handshake,
-  Flag,
   BookOpen,
   ChevronLeft,
   ChevronRight,
@@ -768,7 +767,7 @@ export default function Home() {
           </button>
         </div>
       )}
-      {room?.offer && (!ended || room.offer.kind !== 'rematch') && (
+      {room?.offer && (
         <div className="mobile-offer-bar" role="status">
           <span>
             {room.offer.side === room.you
