@@ -14,6 +14,7 @@
     "db:generate": "drizzle-kit generate",
     "test": "esbuild tests/rules.test.ts --bundle --platform=node --format=esm --outfile=work/rules.test.mjs && node work/rules.test.mjs",
     "test:online": "node tests/online.test.mjs",
+    "test:ai": "esbuild tests/ai.test.ts tests/ai-engine.test.ts --bundle --platform=node --format=esm --outdir=work/ai-tests --out-extension:.js=.mjs && node --test work/ai-tests/ai.test.mjs && node work/ai-tests/ai-engine.test.mjs",
     "build:pages": "vite build --config vite.pages.config.ts",
     "test:pages": "esbuild tests/pages.test.ts --bundle --platform=node --format=esm --outfile=work/pages.test.mjs && node work/pages.test.mjs",
     "test:ui": "esbuild tests/presentation.test.ts --bundle --platform=node --format=esm --outfile=work/presentation.test.mjs && node work/presentation.test.mjs",

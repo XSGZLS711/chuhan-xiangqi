@@ -37,6 +37,7 @@ import {
 import type { PublicRoom } from '@/lib/game';
 import {
   Users,
+  Bot,
   ArrowRight,
   Undo2,
   GitBranch,
@@ -1032,6 +1033,9 @@ export default function Home() {
               >
                 <Users size={18} /> 创建好友对局 <ArrowRight size={18} />
               </button>
+              <a className="secondary-button ai-entry" href="./ai/">
+                <Bot size={18} /> 人机对战与局势分析
+              </a>
               <div className="friendly-note">
                 无限悔棋 · 无需注册 · 随时推演
               </div>

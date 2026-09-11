@@ -1,0 +1,329 @@
+.ai-room .workspace {
+  align-items: stretch;
+}
+.ai-room .play-column {
+  min-width: 0;
+}
+.ai-room .room-column {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.ai-mobile-nav,
+.ai-mobile-evaluation,
+.ai-dock {
+  display: none;
+}
+.ai-status-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 2px;
+  color: var(--foreground);
+  font-size: 14px;
+}
+.ai-status-line > span:last-child {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.ai-analysis-panel {
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--card);
+  padding: 20px;
+}
+.ai-analysis-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+.ai-analysis-title svg {
+  color: var(--emphasis);
+}
+.ai-toggle {
+  margin-left: auto;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 6px 12px;
+  background: var(--secondary);
+  font-size: 13px;
+  min-height: 36px;
+}
+.ai-toggle[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--emphasis);
+}
+.ai-score {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 18px;
+}
+.ai-score > span {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.ai-score-track {
+  height: 7px;
+  background: var(--foreground);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 16px;
+}
+.ai-score-track > span {
+  height: 100%;
+  display: block;
+  background: var(--primary);
+  transition: width 200ms;
+}
+.ai-score-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-top: 6px;
+}
+.ai-best-move {
+  margin: 22px 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+}
+.ai-variation {
+  padding: 0;
+  margin: 0 0 16px;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+}
+.ai-variation li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+}
+.ai-variation li > span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.ai-analysis-panel > small,
+.ai-muted {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--muted-foreground);
+}
+.ai-record-panel .game-record {
+  max-height: 430px;
+  overflow-y: auto;
+}
+.ai-record-panel .panel-heading {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.ai-engine-credit {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+.ai-engine-credit a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ai-desktop-actions {
+  display: flex;
+  gap: 8px;
+  margin: 12px 0;
+}
+.ai-desktop-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: 1;
+  min-height: 46px;
+  padding: 9px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+}
+.ai-setup {
+  max-width: 420px;
+  gap: 20px;
+}
+.ai-setup fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.ai-setup legend {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  margin-bottom: 10px;
+}
+.ai-choice-row {
+  display: flex;
+  gap: 9px;
+}
+.ai-choice-row button {
+  flex: 1;
+  min-height: 48px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 7px;
+  background: var(--card);
+  font-size: 14px;
+}
+.ai-choice-row button.selected {
+  border-color: var(--primary);
+  background: var(--accent);
+  color: var(--emphasis);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+.ai-setup-note {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.7;
+  margin: 0;
+}
+.ai-cancel {
+  display: block;
+  text-align: center;
+  background: none;
+  border: 0;
+  font-size: 14px;
+  color: var(--muted-foreground);
+  min-height: 36px;
+}
+.ai-error {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--accent);
+  font-size: 13px;
+}
+.ai-error span {
+  flex: 1;
+}
+.ai-error button {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  padding: 7px 12px;
+  flex-shrink: 0;
+}
+.ai-setup-error {
+  color: var(--destructive);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.ai-room button:focus-visible,
+.ai-room a:focus-visible,
+.ai-setup button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 3px;
+}
+@media (max-width: 660px), (max-height: 500px) and (pointer: coarse) {
+  .ai-room.in-room .ai-mobile-nav {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex: 0 0 40px;
+    min-height: 40px;
+  }
+  .ai-mobile-nav a,
+  .ai-mobile-nav button {
+    display: grid;
+    place-items: center;
+    min-height: 36px;
+    min-width: 36px;
+    border: 0;
+    background: none;
+  }
+  .ai-mobile-nav strong {
+    font-size: 14px;
+  }
+  .ai-mobile-nav > span {
+    color: var(--muted-foreground);
+    font-size: 12px;
+    flex: 1;
+  }
+  .ai-room.in-room .ai-status-line {
+    flex: 0 0 30px;
+    min-height: 30px;
+    padding: 2px 6px;
+    font-size: 13px;
+  }
+  .ai-room.in-room .ai-desktop-actions {
+    display: none;
+  }
+  .ai-room.in-room .room-column {
+    display: none;
+  }
+  .ai-room.in-room .ai-mobile-evaluation {
+    display: flex;
+    align-items: center;
+    flex: 0 0 42px;
+    min-height: 42px;
+    gap: 7px;
+    width: 100%;
+    padding: 6px 8px;
+    border: 0;
+    border-top: 1px solid var(--border);
+    background: var(--card);
+    text-align: left;
+    font-size: 12px;
+  }
+  .ai-mobile-evaluation > svg {
+    color: var(--emphasis);
+    flex-shrink: 0;
+  }
+  .ai-mobile-evaluation > strong {
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .ai-mobile-evaluation > span {
+    flex: 1;
+    color: var(--muted-foreground);
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    text-align: right;
+  }
+  .ai-room.in-room .ai-dock {
+    display: flex;
+  }
+  .ai-analysis-toggle {
+    justify-content: center;
+    gap: 5px;
+  }
+  .ai-analysis-toggle.active {
+    color: var(--emphasis);
+    background: var(--accent);
+  }
+  .ai-analysis-toggle > span {
+    font-size: 12px;
+  }
+  .ai-room.in-room .ai-error {
+    margin: 2px 0;
+    flex: 0 0 auto;
+  }
+  .game-sheet .ai-analysis-panel {
+    padding: 12px 0;
+    border: 0;
+    background: none;
+  }
+  .game-sheet .ai-variation {
+    gap: 9px 14px;
+  }
+  .ai-room.in-room .analysis-controls > span {
+    flex: 1;
+  }
+}

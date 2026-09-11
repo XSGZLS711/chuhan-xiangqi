@@ -11,8 +11,22 @@ export default defineConfig({
   plugins: [react()],
   css: { postcss: { plugins: [tailwindcss()] } },
   resolve: { alias: { '@': projectRoot } },
-  define: { __CHUHAN_API_ORIGIN__: JSON.stringify('https://chuhan-friends-xiangqi.zhanglushan1.chatgpt.site') },
+  define: {
+    __CHUHAN_API_ORIGIN__: JSON.stringify(
+      'https://chuhan-friends-xiangqi.zhanglushan1.chatgpt.site',
+    ),
+  },
   build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(
+          new URL('./pages-client/index.html', import.meta.url),
+        ),
+        ai: fileURLToPath(
+          new URL('./pages-client/ai/index.html', import.meta.url),
+        ),
+      },
+    },
     outDir: fileURLToPath(new URL('./dist-pages', import.meta.url)),
     emptyOutDir: true,
   },
