@@ -14,6 +14,7 @@ import {
   Settings2,
   Sparkles,
   Undo2,
+  X,
 } from 'lucide-react';
 import ChessBoard from './chess-board';
 import CapturedTray from './captured-tray';
@@ -226,6 +227,10 @@ export default function AiGame() {
     setEngineState('loading');
     setError('');
     setEngineAttempt((n) => n + 1);
+  }
+  function closeSetup() {
+    if (started) setSetup(false);
+    else window.location.assign('../');
   }
   function start() {
     setMatch((current) =>
@@ -685,10 +690,17 @@ export default function AiGame() {
       <Dialog
         open={setup}
         onOpenChange={(open) => {
-          if (started) setSetup(open);
+          if (!open) closeSetup();
         }}
       >
-        <DialogContent className="ai-setup">
+        <DialogContent className="ai-setup" showCloseButton={false}>
+          <button
+            className="ai-setup-close"
+            aria-label={started ? '关闭设置' : '退出人机设置'}
+            onClick={closeSetup}
+          >
+            <X size={20} />
+          </button>
           <DialogTitle>和 AI 下盘棋</DialogTitle>
           <DialogDescription>
             {started
@@ -747,14 +759,10 @@ export default function AiGame() {
               {engineState === 'ready' ? '开始对弈' : '正在准备棋手…'}
             </button>
           )}
-          {started ? (
+          {started && (
             <button className="ai-cancel" onClick={() => setSetup(false)}>
               继续当前对局
             </button>
-          ) : (
-            <a className="ai-cancel" href="../">
-              返回棋社
-            </a>
           )}
         </DialogContent>
       </Dialog>

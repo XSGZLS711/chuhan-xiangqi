@@ -1,4 +1,5 @@
 'use client';
+import './lobby.css';
 import { useEffect, useRef, useState } from 'react';
 import { gameFetch, invitationUrl } from '@/lib/client-api';
 import ChessBoard from '@/components/chess-board';
@@ -7,6 +8,7 @@ import GameActions from '@/components/game-actions';
 import GameRecord from '@/components/game-record';
 import GameSheet from '@/components/game-sheet';
 import MobileDock from '@/components/mobile-dock';
+import GameLobby from '@/components/game-lobby';
 import {
   canPlayLive,
   rematchControl,
@@ -208,6 +210,7 @@ export default function Home() {
   }
   useEffect(() => {
     alive.current = true;
+    setRoomId(new URLSearchParams(location.search).get('room') || '');
     try {
       setName(localStorage.getItem('chuhan-name') || '棋友');
       setSound(localStorage.getItem('chuhan-sound') !== 'off');
@@ -225,7 +228,6 @@ export default function Home() {
         setConnection('offline');
         setMessage('暂时连接不上棋室，点击右上角重新连接。');
       }
-      setRoomId(new URLSearchParams(location.search).get('room') || '');
     };
     void initialize();
     const timer = setInterval(() => setTick(Date.now()), 500);
@@ -332,6 +334,7 @@ export default function Home() {
       setSelected(null);
       setMessage('');
       if (kind === 'create') {
+        setReady(true);
         setRoomId(data.id);
         history.replaceState(null, '', '?room=' + data.id);
         setModal('invite');
@@ -694,9 +697,10 @@ export default function Home() {
   }
   const rematchButton = room ? rematchControl(room, busy) : null;
   const ended = !!room?.result && !analysis && review === null;
+  const lobby = !room && !roomId && !analysis;
   return (
     <main
-      className={`app-shell ${room ? 'in-room' : ''} ${ended ? 'game-ended' : ''} ${analysis ? 'is-analysis' : ''} ${review !== null && !analysis ? 'is-review' : ''}`}
+      className={`app-shell ${lobby ? 'is-lobby' : ''} ${room ? 'in-room' : ''} ${ended ? 'game-ended' : ''} ${analysis ? 'is-analysis' : ''} ${review !== null && !analysis ? 'is-review' : ''}`}
       style={viewportStyle}
       onPointerDown={unlockSound}
       onKeyDownCapture={unlockSound}
@@ -808,337 +812,347 @@ export default function Home() {
           </button>
         </div>
       )}
-      <div className="workspace">
-        <section className="play-column">
-          <div className="table-heading">
-            <div>
-              <span className="eyebrow">
-                {room ? `好友对弈 / 第 ${room.round} 局` : '好友对弈'}
-              </span>
-              <h1>
-                {analysis
-                  ? '且行一着，细思一步。'
-                  : room?.result
-                    ? room.result.winner === 'draw'
-                      ? '握手言和。'
-                      : sideLabel(room.result.winner) + '胜。'
-                    : '一盘棋，叙一场。'}
-              </h1>
-            </div>
-            <span className={`status-pill ${analysis ? 'analysis-pill' : ''}`}>
-              {analysis
-                ? '独立推演'
-                : review !== null
-                  ? '棋谱复盘'
-                  : room?.result
-                    ? '对局结束'
-                    : room && !room.you
-                      ? '观战中'
-                      : room?.players.black
-                        ? check
-                          ? '将军！'
-                          : sideLabel(room.turn) + '走棋'
-                        : '自由棋局'}
-            </span>
-          </div>
-          {roomId && !room && (
-            <div className="room-loading" role="status">
-              {connection === 'offline'
-                ? '暂时无法打开棋室，请重新连接。'
-                : '正在打开好友棋室…'}
-            </div>
-          )}
-          {player(flipped ? 'red' : 'black')}
-          <div className="board-stage">
-            <ChessBoard
-              board={board}
-              selected={selected}
-              targets={targets}
-              last={last}
-              onSquare={square}
-              flipped={flipped}
-              checkSide={check}
-              effect={boardEffect}
-              animationContext={`${room?.id ?? 'local'}:${room?.round ?? 0}:${analysis ? 'analysis' : review !== null ? 'review' : 'live'}`}
-              animate={!!analysis || review === null}
-            />
-          </div>
-          {player(flipped ? 'black' : 'red')}
-          {analysis ? (
-            <div className="analysis-controls">
-              <span>
-                <GitBranch size={17} /> 推演 {analysis.texts.length} 步
-              </span>
-              <button
-                disabled={analysis.boards.length < 2}
-                onClick={() => {
-                  setBoardEffect(null);
-                  setAnalysis({
-                    ...analysis,
-                    boards: analysis.boards.slice(0, -1),
-                    turns: analysis.turns.slice(0, -1),
-                    texts: analysis.texts.slice(0, -1),
-                  });
-                  setSelected(null);
-                }}
-              >
-                <Undo2 size={17} />
-                退一步
-              </button>
-              <button
-                onClick={() => {
-                  setBoardEffect(null);
-                  setAnalysis({
-                    ...analysis,
-                    boards: [analysis.boards[0]],
-                    turns: [analysis.turns[0]],
-                    texts: [],
-                  });
-                  setSelected(null);
-                }}
-              >
-                重置
-              </button>
-              <button onClick={exitAnalysis}>
-                <ArrowLeft size={17} />
-                返回对局
-              </button>
-            </div>
-          ) : review !== null ? (
-            <div className="analysis-controls">
-              <span>复盘 · 第 {reviewIndex} 步</span>
-              <button
-                className="review-step"
-                aria-label="复盘上一步"
-                disabled={!reviewIndex}
-                onClick={() => navigate(reviewIndex - 1)}
-              >
-                <ChevronLeft size={17} />
-              </button>
-              <button
-                className="review-step"
-                aria-label="复盘下一步"
-                disabled={reviewIndex >= historyMoves.length}
-                onClick={() => navigate(reviewIndex + 1)}
-              >
-                <ChevronRight size={17} />
-              </button>
-              <button onClick={startAnalysis}>
-                <GitBranch size={17} />
-                从此处推演
-              </button>
-              <button
-                onClick={() => {
-                  setReview(null);
-                  setSelected(null);
-                }}
-              >
-                返回对局
-              </button>
-            </div>
-          ) : (
-            <GameActions
-              canUndo={canAct && (!!historyMoves.length || !!room?.result)}
-              canDraw={canAct && !room?.result && !room?.offer}
-              canResign={canAct && !room?.result}
-              canRematch={canAct && !room?.offer}
-              onUndo={() => void undoAndContinue()}
-              onAnalysis={startAnalysis}
-              onDraw={() => void action('offer-draw')}
-              onResign={() => setConfirm('resign')}
-              onRematch={() => setConfirm('rematch')}
-            />
-          )}
-          <div className="table-tools">
-            <span>
-              {analysis
-                ? !hasLegalMove(board, turn)
-                  ? `${sideLabel(opposite(turn))}胜 · 推演结束`
-                  : analysis.texts.at(-1) || '从当前局面开始'
-                : room?.note || '双方可自由悔棋，无需对方同意'}
-            </span>
-            <div>
-              <button
-                aria-label="翻转棋盘"
-                title="翻转棋盘"
-                onClick={() => {
-                  setFlipped(!flipped);
-                  setSelected(null);
-                }}
-              >
-                <RotateCw size={16} />
-              </button>
-              <button
-                aria-label={sound ? '关闭对局音效' : '开启对局音效'}
-                title={sound ? '关闭音效' : '开启音效'}
-                onClick={toggleSound}
-              >
-                {sound ? <Volume2 size={16} /> : <VolumeX size={16} />}
-              </button>
-            </div>
-          </div>
-          {room?.result && !analysis && review === null && (
-            <div className="endgame-panel">
-              <div className="endgame-caption">
-                <strong>
-                  {room.result.winner === 'draw'
-                    ? '和棋'
-                    : sideLabel(room.result.winner) + '获胜'}
-                </strong>
-                <span>{room.result.reason}</span>
+      {lobby ? (
+        <GameLobby
+          friendDisabled={busy}
+          onCreate={() => setModal('create')}
+          onExplore={startAnalysis}
+        />
+      ) : (
+        <div className="workspace">
+          <section className="play-column">
+            <div className="table-heading">
+              <div>
+                <span className="eyebrow">
+                  {room ? `好友对弈 / 第 ${room.round} 局` : '好友对弈'}
+                </span>
+                <h1>
+                  {analysis
+                    ? '且行一着，细思一步。'
+                    : room?.result
+                      ? room.result.winner === 'draw'
+                        ? '握手言和。'
+                        : sideLabel(room.result.winner) + '胜。'
+                      : '一盘棋，叙一场。'}
+                </h1>
               </div>
-              <div className="endgame-buttons">
+              <span
+                className={`status-pill ${analysis ? 'analysis-pill' : ''}`}
+              >
+                {analysis
+                  ? '独立推演'
+                  : review !== null
+                    ? '棋谱复盘'
+                    : room?.result
+                      ? '对局结束'
+                      : room && !room.you
+                        ? '观战中'
+                        : room?.players.black
+                          ? check
+                            ? '将军！'
+                            : sideLabel(room.turn) + '走棋'
+                          : '自由棋局'}
+              </span>
+            </div>
+            {roomId && !room && (
+              <div className="room-loading" role="status">
+                {connection === 'offline'
+                  ? '暂时无法打开棋室，请重新连接。'
+                  : '正在打开好友棋室…'}
+              </div>
+            )}
+            {player(flipped ? 'red' : 'black')}
+            <div className="board-stage">
+              <ChessBoard
+                board={board}
+                selected={selected}
+                targets={targets}
+                last={last}
+                onSquare={square}
+                flipped={flipped}
+                checkSide={check}
+                effect={boardEffect}
+                animationContext={`${room?.id ?? 'local'}:${room?.round ?? 0}:${analysis ? 'analysis' : review !== null ? 'review' : 'live'}`}
+                animate={!!analysis || review === null}
+              />
+            </div>
+            {player(flipped ? 'black' : 'red')}
+            {analysis ? (
+              <div className="analysis-controls">
+                <span>
+                  <GitBranch size={17} /> 推演 {analysis.texts.length} 步
+                </span>
                 <button
-                  className="primary-button"
-                  disabled={rematchButton?.disabled}
-                  onClick={rematch}
-                >
-                  {rematchButton?.label ?? '再来一局'}
-                </button>
-                <button
-                  className="secondary-button steam-button"
-                  disabled={!canAct}
-                  onClick={() => void undoAndContinue()}
-                >
-                  再蒸一下<small>悔棋继续</small>
-                </button>
-                <button
-                  className="secondary-button"
-                  disabled={!historyMoves.length}
+                  disabled={analysis.boards.length < 2}
                   onClick={() => {
-                    navigate(0);
-                    setSheet('record');
+                    setBoardEffect(null);
+                    setAnalysis({
+                      ...analysis,
+                      boards: analysis.boards.slice(0, -1),
+                      turns: analysis.turns.slice(0, -1),
+                      texts: analysis.texts.slice(0, -1),
+                    });
+                    setSelected(null);
                   }}
                 >
-                  复盘
+                  <Undo2 size={17} />
+                  退一步
+                </button>
+                <button
+                  onClick={() => {
+                    setBoardEffect(null);
+                    setAnalysis({
+                      ...analysis,
+                      boards: [analysis.boards[0]],
+                      turns: [analysis.turns[0]],
+                      texts: [],
+                    });
+                    setSelected(null);
+                  }}
+                >
+                  重置
+                </button>
+                <button onClick={exitAnalysis}>
+                  <ArrowLeft size={17} />
+                  返回对局
+                </button>
+              </div>
+            ) : review !== null ? (
+              <div className="analysis-controls">
+                <span>复盘 · 第 {reviewIndex} 步</span>
+                <button
+                  className="review-step"
+                  aria-label="复盘上一步"
+                  disabled={!reviewIndex}
+                  onClick={() => navigate(reviewIndex - 1)}
+                >
+                  <ChevronLeft size={17} />
+                </button>
+                <button
+                  className="review-step"
+                  aria-label="复盘下一步"
+                  disabled={reviewIndex >= historyMoves.length}
+                  onClick={() => navigate(reviewIndex + 1)}
+                >
+                  <ChevronRight size={17} />
+                </button>
+                <button onClick={startAnalysis}>
+                  <GitBranch size={17} />
+                  从此处推演
+                </button>
+                <button
+                  onClick={() => {
+                    setReview(null);
+                    setSelected(null);
+                  }}
+                >
+                  返回对局
+                </button>
+              </div>
+            ) : (
+              <GameActions
+                canUndo={canAct && (!!historyMoves.length || !!room?.result)}
+                canDraw={canAct && !room?.result && !room?.offer}
+                canResign={canAct && !room?.result}
+                canRematch={canAct && !room?.offer}
+                onUndo={() => void undoAndContinue()}
+                onAnalysis={startAnalysis}
+                onDraw={() => void action('offer-draw')}
+                onResign={() => setConfirm('resign')}
+                onRematch={() => setConfirm('rematch')}
+              />
+            )}
+            <div className="table-tools">
+              <span>
+                {analysis
+                  ? !hasLegalMove(board, turn)
+                    ? `${sideLabel(opposite(turn))}胜 · 推演结束`
+                    : analysis.texts.at(-1) || '从当前局面开始'
+                  : room?.note || '双方可自由悔棋，无需对方同意'}
+              </span>
+              <div>
+                <button
+                  aria-label="翻转棋盘"
+                  title="翻转棋盘"
+                  onClick={() => {
+                    setFlipped(!flipped);
+                    setSelected(null);
+                  }}
+                >
+                  <RotateCw size={16} />
+                </button>
+                <button
+                  aria-label={sound ? '关闭对局音效' : '开启对局音效'}
+                  title={sound ? '关闭音效' : '开启音效'}
+                  onClick={toggleSound}
+                >
+                  {sound ? <Volume2 size={16} /> : <VolumeX size={16} />}
                 </button>
               </div>
             </div>
-          )}
-        </section>
-        <aside className="room-column">
-          {!room ? (
-            <section className="panel invite-panel">
-              <span className="eyebrow">一席棋局，等你开场</span>
-              <h2>请好友来下盘棋</h2>
-              <p>
-                开好棋桌，分享链接。
-                <br />
-                朋友点开，就能和你对弈。
-              </p>
-              <button
-                className="primary-button"
-                disabled={!ready || busy || !!roomId}
-                onClick={() => setModal('create')}
-              >
-                <Users size={18} /> 创建好友对局 <ArrowRight size={18} />
-              </button>
-              <a className="secondary-button ai-entry" href="./ai/">
-                <Bot size={18} /> 人机对战与局势分析
-              </a>
-              <div className="friendly-note">
-                无限悔棋 · 无需注册 · 随时推演
-              </div>
-            </section>
-          ) : (
-            <section className="panel invite-panel">
-              <div className="room-card-label">
-                <span className="eyebrow">
-                  {room.players.black ? '好友棋室' : '棋桌已备好'}
-                </span>
-                <span className="room-code">
-                  {room.id.slice(0, 6).toUpperCase()}
-                </span>
-              </div>
-              <h2>
-                {!room.players.black
-                  ? '静候好友，入席对弈。'
-                  : room.you
-                    ? '棋逢好友，从容过招。'
-                    : '坐观楚汉，静听落子。'}
-              </h2>
-              <p>
-                {room.you
-                  ? `你执${room.you === 'red' ? '红' : '黑'} · ${room.clockMinutes ? '每方 ' + room.clockMinutes + ' 分钟' : '不限时对局'}`
-                  : '你正在观战，可独立推演与复盘'}
-                <br />
-                双方可无限自由悔棋。
-              </p>
-              <button className="primary-button" onClick={copyInvite}>
-                <Copy size={17} />
-                {room.players.black ? '复制棋室链接' : '复制邀请链接'}
-                <ArrowRight size={17} />
-              </button>
-              <div className="room-secondary">
-                <button onClick={() => setModal('invite')}>
-                  <LinkIcon size={14} /> 查看链接
-                </button>
-                {participant && (
+            {room?.result && !analysis && review === null && (
+              <div className="endgame-panel">
+                <div className="endgame-caption">
+                  <strong>
+                    {room.result.winner === 'draw'
+                      ? '和棋'
+                      : sideLabel(room.result.winner) + '获胜'}
+                  </strong>
+                  <span>{room.result.reason}</span>
+                </div>
+                <div className="endgame-buttons">
                   <button
-                    disabled={!room.players.black || busy || !!room.offer}
-                    onClick={() => setConfirm('rematch')}
+                    className="primary-button"
+                    disabled={rematchButton?.disabled}
+                    onClick={rematch}
                   >
-                    <RefreshCw size={14} /> 重新开局
+                    {rematchButton?.label ?? '再来一局'}
                   </button>
-                )}
+                  <button
+                    className="secondary-button steam-button"
+                    disabled={!canAct}
+                    onClick={() => void undoAndContinue()}
+                  >
+                    再蒸一下<small>悔棋继续</small>
+                  </button>
+                  <button
+                    className="secondary-button"
+                    disabled={!historyMoves.length}
+                    onClick={() => {
+                      navigate(0);
+                      setSheet('record');
+                    }}
+                  >
+                    复盘
+                  </button>
+                </div>
               </div>
-            </section>
-          )}
-          {room?.offer && (
-            <section className="panel offer-panel">
-              <Handshake size={24} />
-              <h3>
-                {room.offer.side === room.you
-                  ? '等待好友回应'
-                  : `${sideLabel(room.offer.side)}${room.offer.kind === 'draw' ? '提议和棋' : '邀请重新开局'}`}
-              </h3>
-              <p>
-                {room.offer.kind === 'draw'
-                  ? '握手言和，下次再战。'
-                  : '同意后交换先后手，开始新的一局。请先导出要保留的棋谱。'}
-              </p>
-              {room.you === room.offer.side ? (
+            )}
+          </section>
+          <aside className="room-column">
+            {!room ? (
+              <section className="panel invite-panel">
+                <span className="eyebrow">一席棋局，等你开场</span>
+                <h2>请好友来下盘棋</h2>
+                <p>
+                  开好棋桌，分享链接。
+                  <br />
+                  朋友点开，就能和你对弈。
+                </p>
                 <button
-                  className="secondary-button"
-                  disabled={busy}
-                  onClick={() => void action('cancel-offer')}
+                  className="primary-button"
+                  disabled={!ready || busy || !!roomId}
+                  onClick={() => setModal('create')}
                 >
-                  撤回邀请
+                  <Users size={18} /> 创建好友对局 <ArrowRight size={18} />
                 </button>
-              ) : participant ? (
-                <div className="button-pair">
+                <a className="secondary-button ai-entry" href="./ai/">
+                  <Bot size={18} /> 人机对战与局势分析
+                </a>
+                <div className="friendly-note">
+                  无限悔棋 · 无需注册 · 随时推演
+                </div>
+              </section>
+            ) : (
+              <section className="panel invite-panel">
+                <div className="room-card-label">
+                  <span className="eyebrow">
+                    {room.players.black ? '好友棋室' : '棋桌已备好'}
+                  </span>
+                  <span className="room-code">
+                    {room.id.slice(0, 6).toUpperCase()}
+                  </span>
+                </div>
+                <h2>
+                  {!room.players.black
+                    ? '静候好友，入席对弈。'
+                    : room.you
+                      ? '棋逢好友，从容过招。'
+                      : '坐观楚汉，静听落子。'}
+                </h2>
+                <p>
+                  {room.you
+                    ? `你执${room.you === 'red' ? '红' : '黑'} · ${room.clockMinutes ? '每方 ' + room.clockMinutes + ' 分钟' : '不限时对局'}`
+                    : '你正在观战，可独立推演与复盘'}
+                  <br />
+                  双方可无限自由悔棋。
+                </p>
+                <button className="primary-button" onClick={copyInvite}>
+                  <Copy size={17} />
+                  {room.players.black ? '复制棋室链接' : '复制邀请链接'}
+                  <ArrowRight size={17} />
+                </button>
+                <div className="room-secondary">
+                  <button onClick={() => setModal('invite')}>
+                    <LinkIcon size={14} /> 查看链接
+                  </button>
+                  {participant && (
+                    <button
+                      disabled={!room.players.black || busy || !!room.offer}
+                      onClick={() => setConfirm('rematch')}
+                    >
+                      <RefreshCw size={14} /> 重新开局
+                    </button>
+                  )}
+                </div>
+              </section>
+            )}
+            {room?.offer && (
+              <section className="panel offer-panel">
+                <Handshake size={24} />
+                <h3>
+                  {room.offer.side === room.you
+                    ? '等待好友回应'
+                    : `${sideLabel(room.offer.side)}${room.offer.kind === 'draw' ? '提议和棋' : '邀请重新开局'}`}
+                </h3>
+                <p>
+                  {room.offer.kind === 'draw'
+                    ? '握手言和，下次再战。'
+                    : '同意后交换先后手，开始新的一局。请先导出要保留的棋谱。'}
+                </p>
+                {room.you === room.offer.side ? (
                   <button
                     className="secondary-button"
                     disabled={busy}
-                    onClick={() => void action('respond', { accept: false })}
+                    onClick={() => void action('cancel-offer')}
                   >
-                    婉拒
+                    撤回邀请
                   </button>
-                  <button
-                    className="primary-button compact"
-                    disabled={busy}
-                    onClick={() => void action('respond', { accept: true })}
-                  >
-                    同意
-                  </button>
-                </div>
-              ) : null}
-            </section>
-          )}
-          {scorePanel()}
-          <div className="table-footnote">
-            棋逢好友，不急输赢。
-            <br />
-            推演互不影响，悔棋无需等待。
-          </div>
-          {room && (
-            <a className="back-home" href="./">
-              <ArrowLeft size={14} />
-              回到棋社 <small>保留当前棋局</small>
-            </a>
-          )}
-        </aside>
-      </div>
+                ) : participant ? (
+                  <div className="button-pair">
+                    <button
+                      className="secondary-button"
+                      disabled={busy}
+                      onClick={() => void action('respond', { accept: false })}
+                    >
+                      婉拒
+                    </button>
+                    <button
+                      className="primary-button compact"
+                      disabled={busy}
+                      onClick={() => void action('respond', { accept: true })}
+                    >
+                      同意
+                    </button>
+                  </div>
+                ) : null}
+              </section>
+            )}
+            {scorePanel()}
+            <div className="table-footnote">
+              棋逢好友，不急输赢。
+              <br />
+              推演互不影响，悔棋无需等待。
+            </div>
+            {room && (
+              <a className="back-home" href="./">
+                <ArrowLeft size={14} />
+                回到棋社 <small>保留当前棋局</small>
+              </a>
+            )}
+          </aside>
+        </div>
+      )}
       {room && (
         <>
           <MobileDock
@@ -1168,9 +1182,11 @@ export default function Home() {
           </GameSheet>
         </>
       )}
-      <footer>
-        楚河汉界之间，方寸自有天地。<span>好友约棋 · 中国象棋</span>
-      </footer>
+      {!lobby && (
+        <footer>
+          楚河汉界之间，方寸自有天地。<span>好友约棋 · 中国象棋</span>
+        </footer>
+      )}
       <Dialog
         open={modal !== null}
         onOpenChange={(open) => {
