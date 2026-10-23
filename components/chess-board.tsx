@@ -1,11 +1,32 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { Board, label, Side, type Piece } from '@/lib/xiangqi';
 import {
+  boardSignature,
   boardTransition,
   type BoardEffect as Effect,
 } from '@/lib/presentation';
 import BoardEffect from '@/components/board-effect';
+
+type Frame = {
+  sig: string;
+  board: Board;
+  context: string;
+  flipped: boolean;
+  /** The piece that just travelled, with its slide time in ms. */
+  move: { id: string; key: string; ms: number } | null;
+  /** Restored by an undo; fades back in once the mover has left its square. */
+  revived: string | null;
+  ghost: {
+    piece: Piece;
+    at: number;
+    key: string;
+    delay: number;
+    life: number;
+  } | null;
+};
+const SHARDS = [0, 1, 2, 3, 4, 5, 6, 7];
+const css = (vars: Record<string, string | number>) => vars as CSSProperties;
 
 export default function ChessBoard({
   board,
@@ -30,15 +51,21 @@ export default function ChessBoard({
   animationContext?: string;
   animate?: boolean;
 }) {
-  const [frame, setFrame] = useState<{
-    board: Board;
-    context: string;
-    flipped: boolean;
-    ghost: { piece: Piece; at: number; key: string } | null;
-  }>({ board, context: animationContext, flipped, ghost: null });
-  // Adjust only when the incoming board changes, before React paints it.
+  const signature = boardSignature(board);
+  const [frame, setFrame] = useState<Frame>({
+    sig: signature,
+    board,
+    context: animationContext,
+    flipped,
+    move: null,
+    revived: null,
+    ghost: null,
+  });
+  // Adjust only when the position really changes, before React paints it.
+  // Polling hands us a fresh array every time, so identity is not enough: an
+  // identical board must not cut a running capture animation short.
   if (
-    frame.board !== board ||
+    frame.sig !== signature ||
     frame.context !== animationContext ||
     frame.flipped !== flipped
   ) {
@@ -46,15 +73,34 @@ export default function ChessBoard({
       animate && frame.context === animationContext && frame.flipped === flipped
         ? boardTransition(frame.board, board)
         : null;
+    const distance = transition
+      ? Math.hypot(
+          (transition.to % 9) - (transition.from % 9),
+          Math.floor(transition.to / 9) - Math.floor(transition.from / 9),
+        )
+      : 0;
+    const ms = Math.round(Math.min(440, 190 + 48 * distance));
+    const delay = Math.round(ms * 0.78);
     setFrame({
+      sig: signature,
       board,
       context: animationContext,
       flipped,
+      move: transition
+        ? {
+            id: transition.piece.id,
+            key: `${transition.piece.id}:${transition.from}:${transition.to}`,
+            ms,
+          }
+        : null,
+      revived: transition?.revived?.id ?? null,
       ghost: transition?.captured
         ? {
             piece: transition.captured,
             at: transition.to,
             key: `${transition.piece.id}:${transition.from}:${transition.to}`,
+            delay,
+            life: delay + 620,
           }
         : null,
     });
@@ -67,7 +113,7 @@ export default function ChessBoard({
         setFrame((current) =>
           current.ghost === ghost ? { ...current, ghost: null } : current,
         ),
-      380,
+      ghost.life,
     );
     return () => clearTimeout(timer);
   }, [ghost]);
@@ -80,7 +126,7 @@ export default function ChessBoard({
     };
   };
   return (
-    <div className="board-frame">
+    <div className={`board-frame ${effect ? `fx-${effect.kind}` : ''}`}>
       <fieldset className="chess-board" aria-label="中国象棋棋盘">
         <svg viewBox="0 0 900 1000" aria-hidden="true" className="board-lines">
           <g fill="none" stroke="currentColor" strokeWidth="1.8">
@@ -138,7 +184,7 @@ export default function ChessBoard({
               key={n}
               onClick={() => onSquare(n)}
               style={position(n)}
-              className={`intersection ${selected === n ? 'selected' : ''} ${possible ? 'legal-target' : ''} ${last?.to === n || last?.from === n ? 'last-move' : ''}`}
+              className={`intersection ${selected === n ? 'selected' : ''} ${possible ? 'legal-target' : ''} ${last?.to === n ? 'last-to' : ''} ${last?.from === n ? 'last-from' : ''}`}
               aria-label={`${Math.floor(n / 9) + 1}行${(n % 9) + 1}列${p ? `${p.side === 'red' ? '红' : '黑'}${label(p)}` : '空位'}${possible ? '，可走' : ''}`}
               aria-pressed={selected === n}
             >
@@ -156,34 +202,58 @@ export default function ChessBoard({
           key={`${animationContext}:${flipped}`}
           aria-hidden="true"
         >
-          {board.map((p, n) =>
-            p ? (
+          {board.map((p, n) => {
+            if (!p) return null;
+            const moved = frame.move?.id === p.id,
+              revived = frame.revived === p.id;
+            return (
               <div
                 key={p.id}
                 data-piece-id={p.id}
-                style={position(n)}
-                className={`piece-position ${selected === n ? 'selected' : ''} ${last?.to === n ? 'latest-piece' : ''}`}
+                style={{
+                  ...position(n),
+                  ...(moved || revived
+                    ? css({
+                        '--slide': `${frame.move?.ms ?? 240}ms`,
+                        ...(moved
+                          ? { transitionDuration: `${frame.move?.ms}ms` }
+                          : {}),
+                      })
+                    : {}),
+                }}
+                className={`piece-position ${selected === n ? 'selected' : ''} ${last?.to === n ? 'latest-piece' : ''} ${moved ? 'moving' : ''} ${revived ? 'revived' : ''}`}
               >
                 <span
+                  key={moved ? frame.move?.key : 'idle'}
                   className={`piece ${p.side} ${p.kind === 'k' && checkSide === p.side ? 'checked' : ''}`}
                 >
                   <span>{label(p)}</span>
                 </span>
               </div>
-            ) : null,
-          )}
+            );
+          })}
         </div>
         {ghost && (
           <div
             key={ghost.key}
             className="capture-ghost piece-position"
-            style={position(ghost.at)}
+            style={{
+              ...position(ghost.at),
+              ...css({ '--impact-delay': `${ghost.delay}ms` }),
+            }}
             aria-hidden="true"
           >
             <span className={`piece ${ghost.piece.side}`}>
               <span>{label(ghost.piece)}</span>
             </span>
             <i className="capture-impact" />
+            {SHARDS.map((i) => (
+              <i
+                key={i}
+                className="capture-shard"
+                style={css({ '--a': `${i * 45 + 22}deg`, '--i': i })}
+              />
+            ))}
           </div>
         )}
         <BoardEffect effect={effect} />

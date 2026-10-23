@@ -41,18 +41,14 @@ export default function GameActions(props: Props) {
           onClick={props.onUndo}
         >
           <Undo2 size={20} />
-          <span>
-            悔棋<small>不限次数</small>
-          </span>
+          <span>悔棋</span>
         </button>
         <button
           className="board-action"
           onClick={() => choose(props.onAnalysis)}
         >
           <GitBranch size={20} />
-          <span>
-            推演<small>独立棋盘</small>
-          </span>
+          <span>推演</span>
         </button>
         <button
           className="board-action"
@@ -60,9 +56,7 @@ export default function GameActions(props: Props) {
           onClick={() => choose(props.onDraw)}
         >
           <Handshake size={20} />
-          <span>
-            提和<small>对方同意</small>
-          </span>
+          <span>提和</span>
         </button>
         <button
           className="board-action"
@@ -70,9 +64,7 @@ export default function GameActions(props: Props) {
           onClick={() => choose(props.onResign)}
         >
           <Flag size={20} />
-          <span>
-            认输<small>结束本局</small>
-          </span>
+          <span>认输</span>
         </button>
       </>
     );
@@ -91,7 +83,7 @@ export default function GameActions(props: Props) {
             <span>对局操作</span>
             <ChevronDown size={16} className={open ? 'expanded' : ''} />
           </CollapsibleTrigger>
-          <span className="undo-promise">双方自由悔棋</span>
+          <span className="actions-spacer" />
           <button
             className="rematch-shortcut"
             disabled={!props.canRematch}

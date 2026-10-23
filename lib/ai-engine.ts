@@ -1,23 +1,45 @@
 import { parseEngineInfo, type EngineInfo } from './ai-game';
 import type { Side } from './xiangqi';
 
+/** Directory of the AI room, with or without a trailing slash in the address. */
+export function aiBase(): URL {
+  const url = new URL(window.location.href);
+  url.search = '';
+  url.hash = '';
+  if (!url.pathname.endsWith('/')) url.pathname += '/';
+  return url;
+}
+
 export async function prepareAiPage(): Promise<void> {
-  if (!window.location.pathname.endsWith('/')) {
-    window.location.replace(
-      window.location.pathname +
-        '/' +
-        window.location.search +
-        window.location.hash,
-    );
-    await new Promise<void>(() => {});
-  }
+  // A server that sets the isolation headers itself needs neither the worker
+  // nor a trailing slash.
   if (window.crossOriginIsolated) return;
+  if (!window.location.pathname.endsWith('/')) {
+    // Static hosts only scope the isolation worker to ".../ai/". Retry once;
+    // a server that strips the slash again must not trap the tab in a loop.
+    const key = 'chuhan-ai-slash';
+    let retried = false;
+    try {
+      retried = sessionStorage.getItem(key) === window.location.pathname;
+      sessionStorage.setItem(key, window.location.pathname);
+    } catch {}
+    if (!retried) {
+      window.location.replace(
+        window.location.pathname +
+          '/' +
+          window.location.search +
+          window.location.hash,
+      );
+      await new Promise<void>(() => {});
+    }
+    throw new Error('无法在此地址启动本地棋手，请从首页的「人机对弈」进入。');
+  }
   if (!window.isSecureContext || !('serviceWorker' in navigator)) {
     throw new Error(
       '此浏览器无法启动本地棋手，请用新版 Safari、Chrome 或 Edge 打开。',
     );
   }
-  const script = new URL('./isolation-worker.js', window.location.href);
+  const script = new URL('isolation-worker.js', aiBase());
   const controlled =
     navigator.serviceWorker.controller?.scriptURL === script.href;
   await navigator.serviceWorker.register(script, {
@@ -72,7 +94,7 @@ export class BrowserEngine {
   private fatalError: Error | null = null;
   readonly ready: Promise<void>;
   constructor() {
-    this.worker = new Worker(new URL('./engine-host.js', window.location.href));
+    this.worker = new Worker(new URL('engine-host.js', aiBase()));
     this.ready = new Promise<void>((resolve, reject) => {
       const timer = setTimeout(
         () => this.fail(new Error('引擎加载超时，请重试。')),

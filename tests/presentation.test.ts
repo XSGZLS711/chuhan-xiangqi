@@ -1,11 +1,21 @@
 import assert from 'node:assert/strict';
 import {
   capturedBy,
+  boardSignature,
   boardTransition,
+  branchFeedback,
+  effectDuration,
   updateFeedback,
   resultEffect,
 } from '../lib/presentation';
-import { initialBoard, moveBoard, type Result } from '../lib/xiangqi';
+import {
+  initialBoard,
+  moveBoard,
+  type Board,
+  type Kind,
+  type Result,
+  type Side,
+} from '../lib/xiangqi';
 import { newRoom, applyAction, type Room, type PublicRoom } from '../lib/game';
 
 let checks = 0;
@@ -223,5 +233,71 @@ test('推演绝杀明确标记独立推演', () => {
   const f = resultEffect({ winner: 'black', reason: '将死' }, 'branch', true);
   assert(f.analysis);
   assert(f.detail.startsWith('推演 · '));
+});
+test('轮询得到的相同棋盘签名一致，走子后签名改变', () => {
+  assert.equal(
+    boardSignature(initial),
+    boardSignature(structuredClone(initial)),
+  );
+  assert.notEqual(
+    boardSignature(initial),
+    boardSignature(moveBoard(initial, 54, 45)),
+  );
+});
+test('悔棋吃子时复活的棋子出现在被吃的位置', () => {
+  const captured = moveBoard(initial, 64, 1);
+  const t = boardTransition(captured, initial);
+  assert(t);
+  assert.equal(t.revived?.id, initial[1]!.id);
+  assert.equal(t.from, 1);
+  assert.equal(t.to, 64);
+  assert.equal(boardTransition(initial, captured)?.revived, null);
+});
+test('同时出现多枚新棋子不虚构复活动画', () => {
+  const stripped = initial.slice();
+  stripped[1] = null;
+  stripped[7] = null;
+  assert.equal(boardTransition(stripped, initial), null);
+});
+const lone = (pieces: [number, Side, Kind][]): Board => {
+  const b: Board = Array(90).fill(null);
+  pieces.forEach(
+    ([n, side, kind]) => (b[n] = { side, kind, id: `${side}${kind}${n}` }),
+  );
+  return b;
+};
+test('推演吃子与普通走子分别使用对应音效', () => {
+  assert.deepEqual(branchFeedback(initial, 64, 1, 'red', 'a').sounds, [
+    'capture',
+  ]);
+  assert.deepEqual(branchFeedback(initial, 54, 45, 'red', 'a').sounds, [
+    'move',
+  ]);
+  assert.equal(branchFeedback(initial, 54, 45, 'red', 'a').effect, null);
+});
+test('推演将军标明独立推演，绝杀触发终局音', () => {
+  const check = lone([
+    [3, 'black', 'k'],
+    [86, 'red', 'k'],
+    [45, 'red', 'r'],
+  ]);
+  const f = branchFeedback(check, 45, 48, 'red', 'check');
+  assert.deepEqual(f.sounds, ['move', 'check']);
+  assert.equal(f.effect?.kind, 'check');
+  assert(f.effect?.analysis);
+  const mate = lone([
+    [3, 'black', 'k'],
+    [86, 'red', 'k'],
+    [8, 'red', 'r'],
+    [45, 'red', 'r'],
+  ]);
+  const m = branchFeedback(mate, 45, 9, 'red', 'mate');
+  assert.deepEqual(m.sounds, ['move', 'mate']);
+  assert.equal(m.effect?.title, '绝杀');
+  assert.equal(m.effect?.side, 'red');
+});
+test('将军提示比终局提示短', () => {
+  assert(effectDuration('check') < effectDuration('mate'));
+  assert.equal(effectDuration('mate'), effectDuration('result'));
 });
 console.log(`\n${checks} presentation checks passed`);

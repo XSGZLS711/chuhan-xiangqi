@@ -14,6 +14,8 @@ import {
   Settings2,
   Sparkles,
   Undo2,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react';
 import ChessBoard from './chess-board';
@@ -46,7 +48,16 @@ import {
   type AiLevel,
   type EngineInfo,
 } from '@/lib/ai-game';
-import { BrowserEngine, prepareAiPage } from '@/lib/ai-engine';
+import { BrowserEngine, aiBase, prepareAiPage } from '@/lib/ai-engine';
+import { GameAudio } from '@/lib/game-audio';
+import {
+  branchFeedback,
+  effectDuration,
+  updateFeedback,
+  type BoardEffect,
+  type FeedbackRoom,
+  type SoundKind,
+} from '@/lib/presentation';
 import {
   hasLegalMove,
   inCheck,
@@ -83,7 +94,14 @@ export default function AiGame() {
   const [sheet, setSheet] = useState<'record' | 'analysis' | null>(null);
   const [confirmResign, setConfirmResign] = useState(false);
   const [visible, setVisible] = useState(true);
+  const [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null);
+  const [sound, setSound] = useState(true);
+  const [assetBase, setAssetBase] = useState('./');
   const engineRef = useRef<BrowserEngine | null>(null);
+  const audioRef = useRef<GameAudio | null>(null);
+  const soundRef = useRef(true);
+  const feedbackRef = useRef<FeedbackRoom | null>(null);
+  const viewRef = useRef({ live: true, branch: false });
   const viewport = useGameViewport(started);
   const { room } = match;
   const index =
@@ -121,6 +139,63 @@ export default function AiGame() {
     room.history.some((m) => m.side === match.human) || !!room.result;
   const ended = live && !!room.result;
 
+  function unlockSound() {
+    if (!soundRef.current) return;
+    audioRef.current ??= new GameAudio();
+    audioRef.current.unlock();
+  }
+  function playSound(kind: SoundKind, delay = 0) {
+    if (soundRef.current) audioRef.current?.play(kind, delay);
+  }
+  function toggleSound() {
+    const next = !sound;
+    setSound(next);
+    soundRef.current = next;
+    if (next) unlockSound();
+    else audioRef.current?.silence();
+    try {
+      localStorage.setItem('chuhan-sound', next ? 'on' : 'off');
+    } catch {}
+  }
+
+  useEffect(() => {
+    viewRef.current = { live: review === null && !branch, branch: !!branch };
+  }, [review, branch]);
+  useEffect(() => () => audioRef.current?.close(), []);
+  useEffect(() => {
+    if (!boardEffect) return;
+    const timer = setTimeout(
+      () => setBoardEffect(null),
+      effectDuration(boardEffect.kind),
+    );
+    return () => clearTimeout(timer);
+  }, [boardEffect]);
+  // Both sides' moves, undo and results share the friend room's sounds and overlays.
+  useEffect(() => {
+    const { room: next } = match;
+    const current: FeedbackRoom = {
+      id: next.id,
+      round: next.round,
+      version: match.revision,
+      history: next.history,
+      result: next.result,
+      turn: next.turn,
+    };
+    const previous = feedbackRef.current;
+    feedbackRef.current = current;
+    if (!previous) return;
+    const feedback = updateFeedback(previous, current);
+    feedback.sounds.forEach((kind, order) =>
+      playSound(
+        kind,
+        order ? 0.36 : kind === 'move' || kind === 'capture' ? 0.18 : 0,
+      ),
+    );
+    if (feedback.reset) setBoardEffect(null);
+    if (feedback.effect && viewRef.current.live)
+      setBoardEffect(feedback.effect);
+  }, [match]);
+
   useEffect(() => {
     let disposed = false;
     let engine: BrowserEngine | undefined;
@@ -128,6 +203,12 @@ export default function AiGame() {
       try {
         await prepareAiPage();
         if (disposed) return;
+        try {
+          const saved = localStorage.getItem('chuhan-sound') !== 'off';
+          soundRef.current = saved;
+          setSound(saved);
+        } catch {}
+        setAssetBase(aiBase().href);
         engine = new BrowserEngine();
         engineRef.current = engine;
         await engine.ready;
@@ -245,6 +326,7 @@ export default function AiGame() {
     setSheet(null);
   }
   function backToLive() {
+    setBoardEffect(null);
     setReview(null);
     setBranch(null);
     setSelected(null);
@@ -255,12 +337,14 @@ export default function AiGame() {
     backToLive();
   }
   function navigate(next: number) {
+    setBoardEffect(null);
     setReview(Math.max(0, Math.min(room.history.length, next)));
     setBranch(null);
     setSelected(null);
     setSheet(null);
   }
   function explore() {
+    setBoardEffect(null);
     setBranch({ boards: [board], turns: [turn], base: position, moves: [] });
     setSelected(null);
     setSheet(null);
@@ -268,7 +352,7 @@ export default function AiGame() {
   function square(n: number) {
     if (!canMove) return;
     if (selected !== null && legalMove(board, selected, n, turn)) {
-      if (branch)
+      if (branch) {
         setBranch({
           ...branch,
           boards: [...branch.boards, moveBoard(board, selected, n)],
@@ -278,7 +362,18 @@ export default function AiGame() {
             squareToEngine(selected) + squareToEngine(n),
           ],
         });
-      else setMatch((current) => playAiMove(current, selected, n));
+        const feedback = branchFeedback(
+          board,
+          selected,
+          n,
+          turn,
+          `branch:${branch.moves.length}:${Date.now()}`,
+        );
+        setBoardEffect(feedback.effect);
+        feedback.sounds.forEach((kind, index) =>
+          playSound(kind, index ? 0.36 : 0.18),
+        );
+      } else setMatch((current) => playAiMove(current, selected, n));
       setSelected(null);
     } else if (board[n]?.side === turn) setSelected(n === selected ? null : n);
   }
@@ -303,7 +398,7 @@ export default function AiGame() {
       : room.result
         ? `${room.result.winner === 'draw' ? '和棋' : sideLabel(room.result.winner) + '胜'} · ${room.result.reason}`
         : aiTurn
-          ? 'AI 思考中…'
+          ? 'AI 思考中'
           : inCheck(board, turn)
             ? '将军 · 请应将'
             : '轮到你走';
@@ -383,30 +478,31 @@ export default function AiGame() {
             </span>
           </div>
           <div className="player-name-block">
-            <strong>{me ? '我方' : '象棋 AI'}</strong>
-            <small>
-              {sideLabel(side)} ·{' '}
-              {me ? '从容落子' : AI_LEVELS[match.level].label}
-            </small>
+            <strong>
+              <span className="player-name">{me ? '我方' : '象棋 AI'}</span>
+              {!me && (
+                <em className="player-tag">{AI_LEVELS[match.level].label}</em>
+              )}
+            </strong>
           </div>
+          <CapturedTray board={board} side={side} />
           {!me && <Bot size={20} aria-label="电脑棋手" />}
         </div>
-        <CapturedTray board={board} side={side} />
       </div>
     );
   }
 
   return (
     <main
-      className={`app-shell ai-room ${started ? 'in-room' : ''} ${ended ? 'game-ended' : ''}`}
+      className={`app-shell table-view ai-room ${started ? 'in-room' : ''} ${ended ? 'game-ended' : ''}`}
       style={viewport}
+      onPointerDown={unlockSound}
+      onKeyDownCapture={unlockSound}
     >
       <header className="site-header">
         <a className="brand" href="../">
           <span className="brand-seal">楚</span>
-          <span>
-            楚汉棋社<small>人机练习</small>
-          </span>
+          <span>楚汉棋社</span>
         </a>
         <button className="text-button" onClick={() => setSetup(true)}>
           <Settings2 size={17} />
@@ -426,8 +522,16 @@ export default function AiGame() {
         </button>
       </div>
       <output className="ai-status-line">
-        <span>{engineState === 'loading' ? '正在准备棋手…' : status}</span>
-        <span>{!visible ? '已暂停' : searching ? '计算中' : '本机对弈'}</span>
+        <span>
+          {engineState === 'loading' ? '正在准备棋手…' : status}
+          {engineState !== 'loading' && aiTurn && visible && (
+            <span className="thinking-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+          )}
+        </span>
       </output>
       {error && (
         <div className="ai-error" role="alert">
@@ -447,6 +551,7 @@ export default function AiGame() {
               last={branch ? null : room.history[index - 1]}
               onSquare={square}
               checkSide={inCheck(board, turn) ? turn : null}
+              effect={boardEffect}
               animationContext={
                 branch
                   ? 'ai-branch'
@@ -468,6 +573,7 @@ export default function AiGame() {
                 <button
                   disabled={branch.boards.length < 2}
                   onClick={() => {
+                    setBoardEffect(null);
                     setBranch({
                       ...branch,
                       boards: branch.boards.slice(0, -1),
@@ -530,7 +636,7 @@ export default function AiGame() {
             </button>
             <button onClick={branch ? backToLive : explore}>
               <GitBranch size={18} />
-              {branch ? '返回对局' : '独立推演'}
+              {branch ? '返回对局' : '推演'}
             </button>
             <button
               disabled={!!room.result}
@@ -538,6 +644,14 @@ export default function AiGame() {
             >
               <Flag size={18} />
               认输
+            </button>
+            <button
+              className="ai-sound-toggle"
+              aria-label={sound ? '关闭对局音效' : '开启对局音效'}
+              title={sound ? '关闭音效' : '开启音效'}
+              onClick={toggleSound}
+            >
+              {sound ? <Volume2 size={18} /> : <VolumeX size={18} />}
             </button>
           </div>
         </section>
@@ -565,7 +679,11 @@ export default function AiGame() {
               Fairy-Stockfish
             </a>{' '}
             ·{' '}
-            <a href="./engine/SOURCE.md" target="_blank" rel="noreferrer">
+            <a
+              href={`${assetBase}engine/SOURCE.md`}
+              target="_blank"
+              rel="noreferrer"
+            >
               源码与许可
             </a>
           </p>
@@ -619,6 +737,10 @@ export default function AiGame() {
             >
               <Flag />
               <span>认输</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={toggleSound}>
+              {sound ? <Volume2 /> : <VolumeX />}
+              <span>{sound ? '关闭音效' : '开启音效'}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => location.assign('../')}>
               <ArrowLeft />
@@ -682,7 +804,11 @@ export default function AiGame() {
         {analysisPanel()}
         <p className="ai-engine-credit">
           Fairy-Stockfish ·{' '}
-          <a href="./engine/SOURCE.md" target="_blank" rel="noreferrer">
+          <a
+            href={`${assetBase}engine/SOURCE.md`}
+            target="_blank"
+            rel="noreferrer"
+          >
             源码与许可
           </a>
         </p>
@@ -702,11 +828,9 @@ export default function AiGame() {
             <X size={20} />
           </button>
           <DialogTitle>和 AI 下盘棋</DialogTitle>
-          <DialogDescription>
-            {started
-              ? '开始后会替换当前练习棋局。'
-              : '选择执子和难度，随时悔棋、推演与复盘。'}
-          </DialogDescription>
+          {started && (
+            <DialogDescription>开始后会替换当前练习棋局。</DialogDescription>
+          )}
           <fieldset>
             <legend>我方执子</legend>
             <div className="ai-choice-row">
