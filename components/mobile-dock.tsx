@@ -11,6 +11,9 @@ import {
   Handshake,
   Flag,
   LogOut,
+  RotateCw,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react';
 import {
@@ -43,6 +46,9 @@ export default function MobileDock({
   onRecord,
   onAnalysis,
   onSend,
+  sound,
+  onFlip,
+  onToggleSound,
 }: {
   chat: string;
   setChat: (text: string) => void;
@@ -59,6 +65,9 @@ export default function MobileDock({
   onRecord: () => void;
   onAnalysis: () => void;
   onSend: () => Promise<boolean>;
+  sound: boolean;
+  onFlip: () => void;
+  onToggleSound: () => void;
 }) {
   const [chatOpen, setChatOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -103,6 +112,14 @@ export default function MobileDock({
             <DropdownMenuItem disabled={!canResign} onClick={onResign}>
               <Flag />
               <span>认输</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onFlip}>
+              <RotateCw />
+              <span>翻转棋盘</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onToggleSound}>
+              {sound ? <Volume2 /> : <VolumeX />}
+              <span>{sound ? '关闭音效' : '开启音效'}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => window.location.assign('./')}>
               <LogOut />

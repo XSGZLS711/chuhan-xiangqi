@@ -9,6 +9,31 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 
 const { d1, r2 } = hostingConfig;
 
+// Static files under public/ bypass the framework's header rules, but the AI
+// engine worker must carry the same isolation headers as its page in development.
+const aiIsolationHeaders = {
+  name: 'ai-isolation-headers',
+  configureServer(server: {
+    middlewares: {
+      use: (
+        handler: (
+          req: { url?: string },
+          res: { setHeader: (name: string, value: string) => void },
+          next: () => void,
+        ) => void,
+      ) => void;
+    };
+  }) {
+    server.middlewares.use((req, res, next) => {
+      if (req.url?.startsWith('/ai/')) {
+        res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+        res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+      }
+      next();
+    });
+  },
+};
+
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === 'seatbelt';
 
@@ -50,6 +75,7 @@ export default defineConfig(async () => {
       ? { watch: { useFsEvents: false, usePolling: true } }
       : undefined,
     plugins: [
+      aiIsolationHeaders,
       vinext(),
       sites(),
       cloudflare({

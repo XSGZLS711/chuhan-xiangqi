@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useRef } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -19,6 +20,23 @@ export default function GameRecord({
   onNavigate: (index: number) => void;
   onLive: () => void;
 }) {
+  const list = useRef<HTMLDivElement>(null);
+  const shown = useRef(0);
+  // Keep the move being viewed (or the newest one) inside the scrolling list.
+  useEffect(() => {
+    const el = list.current;
+    const current = el?.querySelector<HTMLElement>('.current-move');
+    if (!el || !current) return;
+    const margin = 10,
+      top = current.offsetTop,
+      bottom = top + current.offsetHeight;
+    const behavior = shown.current ? 'smooth' : 'auto';
+    shown.current = history.length;
+    if (top < el.scrollTop + margin)
+      el.scrollTo({ top: Math.max(0, top - margin), behavior });
+    else if (bottom > el.scrollTop + el.clientHeight - margin)
+      el.scrollTo({ top: bottom - el.clientHeight + margin, behavior });
+  }, [index, history.length]);
   const rows = Array.from(
     { length: Math.ceil(history.length / 2) },
     (_, n) => n,
@@ -32,7 +50,7 @@ export default function GameRecord({
             <span>红方</span>
             <span>黑方</span>
           </div>
-          <div className="move-list">
+          <div className="move-list" ref={list}>
             {rows.map((n) => (
               <div className="move-row" key={n}>
                 <span>{String(n + 1).padStart(2, '0')}</span>
@@ -58,9 +76,7 @@ export default function GameRecord({
         </>
       ) : (
         <div className="empty-record">
-          <span className="record-glyph">谱</span>
           <p>棋谱从第一步开始记录</p>
-          <small>落子后可在这里逐步回看</small>
         </div>
       )}
       <div className="replay-nav">
