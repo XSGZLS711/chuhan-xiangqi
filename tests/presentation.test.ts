@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './effect-settings.test';
 import { pieceMotion } from '../lib/motion';
 import {
   capturedBy,

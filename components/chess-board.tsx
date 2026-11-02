@@ -44,6 +44,7 @@ export default function ChessBoard({
   effect = null,
   animationContext = 'live',
   animate = true,
+  captureEffects = true,
 }: {
   board: Board;
   flipped?: boolean;
@@ -55,6 +56,7 @@ export default function ChessBoard({
   effect?: Effect | null;
   animationContext?: string;
   animate?: boolean;
+  captureEffects?: boolean;
 }) {
   const signature = boardSignature(board);
   const [frame, setFrame] = useState<Frame>({
@@ -140,7 +142,7 @@ export default function ChessBoard({
   return (
     <div className={`board-frame ${effect ? `fx-${effect.kind}` : ''}`}>
       <fieldset
-        className="chess-board"
+        className={`chess-board ${captureEffects ? '' : 'tactics-off'}`}
         aria-label="中国象棋棋盘"
         style={css({
           '--slide': `${PIECE_MOTION.slideMs}ms`,
@@ -264,7 +266,7 @@ export default function ChessBoard({
             );
           })}
         </div>
-        {ghost && (
+        {ghost && captureEffects && (
           <div
             key={ghost.key}
             className="capture-ghost piece-position"

@@ -49,6 +49,9 @@ import {
   type EngineInfo,
 } from '@/lib/ai-game';
 import { BrowserEngine, aiBase, prepareAiPage } from '@/lib/ai-engine';
+import EffectSettings from '@/components/effect-settings';
+import { useEffectSettings } from '@/lib/use-effect-settings';
+import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
 import { GameAudio, soundDelay } from '@/lib/game-audio';
 import {
   branchFeedback,
@@ -75,6 +78,8 @@ type Branch = { boards: Board[]; turns: Side[]; base: string; moves: string[] };
 type AnalysisResult = { key: string; info: EngineInfo };
 
 export default function AiGame() {
+  const { settings, setSetting } = useEffectSettings();
+  const sound = settings.sound;
   const [match, setMatch] = useState(() => createAiMatch('red', 'medium'));
   const [started, setStarted] = useState(false);
   const [setup, setSetup] = useState(true);
@@ -95,11 +100,10 @@ export default function AiGame() {
   const [confirmResign, setConfirmResign] = useState(false);
   const [visible, setVisible] = useState(true);
   const [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null);
-  const [sound, setSound] = useState(true);
   const [assetBase, setAssetBase] = useState('./');
   const engineRef = useRef<BrowserEngine | null>(null);
   const audioRef = useRef<GameAudio | null>(null);
-  const soundRef = useRef(true);
+  const soundRef = useRef(sound);
   const feedbackRef = useRef<FeedbackRoom | null>(null);
   const viewRef = useRef({ live: true, branch: false });
   const viewport = useGameViewport(started);
@@ -147,20 +151,25 @@ export default function AiGame() {
   function playSound(kind: SoundKind, delay = 0) {
     if (soundRef.current) audioRef.current?.play(kind, delay);
   }
+  function changeSetting(key: SettingKey, value: boolean) {
+    setSetting(key, value);
+    if (key === 'sound') {
+      soundRef.current = value;
+      if (value) unlockSound();
+      else audioRef.current?.silence();
+    }
+  }
   function toggleSound() {
-    const next = !sound;
-    setSound(next);
-    soundRef.current = next;
-    if (next) unlockSound();
-    else audioRef.current?.silence();
-    try {
-      localStorage.setItem('chuhan-sound', next ? 'on' : 'off');
-    } catch {}
+    changeSetting('sound', !sound);
   }
 
   useEffect(() => {
     viewRef.current = { live: review === null && !branch, branch: !!branch };
   }, [review, branch]);
+  useEffect(() => {
+    soundRef.current = sound;
+    if (!sound) audioRef.current?.silence();
+  }, [sound]);
   useEffect(() => () => audioRef.current?.close(), []);
   useEffect(() => {
     if (!boardEffect) return;
@@ -200,11 +209,6 @@ export default function AiGame() {
       try {
         await prepareAiPage();
         if (disposed) return;
-        try {
-          const saved = localStorage.getItem('chuhan-sound') !== 'off';
-          soundRef.current = saved;
-          setSound(saved);
-        } catch {}
         setAssetBase(aiBase().href);
         engine = new BrowserEngine();
         engineRef.current = engine;
@@ -540,15 +544,17 @@ export default function AiGame() {
         <section className="play-column">
           {player(opposite(match.human))}
           <div className="board-stage">
+            <EffectSettings settings={settings} onChange={changeSetting} />
             <ChessBoard
               board={board}
               flipped={match.human === 'black'}
               selected={selected}
-              targets={targets}
+              targets={settings.hints ? targets : []}
               last={branch ? null : room.history[index - 1]}
               onSquare={square}
               checkSide={inCheck(board, turn) ? turn : null}
-              effect={boardEffect}
+              effect={visibleEffect(boardEffect, settings)}
+              captureEffects={settings.moveEffects}
               animationContext={
                 branch
                   ? 'ai-branch'
