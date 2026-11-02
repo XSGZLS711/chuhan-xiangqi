@@ -8,6 +8,8 @@ import {
   effectDuration,
   updateFeedback,
   resultEffect,
+  STAMP_TIMING,
+  stampDuration,
 } from '../lib/presentation';
 import {
   initialBoard,
@@ -166,6 +168,33 @@ test('普通落子与吃子使用不同音效', () => {
     before = snapshot(r, 1);
   applyAction(r, 'red', { action: 'move', from: 54, to: 45 }, now);
   assert.deepEqual(updateFeedback(before, snapshot(r, 2)).sounds, ['move']);
+});
+test('吃子触发居中印章，相同版本与聊天不会补播', () => {
+  const r = fresh(),
+    before = snapshot(r, 1);
+  capture(r);
+  const after = snapshot(r, 2);
+  const effect = updateFeedback(before, after).effect;
+  assert.equal(effect?.kind, 'capture');
+  assert.equal(effect?.title, '吃');
+  assert.equal(effect?.side, 'red');
+  assert.equal(updateFeedback(after, snapshot(r, 3)).effect, null);
+  assert.equal(updateFeedback(after, after).effect, null);
+  assert.equal(
+    branchFeedback(initial, 64, 1, 'red', 'branch').effect?.analysis,
+    true,
+  );
+});
+test('印章在 250ms 出现，400ms 成形，保留完整淡出时间', () => {
+  assert.equal(STAMP_TIMING.delayMs, 250);
+  assert.equal(STAMP_TIMING.delayMs + STAMP_TIMING.enterMs, 400);
+  assert.equal(STAMP_TIMING.fadeMs, 400);
+  assert.equal(stampDuration('capture'), 1400);
+  assert.equal(stampDuration('mate'), 1600);
+  assert.equal(
+    effectDuration('capture'),
+    STAMP_TIMING.delayMs + stampDuration('capture'),
+  );
 });
 test('聊天与在线状态更新不重复播放音效', () => {
   const r = fresh();

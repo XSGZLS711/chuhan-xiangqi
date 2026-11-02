@@ -1994,10 +1994,8 @@ p {
   }
 }
 
-/* Short, non-blocking calligraphy overlays for check and game results. */
+/* Our own ink ring, shared by captures, checks and results. */
 .board-effect {
-  --accent: #ffe2a0;
-  --glow-rgb: 209, 95, 48;
   position: absolute;
   inset: 0;
   z-index: 8;
@@ -2005,339 +2003,58 @@ p {
   place-items: center;
   pointer-events: none;
   overflow: hidden;
-  animation: fx-life var(--fx, 3400ms) ease both;
+  color: #302a25;
+  animation: stamp-fade var(--stamp-fade) ease-out var(--stamp-fade-at) forwards;
 }
-.board-effect.black {
-  --accent: #e9edf0;
-  --glow-rgb: 140, 160, 175;
+.effect-mate,
+.effect-result { color: #852f26; }
+.ink-stamp {
+  position: relative;
+  width: 70%;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2cqw;
+  text-align: center;
+  animation: stamp-arrive var(--stamp-enter) var(--ease-out) var(--stamp-delay) both;
 }
-.effect-veil {
+.ink-ring {
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    ellipse at center,
-    #140c04f7 0%,
-    #140c04e0 32%,
-    #140c0400 76%
-  );
-  animation: veil-in 0.5s ease-out both;
+  width: 100%;
+  height: 100%;
 }
-.effect-inscription {
+.ink-stamp strong {
   position: relative;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 1.2cqw;
-  text-align: center;
-  color: #fff0c4;
-  padding: 20px;
-  text-shadow: 0 2px 10px #160900;
-}
-.effect-inscription strong {
-  display: flex;
   font-family: 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
-  font-size: 18cqw;
-  letter-spacing: 0.1em;
-  padding-left: 0.1em;
+  font-size: 20cqw;
   line-height: 1.2;
   font-weight: 400;
+  text-shadow: 0 1px 2px #fff3d9, 0 0 12px #fff3d9;
 }
-/* Each character lands like a brush stroke: heavy, blurred, then crisp. */
-.effect-inscription strong > span {
-  display: inline-block;
-  animation: brush-land 0.62s var(--ease-out) calc(0.12s + var(--i, 0) * 0.15s)
-    both;
-}
-.effect-overline {
-  font-size: 2.8cqw;
-  letter-spacing: 0.35em;
-  color: #f0d6a2;
-  animation: fade-rise 0.6s ease-out 0.05s both;
-}
+.effect-mate strong,
+.effect-result strong { font-size: 14cqw; }
+.ink-stamp-context,
 .effect-detail {
-  font-size: 3.4cqw;
-  letter-spacing: 0.06em;
-  text-shadow:
-    0 1px 2px #000,
-    0 0 10px #140c04;
-  animation: fade-rise 0.7s ease-out 0.55s both;
+  position: relative;
+  font-size: 3cqw;
+  line-height: 1.6;
+  max-width: 90%;
+  color: #302a25;
+  background: #fff3d9ed;
+  border-radius: 4px;
+  padding: 0.2cqw 1.4cqw;
 }
-.effect-mate .effect-inscription strong,
-.effect-result .effect-inscription strong {
-  color: var(--accent);
+.ink-stamp-context:empty { display: none; }
+@keyframes stamp-arrive {
+  from { opacity: 0; scale: 1.5; filter: blur(10px); }
+  to { opacity: 1; scale: 1; filter: blur(0); }
 }
-.effect-mate .effect-inscription strong {
-  text-shadow:
-    0 3px 0 #8b301e,
-    0 0 26px rgba(var(--glow-rgb), 0.55);
-}
-.effect-mate.black .effect-inscription strong {
-  text-shadow:
-    0 3px 0 #38424a,
-    0 0 26px rgba(var(--glow-rgb), 0.5);
-}
-.effect-result .effect-inscription strong {
-  font-size: 14cqw;
-}
-.effect-rings {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-}
-.effect-rings > i {
-  position: absolute;
-  width: 62%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--accent) 58%, transparent);
-  box-shadow: 0 0 22px rgba(var(--glow-rgb), 0.22);
-  animation: ring-out 1.9s var(--ease-out) both;
-}
-.effect-rings > i:nth-child(2) {
-  border-style: dashed;
-  opacity: 0.6;
-  animation-delay: 0.18s;
-}
-.effect-rings > i:nth-child(3) {
-  animation-delay: 0.42s;
-}
-.effect-embers {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-.effect-embers > i {
-  position: absolute;
-  left: var(--x);
-  bottom: -4%;
-  width: var(--s);
-  height: var(--s);
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff4cc, var(--accent) 55%, transparent);
-  box-shadow: 0 0 8px rgba(var(--glow-rgb), 0.8);
-  opacity: 0;
-  animation: ember-rise 2.4s ease-out calc(0.2s + var(--d)) both;
-}
-.effect-seal {
-  position: absolute;
-  right: 4%;
-  bottom: 6%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  width: 9.5cqw;
-  aspect-ratio: 1;
-  padding: 0.6cqw;
-  gap: 0;
-  place-items: center;
-  border-radius: 0.6cqw;
-  background: linear-gradient(145deg, #c04a39, #8c2b21);
-  color: #ffe9c8;
-  font: 4.4cqw/1 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
-  text-shadow: none;
-  box-shadow:
-    inset 0 0 0 0.35cqw #8c2b21,
-    inset 0 0 0 0.6cqw #e8b98c88,
-    0 2px 10px #00000066;
-  rotate: -7deg;
-  animation: seal-stamp 0.5s var(--ease-spring) 1.05s both;
-}
-.effect-seal > b {
-  font-weight: 400;
-}
-.effect-slash {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-.effect-slash > i {
-  position: absolute;
-  top: 50%;
-  left: -10%;
-  width: 120%;
-  height: 0.55cqw;
-  margin-top: -0.3cqw;
-  background: linear-gradient(90deg, transparent, #ffd9a8, #fff4e0, #ffb98a, transparent);
-  box-shadow: 0 0 18px #ff9a6a99;
-  rotate: -9deg;
-  transform-origin: 50% 50%;
-  opacity: 0;
-  animation: slash-sweep 0.7s var(--ease-out) both;
-}
-.effect-slash > i + i {
-  rotate: 7deg;
-  animation-delay: 0.1s;
-  height: 0.3cqw;
-}
-.effect-check .effect-inscription strong {
-  font-size: 14cqw;
-  color: #ffdda4;
-  text-shadow:
-    0 2px 0 #7a2a1c,
-    0 0 22px #e0603b99;
-}
-.effect-check .effect-overline {
-  display: none;
-}
-.effect-check .effect-veil {
-  background: radial-gradient(
-    ellipse at center,
-    #2a140cf2 0%,
-    #2a140cc4 30%,
-    #2a140c00 64%
-  );
-}
-.effect-check.black .effect-inscription strong {
-  color: #e8ecef;
-  text-shadow:
-    0 2px 0 #2c353c,
-    0 0 22px #8ca0af99;
-}
-/* The board itself flinches when the king is attacked or falls. */
-.board-frame.fx-check {
-  animation: board-flinch 0.5s var(--ease-out);
-}
-.board-frame.fx-mate {
-  animation: board-slam 0.8s var(--ease-out);
-}
-@keyframes board-flinch {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-  18% {
-    translate: -3px 1px;
-  }
-  38% {
-    translate: 3px -1px;
-  }
-  60% {
-    translate: -2px 0;
-  }
-  80% {
-    translate: 1px 0;
-  }
-}
-@keyframes board-slam {
-  0% {
-    translate: 0 0;
-    scale: 1;
-  }
-  10% {
-    translate: 0 3px;
-    scale: 0.992;
-  }
-  26% {
-    translate: -5px -2px;
-    scale: 1.004;
-  }
-  44% {
-    translate: 4px 2px;
-  }
-  62% {
-    translate: -2px -1px;
-  }
-  100% {
-    translate: 0 0;
-    scale: 1;
-  }
-}
-@keyframes fx-life {
-  0% {
-    opacity: 0;
-  }
-  8%,
-  84% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-@keyframes veil-in {
-  from {
-    opacity: 0;
-    scale: 1.25;
-  }
-}
-@keyframes brush-land {
-  0% {
-    opacity: 0;
-    transform: scale(1.7) translateY(-0.06em) rotate(-4deg);
-    filter: blur(0.12em);
-  }
-  55% {
-    opacity: 1;
-    filter: blur(0);
-  }
-  78% {
-    transform: scale(0.97) rotate(0.6deg);
-  }
-  100% {
-    opacity: 1;
-    transform: scale(1);
-    filter: blur(0);
-  }
-}
+@keyframes stamp-fade { to { opacity: 0; } }
 @keyframes fade-rise {
-  from {
-    opacity: 0;
-    transform: translateY(0.9cqw);
-  }
-}
-@keyframes ring-out {
-  from {
-    opacity: 0;
-    transform: scale(0.45) rotate(-20deg);
-  }
-  35% {
-    opacity: 0.9;
-  }
-  to {
-    opacity: 0.35;
-    transform: scale(1.12) rotate(0);
-  }
-}
-@keyframes ember-rise {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(0.6);
-  }
-  15% {
-    opacity: 0.95;
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--drift), calc(var(--rise) * -9)) scale(1.15);
-  }
-}
-@keyframes seal-stamp {
-  0% {
-    opacity: 0;
-    scale: 2.3;
-    rotate: -22deg;
-  }
-  60% {
-    opacity: 1;
-    scale: 0.92;
-  }
-  100% {
-    opacity: 0.94;
-    scale: 1;
-  }
-}
-@keyframes slash-sweep {
-  0% {
-    opacity: 0;
-    translate: -30% 0;
-  }
-  30% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    translate: 30% 0;
-  }
+  from { opacity: 0; transform: translateY(0.9cqw); }
 }
 
 .mobile-game-actions,
