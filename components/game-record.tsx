@@ -6,6 +6,7 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react';
+import { RATING_LABELS, type GameAnalysis } from '@/lib/game-analysis';
 import type { Move } from '@/lib/xiangqi';
 import { displayNotation } from '@/lib/mobile-game';
 
@@ -14,29 +15,38 @@ export default function GameRecord({
   index,
   onNavigate,
   onLive,
+  analysis = null,
+  ratedPly = null,
+  onRatingSelect,
 }: {
   history: Move[];
   index: number;
   onNavigate: (index: number) => void;
   onLive: () => void;
+  analysis?: GameAnalysis | null;
+  ratedPly?: number | null;
+  onRatingSelect?: (ply: number) => void;
 }) {
   const list = useRef<HTMLDivElement>(null);
   const shown = useRef(0);
   // Keep the move being viewed (or the newest one) inside the scrolling list.
   useEffect(() => {
     const el = list.current;
-    const current = el?.querySelector<HTMLElement>('.current-move');
+    const current =
+      el?.querySelector<HTMLElement>('.selected-rating') ??
+      el?.querySelector<HTMLElement>('.current-move');
     if (!el || !current) return;
+    const rect = current.getBoundingClientRect();
     const margin = 10,
-      top = current.offsetTop,
-      bottom = top + current.offsetHeight;
+      top = rect.top - el.getBoundingClientRect().top + el.scrollTop,
+      bottom = top + rect.height;
     const behavior = shown.current ? 'smooth' : 'auto';
     shown.current = history.length;
     if (top < el.scrollTop + margin)
       el.scrollTo({ top: Math.max(0, top - margin), behavior });
     else if (bottom > el.scrollTop + el.clientHeight - margin)
       el.scrollTo({ top: bottom - el.clientHeight + margin, behavior });
-  }, [index, history.length]);
+  }, [index, history.length, ratedPly]);
   const rows = Array.from(
     { length: Math.ceil(history.length / 2) },
     (_, n) => n,
@@ -57,15 +67,29 @@ export default function GameRecord({
                 {[0, 1].map((offset) => {
                   const step = n * 2 + offset,
                     move = history[step];
+                  const entry = analysis?.moves[step];
+                  const rating =
+                    entry?.status === 'complete' ? entry.analysis.rating : null;
                   return move ? (
-                    <button
-                      key={offset}
-                      className={`${move.side} ${index === step + 1 ? 'current-move' : ''}`}
-                      onClick={() => onNavigate(step + 1)}
-                    >
-                      {displayNotation(move.text)}
-                      {move.check && <small>将</small>}
-                    </button>
+                    <div key={offset} className="record-move-cell">
+                      <button
+                        className={`${move.side} ${index === step + 1 ? 'current-move' : ''}`}
+                        onClick={() => onNavigate(step + 1)}
+                      >
+                        {displayNotation(move.text)}
+                        {move.check && <small>将</small>}
+                      </button>
+                      {rating && onRatingSelect && (
+                        <button
+                          className={`move-rating rating-${rating} ${ratedPly === step + 1 ? 'selected-rating' : ''}`}
+                          aria-label={`第 ${step + 1} 步，${RATING_LABELS[rating]}，查看走前推荐着`}
+                          aria-pressed={ratedPly === step + 1}
+                          onClick={() => onRatingSelect(step + 1)}
+                        >
+                          {RATING_LABELS[rating]}
+                        </button>
+                      )}
+                    </div>
                   ) : (
                     <span key={offset}>—</span>
                   );

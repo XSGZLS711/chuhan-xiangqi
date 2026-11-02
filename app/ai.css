@@ -551,3 +551,78 @@
   font-size: 13px;
   color: var(--muted-foreground);
 }
+
+.whole-game-analysis {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.whole-game-analysis > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.whole-game-analysis strong {
+  font-size: 13px;
+}
+.whole-game-analysis button {
+  border: 1px solid var(--border);
+  background: var(--card);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 12px;
+  min-height: 34px;
+}
+.whole-game-analysis progress {
+  display: block;
+  width: 100%;
+  height: 6px;
+  margin: 10px 0 6px;
+  accent-color: var(--emphasis);
+}
+.whole-game-analysis output,
+.whole-game-analysis small,
+.whole-game-analysis p {
+  display: block;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  line-height: 1.6;
+  margin: 0;
+}
+.rated-recommendation {
+  display: block;
+  padding: 7px 10px;
+  border-radius: 8px;
+  background: var(--success-surface);
+  color: var(--success);
+  font-size: 13px;
+  line-height: 1.5;
+}
+.ai-review-details {
+  flex: 0 0 auto;
+}
+@media (min-aspect-ratio: 23/20) and (min-width: 760px) and (min-height: 501px) {
+  .table-view .ai-review-details {
+    grid-area: room;
+  }
+  .app-shell.table-view .room-column.whole-analysis-column {
+    display: flex;
+    grid-column: 2;
+    grid-row: analysis-start / record-end;
+    min-height: 0;
+    overflow-y: auto;
+    gap: 10px;
+    scrollbar-width: thin;
+  }
+  .whole-analysis-column > section {
+    flex: 0 0 auto;
+  }
+  .table-view .whole-analysis-column .game-record {
+    flex: 0 0 auto;
+  }
+  .table-view .whole-analysis-column .move-list {
+    flex: 0 0 auto;
+    height: 180px;
+  }
+}

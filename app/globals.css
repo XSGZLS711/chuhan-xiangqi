@@ -3843,3 +3843,45 @@ html {
 .tactics-off .piece.checked {
   animation: none;
 }
+
+.record-move-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
+}
+.record-move-cell > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.move-row .move-rating {
+  flex: 0 0 auto;
+  padding: 4px 5px;
+  min-width: 28px;
+  min-height: 32px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #735313;
+  background: #efe2bc;
+}
+.move-row .rating-mistake {
+  color: #81420c;
+  background: #f3dbc2;
+}
+.move-row .rating-blunder,
+.move-row .rating-allowed-mate {
+  color: #852d25;
+  background: #f2d6ce;
+}
+.move-row .rating-missed-mate {
+  color: #634274;
+  background: #e9dced;
+}
+.move-row .selected-rating {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+.game-sheet .move-row .move-rating {
+  font-size: 12px;
+  min-height: 36px;
+}
