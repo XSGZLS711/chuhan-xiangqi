@@ -79,7 +79,7 @@ const MAJOR: Partial<Record<string, number>> = { r: 9, h: 4, c: 4.5 };
 const majorMaterial = (board: Board) =>
   board.reduce((sum, piece) => sum + (piece ? (MAJOR[piece.kind] ?? 0) : 0), 0);
 export const FULL_MAJOR_MATERIAL = 70;
-export const ENDGAME_MATERIAL = 30;
+export const ENDGAME_MATERIAL = 40;
 export type GamePhases = { middle: number | null; end: number | null };
 export type Phase = 'opening' | 'middle' | 'end';
 export const PHASE_LABELS: Record<Phase, string> = {
@@ -89,8 +89,8 @@ export const PHASE_LABELS: Record<Phase, string> = {
 };
 /** Plies at which the middlegame and the endgame begin, by position after that ply.
  * The middlegame starts by move 10 at the latest, earlier once a chariot, horse or
- * cannon is traded after the first four moves; the endgame starts once fewer than
- * ~30 points of them remain on the board.
+ * cannon is traded after the first four moves. The endgame starts once at most 40
+ * of the 70 points of chariots, horses and cannons remain, about six pieces in all.
  */
 export function gamePhases(
   history: readonly Move[],

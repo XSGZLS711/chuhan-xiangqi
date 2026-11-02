@@ -48,12 +48,12 @@ const capture = (r: Room) =>
   applyAction(r, 'red', { action: 'move', from: 64, to: 1 }, now);
 const initial = initialBoard();
 
-test('普通走子快移后悬停，最后六十毫秒落地', () => {
+test('普通走子快移后短暂悬停，约两百毫秒内落地', () => {
   const timing = pieceMotion();
-  assert(timing.slideMs >= 130 && timing.slideMs <= 150);
-  assert.equal(timing.hoverMs, 240);
-  assert.equal(timing.landMs - timing.hoverMs, 60);
-  assert.equal(timing.durationMs, 300);
+  assert(timing.slideMs >= 100 && timing.slideMs <= 120);
+  assert(timing.hoverMs > timing.slideMs);
+  assert.equal(timing.landMs - timing.hoverMs, 40);
+  assert.equal(timing.durationMs, 200);
 });
 test('吃子仅延长悬停，保持同样的平移与落地节奏', () => {
   const move = pieceMotion(),
@@ -61,7 +61,7 @@ test('吃子仅延长悬停，保持同样的平移与落地节奏', () => {
   assert.equal(capture.slideMs, move.slideMs);
   assert.equal(capture.dropMs, move.dropMs);
   assert(capture.hoverMs > move.hoverMs);
-  assert(capture.landMs >= 350 && capture.landMs <= 380);
+  assert(capture.landMs >= 260 && capture.landMs <= 290);
   assert.equal(capture.durationMs, capture.landMs);
 });
 
@@ -170,7 +170,7 @@ test('普通落子与吃子使用不同音效', () => {
   applyAction(r, 'red', { action: 'move', from: 54, to: 45 }, now);
   assert.deepEqual(updateFeedback(before, snapshot(r, 2)).sounds, ['move']);
 });
-test('吃子触发居中印章，相同版本与聊天不会补播', () => {
+test('吃子印章落在吃子位置，相同版本与聊天不会补播', () => {
   const r = fresh(),
     before = snapshot(r, 1);
   capture(r);
@@ -179,6 +179,8 @@ test('吃子触发居中印章，相同版本与聊天不会补播', () => {
   assert.equal(effect?.kind, 'capture');
   assert.equal(effect?.title, '吃');
   assert.equal(effect?.side, 'red');
+  assert.equal(effect?.at, 1);
+  assert.equal(branchFeedback(initial, 64, 1, 'red', 'b').effect?.at, 1);
   assert.equal(updateFeedback(after, snapshot(r, 3)).effect, null);
   assert.equal(updateFeedback(after, after).effect, null);
   assert.equal(

@@ -35,6 +35,7 @@ import {
   type LineStep,
   type Phase,
 } from '@/lib/review';
+import { explainMove } from '@/lib/explain';
 import {
   legalMove,
   legalTargets,
@@ -44,12 +45,13 @@ import {
   type Side,
 } from '@/lib/xiangqi';
 
-type Tab = 'chart' | 'analysis' | 'report' | 'practice';
+type Tab = 'chart' | 'analysis' | 'report' | 'practice' | 'commentary';
 const TABS: [Tab, string][] = [
   ['chart', '局势图'],
   ['analysis', '分析'],
   ['report', '报告'],
   ['practice', '练习'],
+  ['commentary', '解说'],
 ];
 type Line = { kind: 'best' | 'actual'; step: number; playing: boolean };
 type Practice = {
@@ -105,6 +107,17 @@ export default function ReviewScreen({
   const compared = useMemo(
     () => moveComparison(history, data, ply),
     [history, data, ply],
+  );
+  const [commentarySide, setCommentarySide] = useState<Side>(
+    game.viewerSide ?? 'red',
+  );
+  // Commentary only for rated moves: a good move needs no excuse.
+  const commentary = useMemo(
+    () =>
+      compared?.result?.rating
+        ? explainMove(compared.played, compared.result)
+        : null,
+    [compared],
   );
   const drill = useMemo(
     () => (practice ? moveComparison(history, data, practice.ply) : null),
@@ -286,6 +299,129 @@ export default function ReviewScreen({
     );
   }
 
+  function lineMoves() {
+    if (!line) return null;
+    return (
+      <div className="line-moves">
+        <ol>
+          {steps.map((s, i) => (
+            <li
+              key={i}
+              className={
+                i < line.step ? 'played' : i === line.step ? 'next' : ''
+              }
+            >
+              <button
+                onClick={() =>
+                  setLine({ ...line, step: i + 1, playing: false })
+                }
+              >
+                {s.text}
+              </button>
+            </li>
+          ))}
+        </ol>
+        <button className="line-exit" onClick={() => setLine(null)}>
+          回到实战局面
+        </button>
+      </div>
+    );
+  }
+
+  function commentaryTab() {
+    const list = report[commentarySide].mistakes;
+    const current = list.find((m) => m.ply === ply);
+    return (
+      <div className="review-commentary">
+        <div className="practice-sides">
+          {(['red', 'black'] as Side[]).map((s) => (
+            <button
+              key={s}
+              aria-pressed={commentarySide === s}
+              onClick={() => setCommentarySide(s)}
+            >
+              {sideLabel(s)}失误 {report[s].mistakes.length}
+            </button>
+          ))}
+        </div>
+        {list.length ? (
+          <ul className="commentary-list">
+            {list.map((m) => (
+              <li key={m.ply}>
+                <button aria-current={m.ply === ply} onClick={() => go(m.ply)}>
+                  <span>{moveNumber(m.ply, m.side)}</span> {m.text}
+                  <i className={`move-rating rating-${m.rating}`}>
+                    {RATING_LABELS[m.rating]}
+                  </i>
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="review-empty">
+            {done < total
+              ? '分析完成后列出失误。'
+              : `${sideLabel(commentarySide)}没有明显失误。`}
+          </p>
+        )}
+        {current && commentary && compared ? (
+          <article className="commentary-card" aria-live="polite">
+            <header>
+              <strong>
+                {moveNumber(ply, current.side)} {current.text}
+              </strong>
+              <i className={`move-rating rating-${current.rating}`}>
+                {RATING_LABELS[current.rating]}
+              </i>
+              <span>
+                推荐 {compared.best[0]?.text ?? '—'}{' '}
+                <b className="best-star">★</b>
+              </span>
+            </header>
+            <h4>问题在哪</h4>
+            <ul>
+              {commentary.problem.map((text) => (
+                <li key={text}>{text}</li>
+              ))}
+            </ul>
+            <h4>为什么推荐{compared.best[0]?.text ?? ''}</h4>
+            <ul>
+              {commentary.reason.map((text) => (
+                <li key={text}>{text}</li>
+              ))}
+            </ul>
+            {!commentary.certain && (
+              <small>没有找到明确的战术原因，以上是引擎对局面的判断。</small>
+            )}
+            <div className="commentary-actions">
+              <button
+                aria-pressed={line?.kind === 'actual'}
+                onClick={() =>
+                  setLine({ kind: 'actual', step: 0, playing: true })
+                }
+              >
+                <Play /> 演示实战变化
+              </button>
+              <button
+                aria-pressed={line?.kind === 'best'}
+                onClick={() =>
+                  setLine({ kind: 'best', step: 0, playing: true })
+                }
+              >
+                <Play /> 演示推荐变化
+              </button>
+            </div>
+            {lineMoves()}
+          </article>
+        ) : (
+          list.length > 0 && (
+            <p className="review-empty">点一处失误，查看为什么错、该怎么走。</p>
+          )
+        )}
+      </div>
+    );
+  }
+
   function analysisTab() {
     if (!ply)
       return (
@@ -335,37 +471,21 @@ export default function ReviewScreen({
           </div>
           {lineControls('best', best)}
         </div>
-        {line && (
-          <div className="line-moves">
-            <ol>
-              {steps.map((s, i) => (
-                <li
-                  key={i}
-                  className={
-                    i < line.step ? 'played' : i === line.step ? 'next' : ''
-                  }
-                >
-                  <button
-                    onClick={() =>
-                      setLine({ ...line, step: i + 1, playing: false })
-                    }
-                  >
-                    {s.text}
-                  </button>
-                </li>
-              ))}
-            </ol>
-            <button className="line-exit" onClick={() => setLine(null)}>
-              回到实战局面
-            </button>
-          </div>
+        {commentary && (
+          <p className="compare-note">
+            {commentary.problem[0]}
+            <button onClick={() => setTab('commentary')}>完整解说</button>
+          </p>
         )}
+        {lineMoves()}
       </div>
     );
   }
 
   function reportTab() {
-    const cell = (v: number | null) => (v === null ? '—' : `${v}分`);
+    // A phase the game never reached is not a missing score.
+    const cell = (v: number | null) =>
+      v !== null ? `${v}分` : done < total ? '—' : '未进入';
     const side = (s: Side) => (
       <div className={`report-side ${s}`}>
         <span>{game.players[s]}</span>
@@ -590,10 +710,7 @@ export default function ReviewScreen({
         <EvalBar score={score} flipped={boardFlipped} />
       </div>
       <div className="review-body">
-        {(analysis.busy ||
-          analysis.status === 'error' ||
-          !analysis.enabled ||
-          done < total) && (
+        {(analysis.busy || analysis.status === 'error' || done < total) && (
           <div className="review-progress" aria-live="polite">
             {analysis.status === 'error' ? (
               <>
@@ -621,7 +738,7 @@ export default function ReviewScreen({
               onClick={() => {
                 setTab(key);
                 if (key !== 'practice') setPractice(null);
-                if (key !== 'analysis') setLine(null);
+                if (key !== 'analysis' && key !== 'commentary') setLine(null);
               }}
             >
               {name}
@@ -649,6 +766,7 @@ export default function ReviewScreen({
           {tab === 'analysis' && analysisTab()}
           {tab === 'report' && reportTab()}
           {tab === 'practice' && practiceTab()}
+          {tab === 'commentary' && commentaryTab()}
         </section>
       </div>
       <footer className="review-nav">

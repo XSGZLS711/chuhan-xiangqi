@@ -31,6 +31,15 @@ type Frame = {
   } | null;
 };
 const SHARDS = [0, 1, 2, 3, 4, 5, 6, 7];
+/** A capture stamp centred on its point, pulled inward so it never leaves the board. */
+function stampPoint(shown: number) {
+  const clamp = (v: number, edge: number) =>
+    Math.min(100 - edge, Math.max(edge, v));
+  return {
+    x: `${clamp((((shown % 9) + 0.5) / 9) * 100, 17)}%`,
+    y: `${clamp(((Math.floor(shown / 9) + 0.5) / 10) * 100, 16)}%`,
+  };
+}
 /** A move drawn on the board: the engine's choice or the move actually played. */
 export type BoardArrow = { from: number; to: number; tone: 'best' | 'played' };
 /** A small label pinned to a square, such as a move rating or a hint ring. */
@@ -154,6 +163,8 @@ export default function ChessBoard({
         aria-label="中国象棋棋盘"
         style={css({
           '--slide': `${PIECE_MOTION.slideMs}ms`,
+          // The landing halo waits for the drop; jumps without a move show it at once.
+          '--land': `${frame.move?.timing.landMs ?? 0}ms`,
           '--selection-lift': `${PIECE_MOTION.selectionMs}ms`,
         })}
       >
@@ -344,7 +355,14 @@ export default function ChessBoard({
             {mark.text && <b>{mark.text}</b>}
           </span>
         ))}
-        <BoardEffect effect={effect} />
+        <BoardEffect
+          effect={effect}
+          at={
+            effect?.kind === 'capture' && effect.at !== undefined
+              ? stampPoint(view(effect.at))
+              : null
+          }
+        />
       </fieldset>
     </div>
   );
