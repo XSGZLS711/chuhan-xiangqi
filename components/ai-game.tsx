@@ -1,6 +1,6 @@
 'use client';
 /* oxlint-disable next/no-html-link-for-pages -- AI isolation requires full document navigation; this component is also a standalone Pages entry. */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowLeft,
   Bot,
@@ -21,6 +21,9 @@ import {
 import ChessBoard from './chess-board';
 import CapturedTray from './captured-tray';
 import GameRecord from './game-record';
+import GameAnalysisControls from './game-analysis-controls';
+import { useGameAnalysis } from '@/lib/use-game-analysis';
+import { ratingReviewSelection } from '@/lib/analysis-review';
 import GameSheet from './game-sheet';
 import {
   Dialog,
@@ -49,7 +52,19 @@ import {
   type EngineInfo,
 } from '@/lib/ai-game';
 import { BrowserEngine, aiBase, prepareAiPage } from '@/lib/ai-engine';
-import { GameAudio } from '@/lib/game-audio';
+import { useAutoArchive } from '@/lib/use-auto-archive';
+import { getArchivedGame } from '@/lib/archive-storage';
+import ReviewScreen from '@/components/review-screen';
+import {
+  replayArchive,
+  archiveGame,
+  archiveLabel,
+  type ArchivedGame,
+} from '@/lib/archive';
+import EffectSettings from '@/components/effect-settings';
+import { useEffectSettings } from '@/lib/use-effect-settings';
+import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
+import { GameAudio, soundDelay } from '@/lib/game-audio';
 import {
   branchFeedback,
   effectDuration,
@@ -75,9 +90,17 @@ type Branch = { boards: Board[]; turns: Side[]; base: string; moves: string[] };
 type AnalysisResult = { key: string; info: EngineInfo };
 
 export default function AiGame() {
+  const { settings, setSetting } = useEffectSettings();
+  const sound = settings.sound;
+  const [sessionId] = useState(() => crypto.randomUUID());
+  const [archiveId, setArchiveId] = useState(() =>
+    new URLSearchParams(location.search).get('game'),
+  );
+  const [archived, setArchived] = useState<ArchivedGame | null>(null);
+  const [archiveLoadError, setArchiveLoadError] = useState('');
   const [match, setMatch] = useState(() => createAiMatch('red', 'medium'));
   const [started, setStarted] = useState(false);
-  const [setup, setSetup] = useState(true);
+  const [setup, setSetup] = useState(!archiveId);
   const [human, setHuman] = useState<Side>('red');
   const [level, setLevel] = useState<AiLevel>('medium');
   const [engineState, setEngineState] = useState<'loading' | 'ready' | 'error'>(
@@ -95,15 +118,79 @@ export default function AiGame() {
   const [confirmResign, setConfirmResign] = useState(false);
   const [visible, setVisible] = useState(true);
   const [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null);
-  const [sound, setSound] = useState(true);
   const [assetBase, setAssetBase] = useState('./');
   const engineRef = useRef<BrowserEngine | null>(null);
+  const [analysisEngine, setAnalysisEngine] = useState<BrowserEngine | null>(
+    null,
+  );
+  const [ratedPly, setRatedPly] = useState<number | null>(null);
   const audioRef = useRef<GameAudio | null>(null);
-  const soundRef = useRef(true);
+  const soundRef = useRef(sound);
   const feedbackRef = useRef<FeedbackRoom | null>(null);
   const viewRef = useRef({ live: true, branch: false });
   const viewport = useGameViewport(started);
   const { room } = match;
+  const reviewing = review !== null;
+  const analysisGame = useMemo(
+    () =>
+      archived ??
+      (started && reviewing && room.result
+        ? archiveGame(room, {
+            id: `ai:${sessionId}:${room.round}`,
+            date: new Date(room.createdAt).toISOString(),
+            mode: { kind: 'ai', level: match.level },
+            viewerSide: match.human,
+          })
+        : null),
+    [archived, started, reviewing, room, sessionId, match.level, match.human],
+  );
+  const whole = useGameAnalysis(
+    analysisGame,
+    room,
+    analysisEngine,
+    reviewing && !branch && !setup && visible && engineState === 'ready',
+  );
+  const ratedSelection = ratingReviewSelection(
+    room.history,
+    whole.analysis,
+    ratedPly ?? 0,
+  );
+  const archiveError = useAutoArchive(
+    room,
+    started && !archived && !archiveId ? `ai:${sessionId}:${room.round}` : null,
+    { kind: 'ai', level: match.level },
+    match.human,
+  );
+  useEffect(() => {
+    if (!archiveId) return;
+    let active = true;
+    void getArchivedGame(archiveId)
+      .then((game) => {
+        const restored = replayArchive(game);
+        if (!active) return;
+        setArchived(game);
+        setMatch({
+          room: restored,
+          human: game.viewerSide ?? 'red',
+          level: game.mode.kind === 'ai' ? game.mode.level : 'medium',
+          revision: 0,
+        });
+        setReview(0);
+        setStarted(true);
+        setSetup(false);
+        setSelected(null);
+        setBranch(null);
+      })
+      .catch((error: unknown) => {
+        if (active)
+          setArchiveLoadError(
+            error instanceof Error ? error.message : '无法读取这盘对局',
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [archiveId]);
   const index =
     review === null
       ? room.history.length
@@ -128,7 +215,7 @@ export default function AiGame() {
   const evaluationKey = `${match.revision}:${position}`;
   const info = evaluation?.key === evaluationKey ? evaluation.info : null;
   const line = info ? describeLine(board, turn, info.pv) : [];
-  const live = review === null && !branch;
+  const live = review === null && !branch && !archived;
   const aiTurn = started && live && !room.result && room.turn !== match.human;
   const canMove =
     started &&
@@ -136,7 +223,8 @@ export default function AiGame() {
     (!!branch || (live && !room.result && room.turn === match.human));
   const targets = selected === null ? [] : legalTargets(board, selected);
   const canUndo =
-    room.history.some((m) => m.side === match.human) || !!room.result;
+    !archived &&
+    (room.history.some((m) => m.side === match.human) || !!room.result);
   const ended = live && !!room.result;
 
   function unlockSound() {
@@ -147,20 +235,28 @@ export default function AiGame() {
   function playSound(kind: SoundKind, delay = 0) {
     if (soundRef.current) audioRef.current?.play(kind, delay);
   }
+  function changeSetting(key: SettingKey, value: boolean) {
+    setSetting(key, value);
+    if (key === 'sound') {
+      soundRef.current = value;
+      if (value) unlockSound();
+      else audioRef.current?.silence();
+    }
+  }
   function toggleSound() {
-    const next = !sound;
-    setSound(next);
-    soundRef.current = next;
-    if (next) unlockSound();
-    else audioRef.current?.silence();
-    try {
-      localStorage.setItem('chuhan-sound', next ? 'on' : 'off');
-    } catch {}
+    changeSetting('sound', !sound);
   }
 
   useEffect(() => {
-    viewRef.current = { live: review === null && !branch, branch: !!branch };
-  }, [review, branch]);
+    viewRef.current = {
+      live: review === null && !branch && !archived,
+      branch: !!branch,
+    };
+  }, [review, branch, archived]);
+  useEffect(() => {
+    soundRef.current = sound;
+    if (!sound) audioRef.current?.silence();
+  }, [sound]);
   useEffect(() => () => audioRef.current?.close(), []);
   useEffect(() => {
     if (!boardEffect) return;
@@ -186,10 +282,7 @@ export default function AiGame() {
     if (!previous) return;
     const feedback = updateFeedback(previous, current);
     feedback.sounds.forEach((kind, order) =>
-      playSound(
-        kind,
-        order ? 0.36 : kind === 'move' || kind === 'capture' ? 0.18 : 0,
-      ),
+      playSound(kind, soundDelay(feedback.sounds, order)),
     );
     if (feedback.reset) setBoardEffect(null);
     if (feedback.effect && viewRef.current.live)
@@ -203,16 +296,14 @@ export default function AiGame() {
       try {
         await prepareAiPage();
         if (disposed) return;
-        try {
-          const saved = localStorage.getItem('chuhan-sound') !== 'off';
-          soundRef.current = saved;
-          setSound(saved);
-        } catch {}
         setAssetBase(aiBase().href);
         engine = new BrowserEngine();
         engineRef.current = engine;
         await engine.ready;
-        if (!disposed) setEngineState('ready');
+        if (!disposed) {
+          setAnalysisEngine(engine);
+          setEngineState('ready');
+        }
       } catch (e) {
         if (!disposed) {
           setEngineState('error');
@@ -241,6 +332,7 @@ export default function AiGame() {
     if (
       !engine ||
       engineState !== 'ready' ||
+      whole.busy ||
       !started ||
       setup ||
       !visible ||
@@ -301,6 +393,7 @@ export default function AiGame() {
     analysisOn,
     evaluationKey,
     board,
+    whole.busy,
   ]);
 
   /* oxlint-enable react/react-compiler */
@@ -314,6 +407,11 @@ export default function AiGame() {
     else window.location.assign('../');
   }
   function start() {
+    setRatedPly(null);
+    setArchived(null);
+    setArchiveId(null);
+    setArchiveLoadError('');
+    window.history.replaceState(null, '', location.pathname);
     setMatch((current) =>
       createAiMatch(human, level, started ? current.room.round + 1 : 1),
     );
@@ -326,8 +424,9 @@ export default function AiGame() {
     setSheet(null);
   }
   function backToLive() {
+    setRatedPly(null);
     setBoardEffect(null);
-    setReview(null);
+    setReview(archived ? room.history.length : null);
     setBranch(null);
     setSelected(null);
     setSheet(null);
@@ -337,13 +436,21 @@ export default function AiGame() {
     backToLive();
   }
   function navigate(next: number) {
+    setRatedPly(null);
     setBoardEffect(null);
     setReview(Math.max(0, Math.min(room.history.length, next)));
     setBranch(null);
     setSelected(null);
     setSheet(null);
   }
+  function showRating(ply: number) {
+    const selected = ratingReviewSelection(room.history, whole.analysis, ply);
+    if (!selected) return;
+    navigate(selected.index);
+    setRatedPly(ply);
+  }
   function explore() {
+    setRatedPly(null);
     setBoardEffect(null);
     setBranch({ boards: [board], turns: [turn], base: position, moves: [] });
     setSelected(null);
@@ -371,7 +478,7 @@ export default function AiGame() {
         );
         setBoardEffect(feedback.effect);
         feedback.sounds.forEach((kind, index) =>
-          playSound(kind, index ? 0.36 : 0.18),
+          playSound(kind, soundDelay(feedback.sounds, index)),
         );
       } else setMatch((current) => playAiMove(current, selected, n));
       setSelected(null);
@@ -479,19 +586,59 @@ export default function AiGame() {
           </div>
           <div className="player-name-block">
             <strong>
-              <span className="player-name">{me ? '我方' : '象棋 AI'}</span>
-              {!me && (
+              <span className="player-name">
+                {archived ? archived.players[side] : me ? '我方' : '象棋 AI'}
+              </span>
+              {!me && (!archived || archived.mode.kind === 'ai') && (
                 <em className="player-tag">{AI_LEVELS[match.level].label}</em>
               )}
             </strong>
           </div>
           <CapturedTray board={board} side={side} />
-          {!me && <Bot size={20} aria-label="电脑棋手" />}
+          {!me && (!archived || archived.mode.kind === 'ai') && (
+            <Bot size={20} aria-label="电脑棋手" />
+          )}
         </div>
       </div>
     );
   }
 
+  if (archiveId && !archived)
+    return (
+      <main className="app-shell">
+        <a href="../">返回棋社</a>
+        <p role={archiveLoadError ? 'alert' : 'status'}>
+          {archiveLoadError || '正在读取本地对局…'}
+        </p>
+        {archiveLoadError && (
+          <button
+            onClick={() => {
+              setArchiveId(null);
+              setSetup(true);
+              window.history.replaceState(null, '', location.pathname);
+            }}
+          >
+            开始人机对弈
+          </button>
+        )}
+      </main>
+    );
+  // A finished game opens in the full review screen; unfinished games keep the inline replay.
+  if (reviewing && analysisGame && !branch && !setup)
+    return (
+      <ReviewScreen
+        game={analysisGame}
+        history={room.history}
+        finalBoard={room.board}
+        flipped={match.human === 'black'}
+        ply={index}
+        onPly={navigate}
+        analysis={whole}
+        onExplore={explore}
+        onExit={archived ? () => window.location.assign('../') : backToLive}
+        exitLabel={archived ? '返回棋社' : '返回对局'}
+      />
+    );
   return (
     <main
       className={`app-shell table-view ai-room ${started ? 'in-room' : ''} ${ended ? 'game-ended' : ''}`}
@@ -513,9 +660,12 @@ export default function AiGame() {
         <a href="../" aria-label="返回棋社">
           <ArrowLeft size={20} />
         </a>
-        <strong>人机练习</strong>
+        <strong>{archived ? '对局复盘' : '人机练习'}</strong>
         <span>
-          {AI_LEVELS[match.level].label} · 第 {room.round} 局
+          {archived?.mode.kind === 'friend'
+            ? '好友对弈'
+            : AI_LEVELS[match.level].label}{' '}
+          · 第 {room.round} 局
         </span>
         <button onClick={() => setSetup(true)} aria-label="设置新的一局">
           <Settings2 size={20} />
@@ -533,6 +683,27 @@ export default function AiGame() {
           )}
         </span>
       </output>
+      {(archived || (ratedSelection && !branch)) && (
+        <div className="ai-review-details">
+          {ratedSelection && !branch && (
+            <output className="rated-recommendation" aria-live="polite">
+              第 {ratedPly} 步走前 · 推荐：
+              {ratedSelection.recommendation ?? '本次推荐着不可用'}
+            </output>
+          )}
+          {archived && (
+            <p className="archive-banner">
+              本地复盘 · {archived.players.red} / {archived.players.black} ·{' '}
+              {archiveLabel(archived).result} · {archived.result.reason}
+            </p>
+          )}
+        </div>
+      )}
+      {archiveError && (
+        <p className="ai-error" role="alert">
+          {archiveError}
+        </p>
+      )}
       {error && (
         <div className="ai-error" role="alert">
           <span>{error}</span>
@@ -543,15 +714,17 @@ export default function AiGame() {
         <section className="play-column">
           {player(opposite(match.human))}
           <div className="board-stage">
+            <EffectSettings settings={settings} onChange={changeSetting} />
             <ChessBoard
               board={board}
               flipped={match.human === 'black'}
               selected={selected}
-              targets={targets}
+              targets={settings.hints ? targets : []}
               last={branch ? null : room.history[index - 1]}
               onSquare={square}
               checkSide={inCheck(board, turn) ? turn : null}
-              effect={boardEffect}
+              effect={visibleEffect(boardEffect, settings)}
+              captureEffects={settings.moveEffects}
               animationContext={
                 branch
                   ? 'ai-branch'
@@ -604,7 +777,9 @@ export default function AiGame() {
                   </button>
                 </>
               )}
-              <button onClick={backToLive}>返回对局</button>
+              <button onClick={backToLive}>
+                {archived ? '返回复盘' : '返回对局'}
+              </button>
             </div>
           )}
           {ended && (
@@ -636,7 +811,7 @@ export default function AiGame() {
             </button>
             <button onClick={branch ? backToLive : explore}>
               <GitBranch size={18} />
-              {branch ? '返回对局' : '推演'}
+              {branch ? (archived ? '返回复盘' : '返回对局') : '推演'}
             </button>
             <button
               disabled={!!room.result}
@@ -655,14 +830,20 @@ export default function AiGame() {
             </button>
           </div>
         </section>
-        <aside className="room-column">
+        <aside
+          className={`room-column ${analysisGame ? 'whole-analysis-column' : ''}`}
+        >
           {analysisPanel()}
           <section className="panel ai-record-panel">
             <div className="panel-heading">
               <strong>对局棋谱</strong>
               <span>{room.history.length} 步</span>
             </div>
+            {analysisGame && <GameAnalysisControls analysis={whole} />}
             <GameRecord
+              analysis={analysisGame ? whole.analysis : null}
+              ratedPly={ratedPly}
+              onRatingSelect={showRating}
               history={room.history}
               index={index}
               onNavigate={navigate}
@@ -782,7 +963,11 @@ export default function AiGame() {
         title="对局棋谱"
         description="点击着法回看局面，返回对局后继续练习。"
       >
+        {analysisGame && <GameAnalysisControls analysis={whole} />}
         <GameRecord
+          analysis={analysisGame ? whole.analysis : null}
+          ratedPly={ratedPly}
+          onRatingSelect={showRating}
           history={room.history}
           index={index}
           onNavigate={navigate}
@@ -862,7 +1047,7 @@ export default function AiGame() {
             </div>
           </fieldset>
           <p className="ai-setup-note">
-            悔棋会退回到你上一次落子前；练习棋局仅保留在当前页面。
+            悔棋会退回到你上一次落子前；已结束的对局会自动保存在当前浏览器，未结束的棋局仅保留在当前页面。
           </p>
           {error && (
             <p className="ai-setup-error" role="alert">

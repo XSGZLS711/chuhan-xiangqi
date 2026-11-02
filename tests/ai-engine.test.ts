@@ -9,6 +9,7 @@ import {
   historyPosition,
   describeLine,
   parseEngineInfo,
+  squareToEngine,
 } from '../lib/ai-game';
 import { legalMove } from '../lib/xiangqi';
 
@@ -26,6 +27,8 @@ const timeout = setTimeout(() => {
 let match = createAiMatch('red', 'medium');
 let positions = 0;
 let scores = 0;
+let restricted: string | null = null;
+let restrictedScores = 0;
 engine.addMessageListener((line: string) => {
   try {
     if (line === 'uciok')
@@ -45,8 +48,23 @@ engine.addMessageListener((line: string) => {
         describeLine(match.room.board, match.room.turn, info.pv).length > 0,
       );
       scores++;
+      if (restricted) {
+        assert.equal(info.pv[0], restricted);
+        restrictedScores++;
+      }
     }
     if (line.startsWith('bestmove ')) {
+      if (restricted) {
+        assert.equal(line.split(' ')[1], restricted);
+        assert(restrictedScores > 0);
+        console.log(
+          `Real WASM: ${positions} legal plies, ${scores} scores, restricted search ${restricted}`,
+        );
+        clearTimeout(timeout);
+        engine.postMessage('quit');
+        setTimeout(() => process.exit(0), 50);
+        return;
+      }
       const move = engineMove(line.split(' ')[1]);
       assert(move);
       assert(legalMove(match.room.board, move.from, move.to, match.room.turn));
@@ -56,13 +74,16 @@ engine.addMessageListener((line: string) => {
         engine.postMessage(historyPosition(match.room));
         engine.postMessage('go movetime 100 depth 6');
       } else {
-        assert(scores > 0);
-        console.log(
-          `Real WASM: ${positions} legal plies and ${scores} valid analysis updates`,
-        );
-        clearTimeout(timeout);
-        engine.postMessage('quit');
-        setTimeout(() => process.exit(0), 50);
+        for (let from = 0; from < 90 && !restricted; from++)
+          for (let to = 0; to < 90; to++) {
+            if (legalMove(match.room.board, from, to, match.room.turn)) {
+              restricted = squareToEngine(from) + squareToEngine(to);
+              break;
+            }
+          }
+        assert(restricted);
+        engine.postMessage(historyPosition(match.room));
+        engine.postMessage(`go movetime 100 depth 6 searchmoves ${restricted}`);
       }
     }
   } catch (e) {

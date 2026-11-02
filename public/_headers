@@ -1,0 +1,12 @@
+# The AI room runs a WebAssembly engine that needs SharedArrayBuffer, so it must
+# be cross-origin isolated. The engine files below /ai/ need the same headers.
+/ai
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+/ai/*
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+# Hashed build output never changes.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -7,14 +7,19 @@ import {
   type BoardEffect as Effect,
 } from '@/lib/presentation';
 import BoardEffect from '@/components/board-effect';
+import { PIECE_MOTION, pieceMotion } from '@/lib/motion';
 
 type Frame = {
   sig: string;
   board: Board;
   context: string;
   flipped: boolean;
-  /** The piece that just travelled, with its slide time in ms. */
-  move: { id: string; key: string; ms: number } | null;
+  /** The piece that just travelled, with its timing in ms. */
+  move: {
+    id: string;
+    key: string;
+    timing: ReturnType<typeof pieceMotion>;
+  } | null;
   /** Restored by an undo; fades back in once the mover has left its square. */
   revived: string | null;
   ghost: {
@@ -26,6 +31,19 @@ type Frame = {
   } | null;
 };
 const SHARDS = [0, 1, 2, 3, 4, 5, 6, 7];
+/** A capture stamp centred on its point, pulled inward so it never leaves the board. */
+function stampPoint(shown: number) {
+  const clamp = (v: number, edge: number) =>
+    Math.min(100 - edge, Math.max(edge, v));
+  return {
+    x: `${clamp((((shown % 9) + 0.5) / 9) * 100, 17)}%`,
+    y: `${clamp(((Math.floor(shown / 9) + 0.5) / 10) * 100, 16)}%`,
+  };
+}
+/** A move drawn on the board: the engine's choice or the move actually played. */
+export type BoardArrow = { from: number; to: number; tone: 'best' | 'played' };
+/** A small label pinned to a square, such as a move rating or a hint ring. */
+export type BoardMark = { at: number; text: string; tone: string };
 const css = (vars: Record<string, string | number>) => vars as CSSProperties;
 
 export default function ChessBoard({
@@ -39,6 +57,9 @@ export default function ChessBoard({
   effect = null,
   animationContext = 'live',
   animate = true,
+  captureEffects = true,
+  arrows = [],
+  marks = [],
 }: {
   board: Board;
   flipped?: boolean;
@@ -50,6 +71,9 @@ export default function ChessBoard({
   effect?: Effect | null;
   animationContext?: string;
   animate?: boolean;
+  captureEffects?: boolean;
+  arrows?: BoardArrow[];
+  marks?: BoardMark[];
 }) {
   const signature = boardSignature(board);
   const [frame, setFrame] = useState<Frame>({
@@ -73,14 +97,8 @@ export default function ChessBoard({
       animate && frame.context === animationContext && frame.flipped === flipped
         ? boardTransition(frame.board, board)
         : null;
-    const distance = transition
-      ? Math.hypot(
-          (transition.to % 9) - (transition.from % 9),
-          Math.floor(transition.to / 9) - Math.floor(transition.from / 9),
-        )
-      : 0;
-    const ms = Math.round(Math.min(440, 190 + 48 * distance));
-    const delay = Math.round(ms * 0.78);
+    const timing = pieceMotion(!!transition?.captured);
+    const delay = timing.landMs;
     setFrame({
       sig: signature,
       board,
@@ -90,7 +108,7 @@ export default function ChessBoard({
         ? {
             id: transition.piece.id,
             key: `${transition.piece.id}:${transition.from}:${transition.to}`,
-            ms,
+            timing,
           }
         : null,
       revived: transition?.revived?.id ?? null,
@@ -105,6 +123,19 @@ export default function ChessBoard({
         : null,
     });
   }
+  const move = frame.move;
+  useEffect(() => {
+    if (!move) return;
+    // Fallback for reduced motion, where CSS emits no animationend event.
+    const timer = setTimeout(
+      () =>
+        setFrame((current) =>
+          current.move === move ? { ...current, move: null } : current,
+        ),
+      move.timing.durationMs + 50,
+    );
+    return () => clearTimeout(timer);
+  }, [move]);
   const ghost = frame.ghost;
   useEffect(() => {
     if (!ghost) return;
@@ -127,7 +158,16 @@ export default function ChessBoard({
   };
   return (
     <div className={`board-frame ${effect ? `fx-${effect.kind}` : ''}`}>
-      <fieldset className="chess-board" aria-label="中国象棋棋盘">
+      <fieldset
+        className={`chess-board ${captureEffects ? '' : 'tactics-off'}`}
+        aria-label="中国象棋棋盘"
+        style={css({
+          '--slide': `${PIECE_MOTION.slideMs}ms`,
+          // The landing halo waits for the drop; jumps without a move show it at once.
+          '--land': `${frame.move?.timing.landMs ?? 0}ms`,
+          '--selection-lift': `${PIECE_MOTION.selectionMs}ms`,
+        })}
+      >
         <svg viewBox="0 0 900 1000" aria-hidden="true" className="board-lines">
           <g fill="none" stroke="currentColor" strokeWidth="1.8">
             <rect x="50" y="50" width="800" height="900" strokeWidth="3" />
@@ -212,12 +252,10 @@ export default function ChessBoard({
                 data-piece-id={p.id}
                 style={{
                   ...position(n),
-                  ...(moved || revived
+                  ...(moved
                     ? css({
-                        '--slide': `${frame.move?.ms ?? 240}ms`,
-                        ...(moved
-                          ? { transitionDuration: `${frame.move?.ms}ms` }
-                          : {}),
+                        '--hover': `${frame.move?.timing.hoverMs}ms`,
+                        '--drop': `${frame.move?.timing.dropMs}ms`,
                       })
                     : {}),
                 }}
@@ -226,6 +264,20 @@ export default function ChessBoard({
                 <span
                   key={moved ? frame.move?.key : 'idle'}
                   className={`piece ${p.side} ${p.kind === 'k' && checkSide === p.side ? 'checked' : ''}`}
+                  onAnimationEnd={(event) => {
+                    if (event.animationName === 'piece-hop')
+                      setFrame((current) =>
+                        current.move === move
+                          ? { ...current, move: null }
+                          : current,
+                      );
+                    if (event.animationName === 'piece-revive')
+                      setFrame((current) =>
+                        current.revived === p.id
+                          ? { ...current, revived: null }
+                          : current,
+                      );
+                  }}
                 >
                   <span>{label(p)}</span>
                 </span>
@@ -233,7 +285,7 @@ export default function ChessBoard({
             );
           })}
         </div>
-        {ghost && (
+        {ghost && captureEffects && (
           <div
             key={ghost.key}
             className="capture-ghost piece-position"
@@ -256,7 +308,61 @@ export default function ChessBoard({
             ))}
           </div>
         )}
-        <BoardEffect effect={effect} />
+        {arrows.length > 0 && (
+          <svg
+            className="board-arrows"
+            viewBox="0 0 900 1000"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {arrows.map((arrow) => {
+              const point = (n: number) => {
+                  const v = view(n);
+                  return [50 + (v % 9) * 100, 50 + Math.floor(v / 9) * 100];
+                },
+                [x1, y1] = point(arrow.from),
+                [x2, y2] = point(arrow.to),
+                length = Math.hypot(x2 - x1, y2 - y1),
+                ux = (x2 - x1) / length,
+                uy = (y2 - y1) / length,
+                // Stop short of the target so its piece stays readable.
+                tipX = x2 - ux * 18,
+                tipY = y2 - uy * 18,
+                baseX = tipX - ux * 46,
+                baseY = tipY - uy * 46;
+              return (
+                <g
+                  key={`${arrow.tone}:${arrow.from}:${arrow.to}`}
+                  className={`board-arrow ${arrow.tone}`}
+                >
+                  <circle cx={x1} cy={y1} r="13" />
+                  <line x1={x1} y1={y1} x2={baseX} y2={baseY} />
+                  <path
+                    d={`M${tipX} ${tipY}L${baseX - uy * 30} ${baseY + ux * 30}L${baseX + uy * 30} ${baseY - ux * 30}Z`}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+        )}
+        {marks.map((mark) => (
+          <span
+            key={`${mark.at}:${mark.tone}`}
+            className={`board-mark ${mark.tone}`}
+            style={position(mark.at)}
+            aria-hidden="true"
+          >
+            {mark.text && <b>{mark.text}</b>}
+          </span>
+        ))}
+        <BoardEffect
+          effect={effect}
+          at={
+            effect?.kind === 'capture' && effect.at !== undefined
+              ? stampPoint(view(effect.at))
+              : null
+          }
+        />
       </fieldset>
     </div>
   );

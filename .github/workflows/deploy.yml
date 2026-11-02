@@ -1,0 +1,73 @@
+name: Test and deploy
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Where to deploy
+        type: choice
+        options: [staging, production]
+        default: staging
+permissions:
+  contents: read
+concurrency:
+  group: deploy-${{ github.ref }}-${{ inputs.target || 'auto' }}
+  cancel-in-progress: false
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:identity
+      - run: npm run test:ui
+      - run: npm run test:audio
+      - run: npm run test:archive
+      - run: npm run test:analysis
+      - run: npm run test:mobile
+      - run: npm run test:ai
+      - run: npm run build
+  # A push to main refreshes staging. Production is promoted by hand:
+  # Actions → "Test and deploy" → Run workflow → production.
+  deploy:
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.target || 'staging' }}
+    env:
+      TARGET: ${{ inputs.target || 'staging' }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Check Cloudflare credentials
+        id: creds
+        run: |
+          if [ -n "$CLOUDFLARE_API_TOKEN" ] && [ -n "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Cloudflare secrets are not configured, so nothing was deployed."
+          fi
+      - name: Migrate the database and deploy
+        if: steps.creds.outputs.ready == 'true'
+        run: |
+          if [ "$TARGET" = "production" ]; then
+            npx wrangler d1 migrations apply DB --remote
+            npm run deploy
+          else
+            npx wrangler d1 migrations apply DB --env staging --remote
+            npm run deploy:staging
+          fi

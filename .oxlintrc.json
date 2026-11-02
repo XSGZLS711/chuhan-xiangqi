@@ -23,13 +23,13 @@
     "typeCheck": true
   },
   "ignorePatterns": [
-    ".next/**",
-    ".vinext/**",
+    ".wrangler/**",
+    "work/**",
     "out/**",
     "build/**",
     "dist/**",
     "coverage/**",
-    "next-env.d.ts"
+    "public/**"
   ],
   "rules": {
     "no-array-constructor": "error",

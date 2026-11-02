@@ -18,6 +18,7 @@
 - 终局时棋盘略微缩小，出现「再来一局」「再蒸一下」「复盘」；收到重开邀请时显示「应邀出战」。
 - 「再蒸一下」与菜单悔棋均直接撤回最近一步并继续，非己方回合点击棋盘静默忽略。
 - 棋子使用自托管的 Ma Shan Zheng 字体子集，車字统一。字体来源：Google Fonts，授权见 public/fonts/OFL-MaShanZheng.txt。
+- 落子声取自 Freesound 上 JJTaynos 的 CC0 录音，出处与处理方式见 public/sounds/SOURCE.md；吃子、将军、绝杀在它之外用 Web Audio 合成，「吃」「将军」使用设备自带的中文语音。
 - 走棋时棋子起落并按距离调整滑行时间，吃子时被吃棋子先被压住再碎裂消散，悔棋吃子会让棋子回到盘上；将军有刀光与棋盘微颤，绝杀有毛笔落字、涟漪、火星与印章。分开的落子、吃子与终局合成音效，可关闭。
 - 计时局最后 30 秒的时钟会变红闪动；棋谱自动滚动到当前着法，聊天自动滚动到最新消息；提示条数秒后自动消失。
 - 双方吃子栏按车、马、炮、象、士、兵归类计数，跟随悔棋、复盘、推演和重开更新。
@@ -35,35 +36,41 @@
 
 Fairy-Stockfish 以 WebAssembly 在独立 Worker 内计算，选择象棋规则、经典评估器（不加载 NNUE）、单搜索线程与 16 MiB 哈希。难度是搜索预算与引擎技能档位，不对应已测定的等级分。对战和分析串行执行；悔棋、换局、复盘或页面转入后台会取消当前任务，旧结果不能落入新局面。裁决仍以本项目棋规为准，复杂赛事规则未完整覆盖。
 
-GitHub Pages 无法自定义隔离响应头，因此 `/ai/` 使用仅限该目录的网络转发 Service Worker，添加 COOP/COEP；首次打开可能自动刷新一次。它不缓存棋局，不控制好友对战首页，不依赖联机 API。需要支持 WebAssembly SIMD、SharedArrayBuffer 和 Service Worker 的现代浏览器。加载失败会提示重试；不支持的内置浏览器请改用系统浏览器。
-
-本地 `npm run dev` 时 `/ai` 由开发服务器直接发送隔离响应头（`next.config.ts`、`vite.config.ts`），无需 Service Worker；GitHub Pages 仍使用上面的 Service Worker。
+`/ai/` 需要 SharedArrayBuffer，因此页面必须“跨源隔离”。Worker 通过 `public/_headers` 为 `/ai` 与 `/ai/*`（含引擎文件）下发 COOP/COEP，不再需要 Service Worker；开发服务器在 `vite.config.ts` 里用中间件下发相同的头。需要支持 WebAssembly SIMD 与 SharedArrayBuffer 的现代浏览器，加载失败会提示重试；不支持的内置浏览器请改用系统浏览器。
 
 引擎版本、对应源码、构建说明及 GPL-3.0 许可见 `public/ai/engine/SOURCE.md`、`Copying.txt` 与 `AUTHORS`。
 
 ## 开发与验证
 
-使用 `npm install` 安装依赖，`npm run dev` 开发，`npm run build` 构建。
+技术栈：Vite + React 前端；一个 Cloudflare Worker（Hono）同时提供静态页面与 `/api/*`；D1 存棋局。页面是静态资源，只有 `/api/*` 会唤醒 Worker。
 
-数据库定义在 `db/schema.ts`，使用 `npm run db:generate` 生成迁移。生产迁移由 Sites 发布流程应用。本地数据库需使用 Wrangler 将 `drizzle/*.sql` 应用到本机 D1，数据路径 `.wrangler/state`。
+```bash
+npm install
+npm run dev          # 自动迁移本地 D1，然后启动 http://localhost:5173
+npm run build        # 生成 dist/（dist/client 为页面，dist/chuhan_xiangqi 为 Worker）
+npm run preview      # 本地预览构建结果
+```
+
+数据库定义在 `db/schema.ts`，用 `npm run db:generate` 生成迁移到 `drizzle/`；本地迁移是 `npm run db:migrate:local`，`npm run dev` 会自动执行。
 
 - `npm test`：棋规与对局状态测试，包含标准开局三层走法总数 44 / 1920 / 79666。
 - `npm run test:mobile`：再战邀请、终局悔棋、静默点击、聊天气泡与旧棋谱兼容。
 - `npm run test:ui`：吃子分组、走棋过渡、音效去重与终局提示判断。
 - `npm run test:ai`：坐标/FEN、红黑悔棋、评分视角、串行取消及真实 WASM 六步合法走棋与分析。
-- `npm run test:online -- http://localhost:3000`：通过两个独立身份及观战者验证 API 对局流程。
-- `npx tsc --noEmit`：类型检查。
+- `npm run test:identity`：同源与 Cookie 身份规则、`/ai` 隔离响应头、Worker 只在 `/api/*` 运行的部署配置检查。
+- `npm run test:online -- http://localhost:5173`：通过两个独立身份及观战者验证 API 对局流程。
+- `npm run typecheck`：类型检查。
 
-棋局没有公开列表；持有棋室链接者可以进入或观战。保留原浏览器数据可恢复座位。重开前可导出棋谱；重开会替换当前棋谱。
+棋局没有公开列表；持有棋室链接者可以进入或观战。保留原浏览器数据（Cookie）可恢复座位。重开前可导出棋谱；重开会替换当前棋谱。
 
-## GitHub Pages
+## 部署到 Cloudflare
 
-网页发布在 `https://xsgzls711.github.io/chuhan-xiangqi/`。真实的 React 界面及静态资源由 GitHub Pages 托管，联机服务和棋局数据库保留在原 Sites 后台。
+仓库不含任何账号信息，首次上线需要你自己完成：
 
-- `npm run build:pages` 生成 `dist-pages/`。
-- `.github/workflows/pages.yml` 在 `main` 推送后自动验证并发布网页。
-- 后台代码更新仍需通过原 Sites 项目发布；GitHub Actions 不持有后台发布凭证。
-- `npm run test:pages` 检查路径、身份和跨域权限。
-- `node tests/pages-online.test.mjs BACKEND_ORIGIN` 验证 GitHub 来源的双人联机流程。
+1. `npx wrangler login`，然后创建两个数据库：`npx wrangler d1 create chuhan-xiangqi` 与 `npx wrangler d1 create chuhan-xiangqi-staging`，把输出的 `database_id` 分别填进 `wrangler.jsonc`（顶层与 `env.staging`）。
+2. 先上预发：`npm run db:migrate:staging && npm run deploy:staging`，用 Cloudflare 给的 `*.workers.dev` 地址验证。
+3. 再上线：`npm run db:migrate:production && npm run deploy`。要用自己的域名，取消 `wrangler.jsonc` 中 `routes` 注释并改成你的域名。
+4. 自动部署：在 GitHub 仓库的 Settings → Secrets 中添加 `CLOUDFLARE_API_TOKEN`（建议基于 “Edit Cloudflare Workers” 模板，并确认含 D1 编辑权限）与 `CLOUDFLARE_ACCOUNT_ID`。之后推送到 `main` 会先跑测试，再自动更新预发；上线则在 Actions 里手动运行 “Test and deploy” 并选择 `production`。未配置密钥时只跑测试，不部署。
 
-GitHub Pages 玩家身份保存在当前浏览器；请求以专属随机座位凭证连接后台，不依赖第三方 Cookie。旧域名的座位仍保留在原浏览器身份中；新域名是独立身份。分享新的 GitHub 对局链接即可邀请朋友，棋局数据不会迁移或删除。
+旧的 GitHub Pages 前端与旧后端互相独立：本版本不再向 Pages 发布，旧站停留在最后一次发布的状态；新旧站点使用各自的数据库，棋局不会迁移。
+

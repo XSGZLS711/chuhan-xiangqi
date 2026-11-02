@@ -1,0 +1,840 @@
+/* Whole-game review: board and advantage bar on top, tabs below, steps at the bottom. */
+.review-screen {
+  --review-bar: 30px;
+  --review-red: #cf5038;
+  --review-ink: #2c2a2b;
+  /* One screen: the board stays put and only the tab content scrolls. On very
+     short screens the page itself scrolls rather than hiding the steps. */
+  height: 100dvh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  background: var(--background);
+  color: var(--foreground);
+}
+.review-screen button {
+  font: inherit;
+  cursor: pointer;
+}
+.review-screen button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.review-screen button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.review-screen svg {
+  flex: none;
+}
+.review-header {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+}
+.review-header strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 600;
+}
+.review-header span {
+  display: block;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.review-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  color: var(--foreground);
+  background: transparent;
+}
+.review-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.review-header .review-ply {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-variant-numeric: tabular-nums;
+}
+/* The board shrinks with the viewport height so the tabs always stay on screen. */
+.review-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--review-bar);
+  gap: 8px;
+  align-items: stretch;
+  width: min(100%, calc((100dvh - 430px) * 0.9 + var(--review-bar) + 32px));
+  min-width: min(100%, 280px);
+  margin: 0 auto;
+  padding: 0 12px;
+}
+.review-board {
+  min-width: 0;
+}
+.eval-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.eval-bar-track {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--review-ink);
+}
+.eval-bar-track > span {
+  position: absolute;
+  inset: auto 0 0;
+  height: var(--share);
+  background: linear-gradient(180deg, #e26a4f, var(--review-red));
+  transition: height 420ms var(--ease-out);
+}
+.eval-bar.flipped .eval-bar-track > span {
+  inset: 0 0 auto;
+}
+.eval-bar output {
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+.eval-bar output b {
+  display: block;
+  font-weight: 600;
+  color: var(--foreground);
+}
+.eval-bar output small {
+  display: block;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.review-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: min(100%, 720px);
+  min-height: 0;
+  margin: 0 auto;
+  padding: 10px 12px 0;
+}
+.review-progress {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 2px 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.review-progress progress {
+  flex: 1;
+  height: 4px;
+  accent-color: var(--success);
+}
+.review-progress button {
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--foreground);
+  background: transparent;
+}
+.review-tabs {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.review-tabs button {
+  height: 36px;
+  border: 0;
+  border-radius: 9px;
+  font-size: 14px;
+  color: var(--muted-foreground);
+  background: transparent;
+  transition:
+    background 160ms,
+    color 160ms;
+}
+.review-tabs button[aria-selected='true'] {
+  font-weight: 600;
+  color: #fff9ef;
+  background: var(--primary);
+}
+.review-panel {
+  flex: 1;
+  min-height: 120px;
+  overflow: auto;
+  padding: 12px 0;
+}
+.review-empty {
+  margin: 0;
+  padding: 18px 6px;
+  font-size: 14px;
+  text-align: center;
+  color: var(--muted-foreground);
+}
+.review-note {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.review-screen .move-rating {
+  display: inline-grid;
+  place-items: center;
+  min-width: 24px;
+  padding: 1px 6px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-style: normal;
+  font-weight: 600;
+  color: #735313;
+  background: #efe2bc;
+}
+.review-screen .move-rating.rating-mistake {
+  color: #81420c;
+  background: #f3dbc2;
+}
+.review-screen .move-rating.rating-blunder,
+.review-screen .move-rating.rating-allowed-mate {
+  color: #852d25;
+  background: #f2d6ce;
+}
+.review-screen .move-rating.rating-missed-mate {
+  color: #634274;
+  background: #e9dced;
+}
+
+/* Advantage graph. Lines live in a stretched SVG; dots and labels are HTML so they stay round. */
+.eval-chart-area {
+  position: relative;
+  height: clamp(150px, 24dvh, 240px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.eval-chart-area:has(.chart-range:focus-visible) {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.eval-chart-plot {
+  position: absolute;
+  inset: 0 18px;
+}
+.eval-chart-area svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.eval-chart-area svg * {
+  vector-effect: non-scaling-stroke;
+}
+.chart-grid {
+  stroke: var(--border);
+  stroke-dasharray: 3 5;
+}
+.chart-zero {
+  stroke: color-mix(in srgb, var(--foreground) 32%, transparent);
+}
+.chart-phase {
+  stroke: var(--emphasis);
+  stroke-dasharray: 4 4;
+  opacity: 0.7;
+}
+.chart-cursor {
+  stroke: var(--success);
+  stroke-width: 1.5;
+}
+.chart-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.chart-line.red {
+  stroke: var(--review-red);
+}
+.chart-line.black {
+  stroke: color-mix(in srgb, var(--foreground) 82%, transparent);
+}
+.chart-scale,
+.chart-phase-tag {
+  position: absolute;
+  z-index: 1;
+  font-size: 10px;
+  pointer-events: none;
+}
+/* Each limit is labelled on its own grid line, on a chip so the curve passes behind. */
+.chart-scale {
+  top: var(--y);
+  left: 6px;
+  padding: 0 4px;
+  border-radius: 4px;
+  color: var(--muted-foreground);
+  background: var(--card);
+  font-variant-numeric: tabular-nums;
+  transform: translateY(-50%);
+}
+.chart-scale.red {
+  color: var(--review-red);
+}
+.chart-phase-tag {
+  top: 5px;
+  left: var(--x);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: var(--emphasis);
+  background: color-mix(in srgb, var(--emphasis) 16%, var(--card));
+  transform: translateX(3px);
+}
+.chart-dot {
+  position: absolute;
+  top: var(--y);
+  left: var(--x);
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: #c79a35;
+  box-shadow: 0 0 0 2px var(--card);
+  pointer-events: none;
+}
+.chart-dot.rating-mistake {
+  background: #d27126;
+}
+.chart-dot.rating-blunder,
+.chart-dot.rating-allowed-mate {
+  background: #c8432f;
+}
+.chart-dot.rating-missed-mate {
+  background: #85569f;
+}
+.chart-dot.current {
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  background: var(--success);
+  transition:
+    top 200ms var(--ease-out),
+    left 200ms var(--ease-out);
+}
+.chart-range {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  touch-action: pan-y;
+}
+.chart-range::-webkit-slider-thumb {
+  width: 2px;
+  height: 240px;
+  -webkit-appearance: none;
+}
+.chart-range::-moz-range-thumb {
+  width: 2px;
+  height: 240px;
+  border: 0;
+}
+.eval-chart-ticks {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 2px 0;
+  font-size: 11px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.chart-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 2px 0;
+  font-size: 14px;
+}
+
+/* Played move against the engine's choice, each with its own line to step through. */
+.review-compare {
+  display: grid;
+  gap: 10px;
+}
+.compare-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.compare-row.played.active {
+  border-color: #e08a2e;
+}
+.compare-row.best.active {
+  border-color: #3c9a58;
+}
+.compare-who {
+  /* Black's chip is near-black; the hairline keeps it visible on dark cards. */
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--foreground) 22%, transparent);
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--review-ink);
+}
+.compare-who.red {
+  background: var(--review-red);
+}
+.compare-who.engine {
+  background: #3c9a58;
+}
+.compare-move {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  min-width: 0;
+}
+.compare-move strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+.compare-move small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.best-star {
+  color: #d9a93b;
+}
+.line-controls {
+  display: flex;
+  gap: 5px;
+}
+.line-controls button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--foreground);
+  background: transparent;
+}
+.line-controls svg {
+  width: 16px;
+  height: 16px;
+}
+.line-moves ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.line-moves li button {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+.line-moves li.played button {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+.line-moves li.next button {
+  border-color: var(--success);
+  color: var(--foreground);
+}
+.line-exit {
+  margin-top: 10px;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--foreground);
+  background: transparent;
+}
+
+/* Report: both sides' scores around the result, then per-phase rows and mistakes. */
+.report-sides {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+}
+.report-side {
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  text-align: center;
+  background: var(--card);
+}
+.report-side span,
+.report-side small {
+  display: block;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--muted-foreground);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.report-side strong {
+  display: block;
+  font-size: 30px;
+  font-weight: 600;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+.report-side.red strong {
+  color: var(--review-red);
+}
+.report-result {
+  display: grid;
+  place-content: center;
+  padding: 0 6px;
+  text-align: center;
+}
+.report-result b {
+  font-size: 20px;
+}
+.report-result small {
+  font-size: 11px;
+  color: var(--muted-foreground);
+}
+.report-table {
+  width: 100%;
+  margin-top: 10px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.report-table td,
+.report-table th {
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  text-align: center;
+}
+.report-table th {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--muted-foreground);
+}
+.report-mistakes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+.report-mistakes h4 {
+  margin: 0 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.report-mistakes p {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.report-mistakes ul,
+.practice-list {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.report-mistakes li button,
+.practice-list button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 14px;
+  text-align: left;
+  color: var(--foreground);
+  background: transparent;
+}
+.report-mistakes li button span,
+.practice-list button span {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.report-mistakes li button i,
+.practice-list button i {
+  margin-left: auto;
+}
+.practice-list button[aria-current='true'] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+/* Practice: retry the mistakes of one side, with a hint and the answer on demand. */
+.practice-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+.practice-sides button {
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+.practice-sides button[aria-pressed='true'] {
+  border-color: var(--primary);
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+.practice-message {
+  margin: 10px 2px;
+  font-size: 14px;
+}
+.practice-message.solved {
+  font-weight: 600;
+  color: #3c9a58;
+}
+.practice-message.wrong {
+  color: #d27126;
+}
+.practice-actions {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 12px;
+  padding-top: 8px;
+  background: var(--background);
+}
+.practice-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--foreground);
+  background: var(--card);
+}
+.practice-actions svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* Commentary: why the move went wrong and why the engine's choice is better. */
+.compare-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid #d27126;
+  border-radius: 4px 10px 10px 4px;
+  font-size: 14px;
+  line-height: 1.55;
+  background: color-mix(in srgb, #d27126 9%, var(--card));
+}
+.compare-note button {
+  padding: 0;
+  border: 0;
+  font-size: 13px;
+  color: var(--emphasis);
+  background: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.review-commentary {
+  display: grid;
+  gap: 10px;
+}
+.commentary-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.commentary-list button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  font-size: 14px;
+  color: var(--foreground);
+  background: transparent;
+}
+.commentary-list button span {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.commentary-list button[aria-current='true'] {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.commentary-card {
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card);
+}
+.commentary-card header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+}
+.commentary-card header strong {
+  font-size: 16px;
+  font-weight: 600;
+}
+.commentary-card header span {
+  margin-left: auto;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+.commentary-card h4 {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+.commentary-card ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.commentary-card > small {
+  display: block;
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.commentary-actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin: 12px 0 10px;
+}
+.commentary-actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 38px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-size: 13px;
+  color: var(--foreground);
+  background: transparent;
+}
+.commentary-actions button[aria-pressed='true'] {
+  border-color: var(--success);
+}
+.commentary-actions svg {
+  width: 15px;
+  height: 15px;
+}
+
+.review-nav {
+  position: sticky;
+  bottom: 0;
+  display: grid;
+  grid-template-columns: 44px 1fr 1fr 44px auto;
+  gap: 6px;
+  width: min(100%, 720px);
+  margin: 0 auto;
+  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
+  background: var(--background);
+}
+.review-nav button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  font-size: 14px;
+  color: var(--foreground);
+  background: var(--card);
+}
+.review-nav svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* Landscape tablets and desktops: board on the left, everything else beside it. */
+@media (min-aspect-ratio: 23/20) and (min-width: 760px) {
+  .review-screen {
+    display: grid;
+    grid-template-columns: minmax(0, auto) minmax(360px, 460px);
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    column-gap: 20px;
+    justify-content: center;
+    height: 100dvh;
+    padding: 0 16px;
+  }
+  .review-header {
+    grid-column: 1 / -1;
+    padding: 10px 0;
+  }
+  .review-stage {
+    grid-row: 2 / 4;
+    align-self: start;
+    width: calc((100dvh - 96px) * 0.9 + var(--review-bar) + 8px);
+    max-width: 62vw;
+    padding: 0;
+  }
+  .review-body,
+  .review-nav {
+    grid-column: 2;
+    width: 100%;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  .review-body {
+    padding-top: 0;
+  }
+  .review-nav {
+    padding-bottom: 16px;
+  }
+}

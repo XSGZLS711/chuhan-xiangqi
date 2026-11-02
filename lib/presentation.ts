@@ -101,21 +101,44 @@ export type SoundKind =
   | 'result';
 export type BoardEffect = {
   id: string;
-  kind: 'check' | 'mate' | 'result';
+  kind: 'capture' | 'check' | 'mate' | 'result';
   title: string;
   detail: string;
   side?: Side;
   analysis?: boolean;
+  /** Where a capture happened: its stamp lands on that point, not mid-board. */
+  at?: number;
 };
-/** How long an overlay stays up; the stylesheet reads the same value as --fx. */
+export const STAMP_TIMING = { delayMs: 250, enterMs: 150, fadeMs: 400 };
+/** Visible lifetime, after the stamp's delayed entrance. */
+export const stampDuration = (kind: BoardEffect['kind']) =>
+  kind === 'mate' || kind === 'result' ? 1600 : 1400;
+/** Includes the entrance delay, so cleanup cannot cut the fade short. */
 export const effectDuration = (kind: BoardEffect['kind']) =>
-  kind === 'check' ? 1500 : 3400;
+  STAMP_TIMING.delayMs + stampDuration(kind);
+export function captureEffect(
+  id: string,
+  side: Side,
+  analysis = false,
+  at?: number,
+): BoardEffect {
+  return {
+    id,
+    kind: 'capture',
+    at,
+    title: '吃',
+    detail: (analysis ? '推演 · ' : '') + sideLabel(side) + '吃子',
+    side,
+    analysis,
+  };
+}
 export function resultEffect(
   result: Result,
   id: string,
   analysis = false,
 ): BoardEffect {
   const mate = result.reason === '将死';
+  // Name how the game ended, not who won: both players and spectators see this stamp.
   return {
     id,
     kind: mate ? 'mate' : 'result',
@@ -123,9 +146,11 @@ export function resultEffect(
       ? '绝杀'
       : result.winner === 'draw'
         ? '和棋'
-        : result.reason === '困毙'
-          ? '困毙'
-          : '胜局',
+        : result.reason.endsWith('认输')
+          ? '认输'
+          : ['困毙', '超时', '长将判负'].includes(result.reason)
+            ? result.reason
+            : '终局',
     detail:
       (analysis ? '推演 · ' : '') +
       (result.winner === 'draw'
@@ -155,6 +180,13 @@ export function updateFeedback<T extends FeedbackRoom>(
   if (moved) {
     const move = next.history[next.history.length - 1];
     sounds.push(move.captured ? 'capture' : 'move');
+    if (move.captured)
+      effect = captureEffect(
+        `${next.id}:${next.round}:${next.version}`,
+        move.side,
+        false,
+        move.to,
+      );
     if (move.check && !next.result) {
       sounds.push('check');
       effect = {
@@ -210,5 +242,8 @@ export function branchFeedback(
       },
     };
   }
-  return { sounds, effect: null };
+  return {
+    sounds,
+    effect: board[to] ? captureEffect(id, turn, true, to) : null,
+  };
 }

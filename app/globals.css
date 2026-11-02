@@ -444,10 +444,12 @@ button:not(:disabled):active {
     inset 0 1.5px 1px #fffbe6, inset 0 -3px 4px #9c6a3059,
     0 var(--pt) 0 #9a6c3a, 0 calc(var(--pt) + 1px) 0 #6f4622,
     0 calc(var(--pt) + 3px) 7px #4a2c0f70;
+  /* Held above the board: the edge thins and a soft shadow falls down-right,
+     scaled with the board so phones and desktops look the same. */
   --piece-lift:
     inset 0 1.5px 1px #fffbe6, inset 0 -3px 4px #9c6a3059,
-    0 calc(var(--pt) + 4px) 0 #9a6c3a, 0 calc(var(--pt) + 5px) 0 #6f4622,
-    0 calc(var(--pt) + 14px) 14px #4a2c0f66;
+    0 calc(var(--pt) * 0.6) 0 #9a6c3a, 0 calc(var(--pt) * 0.6 + 1px) 0 #6f4622,
+    1.1cqw 2.2cqw 1.8cqw #3a200a5c;
 }
 .board-lines {
   width: 100%;
@@ -546,22 +548,12 @@ button:not(:disabled):active {
 .piece.black {
   color: var(--piece-black);
 }
-.move-dot {
-  width: 24%;
-  height: 24%;
+.move-dot,
+.capture-target {
+  width: 20%;
+  height: 20%;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #6c9a63, #3f6b3e);
-  box-shadow:
-    0 0 0 5px #5b8a5226,
-    0 0 0 1px #ffffff55 inset,
-    0 1px 3px #1e3a1e55;
-  animation: dot-pop 0.28s var(--ease-spring) both;
-}
-@keyframes dot-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.2);
-  }
+  background: rgba(120, 180, 80, 0.55);
 }
 .intersection.last-to::after,
 .intersection.last-from::after {
@@ -570,43 +562,34 @@ button:not(:disabled):active {
   pointer-events: none;
   z-index: 0;
 }
-/* The square a piece just left keeps a faint imprint; its landing is bracketed. */
+/* Like a wooden set under a lamp: the vacated point keeps a small white dot once
+   the piece has slid away, and the landed piece gains a thin halo after it drops. */
 .intersection.last-from::after {
-  inset: 22%;
+  inset: 39%;
   border-radius: 50%;
-  background: radial-gradient(
-    circle,
-    color-mix(in srgb, #b8602f 34%, transparent),
-    transparent 72%
-  );
-  animation: trace-fade 0.6s ease-out both;
+  background: #fffaf0;
+  box-shadow:
+    0 0 0 2px #fffaf080,
+    0 0 6px 2px #fff1c680;
+  animation: origin-dot 0.18s ease-out var(--slide, 0ms) both;
 }
 .intersection.last-to::after {
-  inset: 1%;
-  --c: #b4572c;
-  background:
-    linear-gradient(var(--c), var(--c)) top left / 24% 2px,
-    linear-gradient(var(--c), var(--c)) top left / 2px 24%,
-    linear-gradient(var(--c), var(--c)) top right / 24% 2px,
-    linear-gradient(var(--c), var(--c)) top right / 2px 24%,
-    linear-gradient(var(--c), var(--c)) bottom left / 24% 2px,
-    linear-gradient(var(--c), var(--c)) bottom left / 2px 24%,
-    linear-gradient(var(--c), var(--c)) bottom right / 24% 2px,
-    linear-gradient(var(--c), var(--c)) bottom right / 2px 24%;
-  background-repeat: no-repeat;
-  filter: drop-shadow(0 0 3px #ffe3a066);
-  animation: bracket-in 0.42s var(--ease-out) both;
+  inset: 2%;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1.5px #fffaf0d9,
+    0 0 9px 2px #fff1c690;
+  animation: landing-halo 0.12s ease-out var(--land, 0ms) both;
 }
-@keyframes trace-fade {
+@keyframes origin-dot {
   from {
     opacity: 0;
-    transform: scale(1.5);
+    transform: scale(0.3);
   }
 }
-@keyframes bracket-in {
+@keyframes landing-halo {
   from {
     opacity: 0;
-    transform: scale(1.35);
   }
 }
 .piece.checked {
@@ -1736,6 +1719,93 @@ p {
 .intersection {
   z-index: 4;
 }
+/* Review overlays: move arrows and labels sit over the pieces, under the touch targets. */
+.board-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+.board-arrow.best {
+  --arrow: #3c9a58;
+}
+.board-arrow.played {
+  --arrow: #e08a2e;
+}
+.board-arrow line {
+  stroke: var(--arrow);
+  stroke-width: 15;
+  stroke-linecap: round;
+  opacity: 0.86;
+}
+.board-arrow path {
+  fill: var(--arrow);
+  opacity: 0.92;
+}
+.board-arrow circle {
+  fill: #fffaf0;
+  stroke: var(--arrow);
+  stroke-width: 6;
+}
+.board-mark {
+  position: absolute;
+  /* Above the last-move halo and the touch targets; clicks still pass through. */
+  z-index: 5;
+  width: 10.7%;
+  height: 9.6%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.board-mark b {
+  position: absolute;
+  top: -10%;
+  right: -12%;
+  min-width: 46%;
+  padding: 1px 4px;
+  border-radius: 999px;
+  font-size: clamp(9px, 2.6cqi, 13px);
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  color: #fff;
+  background: #b9832a;
+  box-shadow: 0 1px 3px #0005;
+}
+.board-mark.rating-mistake b {
+  background: #d27126;
+}
+.board-mark.rating-blunder b,
+.board-mark.rating-allowed-mate b {
+  background: #c8432f;
+}
+.board-mark.rating-missed-mate b {
+  background: #85569f;
+}
+.board-mark.best b {
+  background: #3c9a58;
+}
+/* Practice hint: a ring around the piece that should move, nothing more. */
+.board-mark.hint {
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px #fffaf0,
+    0 0 0 6px #3c9a58;
+  animation: hint-ring 1.2s ease-in-out infinite alternate;
+}
+@keyframes hint-ring {
+  to {
+    box-shadow:
+      0 0 0 4px #fffaf0,
+      0 0 0 9px #3c9a5899;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-mark.hint {
+    animation: none;
+  }
+}
 .pieces-layer {
   position: absolute;
   inset: 0;
@@ -1753,26 +1823,20 @@ p {
 }
 .animate-pieces .piece-position {
   transition:
-    left 240ms var(--ease-slide),
-    top 240ms var(--ease-slide);
+    left var(--slide) var(--ease-slide),
+    top var(--slide) var(--ease-slide);
+}
+.piece-position .piece {
+  transition-duration: 0s;
 }
 .piece-position.selected {
   z-index: 3;
 }
 .piece-position.selected .piece {
-  translate: 0 -7%;
-  scale: 1.09;
+  translate: 0 -3%;
+  scale: 1.3;
   box-shadow: var(--piece-lift);
-}
-.piece-position.selected .piece::before {
-  content: '';
-  position: absolute;
-  inset: -9%;
-  border-radius: 50%;
-  border: 2px solid #b8402c;
-  box-shadow: 0 0 10px #b8402c55;
-  animation: select-ring 1.5s ease-out infinite;
-  pointer-events: none;
+  transition-duration: var(--selection-lift);
 }
 .piece-position.latest-piece {
   z-index: 2;
@@ -1782,48 +1846,23 @@ p {
   z-index: 6;
 }
 .piece-position.moving .piece {
-  animation: piece-hop calc(var(--slide, 240ms) + 170ms) var(--ease-out) both;
+  animation: piece-hop var(--drop) ease-out var(--hover) backwards;
 }
 @keyframes piece-hop {
-  0% {
-    translate: 0 0;
-    scale: 1;
-    box-shadow: var(--piece-rest);
-  }
-  28% {
-    translate: 0 -9%;
-    scale: 1.14;
-    box-shadow: var(--piece-lift);
-  }
-  66% {
+  from {
     translate: 0 -3%;
-    scale: 1.06;
+    scale: 1.3;
     box-shadow: var(--piece-lift);
   }
-  84% {
-    translate: 0 1%;
-    scale: 0.965;
-    box-shadow: var(--piece-rest);
-  }
-  100% {
+  to {
     translate: 0 0;
     scale: 1;
     box-shadow: var(--piece-rest);
-  }
-}
-@keyframes select-ring {
-  0% {
-    opacity: 0.95;
-    scale: 0.94;
-  }
-  100% {
-    opacity: 0;
-    scale: 1.32;
   }
 }
 /* An undone capture returns once the capturing piece has stepped away. */
 .piece-position.revived .piece {
-  animation: piece-revive 0.55s var(--ease-spring) calc(var(--slide, 240ms) * 0.55)
+  animation: piece-revive 0.55s var(--ease-spring) calc(var(--slide) * 0.55)
     both;
 }
 @keyframes piece-revive {
@@ -1845,35 +1884,10 @@ p {
     rotate: 0deg;
   }
 }
-.capture-target {
-  width: 104%;
-  height: 104%;
-  border: 2px solid #b6432e;
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 4px #b6432e1f,
-    inset 0 0 8px #b6432e40;
-  animation: target-pulse 1.3s ease-in-out infinite;
-}
-@keyframes target-pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 3px #b6432e1f,
-      inset 0 0 6px #b6432e40;
-    scale: 0.97;
-  }
-  50% {
-    box-shadow:
-      0 0 0 7px #b6432e14,
-      inset 0 0 10px #b6432e55;
-    scale: 1.03;
-  }
-}
 /* The captured piece waits under the arriving one, then bursts apart. */
 .capture-ghost {
   z-index: 1;
-  animation: ghost-above 600ms var(--impact-delay, 180ms) forwards;
+  animation: ghost-above 600ms var(--impact-delay) forwards;
 }
 @keyframes ghost-above {
   from,
@@ -1882,7 +1896,7 @@ p {
   }
 }
 .capture-ghost .piece {
-  animation: captured-piece 520ms var(--ease-out) var(--impact-delay, 180ms) both;
+  animation: captured-piece 520ms var(--ease-out) var(--impact-delay) both;
 }
 .capture-impact {
   position: absolute;
@@ -1892,7 +1906,7 @@ p {
   box-shadow:
     0 0 14px #ffd98a99,
     inset 0 0 12px #ffe6a755;
-  animation: capture-ring 560ms var(--ease-out) var(--impact-delay, 180ms) both;
+  animation: capture-ring 560ms var(--ease-out) var(--impact-delay) both;
 }
 .capture-shard {
   position: absolute;
@@ -1906,7 +1920,7 @@ p {
   box-shadow: 0 0 6px #ffd98a99;
   transform-origin: 50% 50%;
   opacity: 0;
-  animation: capture-shard 520ms var(--ease-out) var(--impact-delay, 180ms) both;
+  animation: capture-shard 520ms var(--ease-out) var(--impact-delay) both;
 }
 @keyframes captured-piece {
   0% {
@@ -2060,10 +2074,9 @@ p {
   }
 }
 
-/* Short, non-blocking calligraphy overlays for check and game results. */
+/* Our own ink stamp, shared by captures, checks and results: an open brush ring
+   with a large pale-gold word, arriving out of a zoom blur as the piece lands. */
 .board-effect {
-  --accent: #ffe2a0;
-  --glow-rgb: 209, 95, 48;
   position: absolute;
   inset: 0;
   z-index: 8;
@@ -2071,339 +2084,173 @@ p {
   place-items: center;
   pointer-events: none;
   overflow: hidden;
-  animation: fx-life var(--fx, 3400ms) ease both;
+  color: #1f1a17;
+  animation: stamp-fade var(--stamp-fade) ease-out var(--stamp-fade-at) forwards;
 }
-.board-effect.black {
-  --accent: #e9edf0;
-  --glow-rgb: 140, 160, 175;
+.effect-check {
+  color: #7e2219;
 }
-.effect-veil {
+.effect-mate {
+  color: #a3362a;
+}
+/* A capture is stamped where it happened, about a third of the board across. */
+.board-effect.at-point {
+  inset: auto;
+  left: var(--at-x);
+  top: var(--at-y);
+  width: 34%;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  overflow: visible;
+}
+.at-point .ink-stamp {
+  width: 100%;
+}
+.at-point .ink-stamp strong {
+  font-size: 19cqw;
+}
+.ink-stamp {
+  position: relative;
+  width: 58%;
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 2cqw;
+  text-align: center;
+}
+.ink-ring,
+.ink-slash {
   position: absolute;
   inset: 0;
-  background: radial-gradient(
-    ellipse at center,
-    #140c04f7 0%,
-    #140c04e0 32%,
-    #140c0400 76%
-  );
-  animation: veil-in 0.5s ease-out both;
+  width: 100%;
+  height: 100%;
 }
-.effect-inscription {
-  position: relative;
-  display: flex;
-  align-items: center;
-  flex-direction: column;
-  gap: 1.2cqw;
-  text-align: center;
-  color: #fff0c4;
-  padding: 20px;
-  text-shadow: 0 2px 10px #160900;
+.ink-ring {
+  animation: ring-arrive calc(var(--stamp-enter) + 30ms) var(--ease-out)
+    calc(var(--stamp-delay) + 30ms) both;
 }
-.effect-inscription strong {
-  display: flex;
-  font-family: 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
-  font-size: 18cqw;
-  letter-spacing: 0.1em;
-  padding-left: 0.1em;
-  line-height: 1.2;
-  font-weight: 400;
-}
-/* Each character lands like a brush stroke: heavy, blurred, then crisp. */
-.effect-inscription strong > span {
-  display: inline-block;
-  animation: brush-land 0.62s var(--ease-out) calc(0.12s + var(--i, 0) * 0.15s)
+.ink-slash {
+  inset: -14%;
+  width: 128%;
+  height: 128%;
+  fill: #6f1f18;
+  animation: slash-arrive var(--stamp-enter) var(--ease-out) var(--stamp-delay)
     both;
 }
-.effect-overline {
-  font-size: 2.8cqw;
-  letter-spacing: 0.35em;
-  color: #f0d6a2;
-  animation: fade-rise 0.6s ease-out 0.05s both;
-}
-.effect-detail {
-  font-size: 3.4cqw;
-  letter-spacing: 0.06em;
-  text-shadow:
-    0 1px 2px #000,
-    0 0 10px #140c04;
-  animation: fade-rise 0.7s ease-out 0.55s both;
-}
-.effect-mate .effect-inscription strong,
-.effect-result .effect-inscription strong {
-  color: var(--accent);
-}
-.effect-mate .effect-inscription strong {
-  text-shadow:
-    0 3px 0 #8b301e,
-    0 0 26px rgba(var(--glow-rgb), 0.55);
-}
-.effect-mate.black .effect-inscription strong {
-  text-shadow:
-    0 3px 0 #38424a,
-    0 0 26px rgba(var(--glow-rgb), 0.5);
-}
-.effect-result .effect-inscription strong {
-  font-size: 14cqw;
-}
-.effect-rings {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-items: center;
-}
-.effect-rings > i {
-  position: absolute;
-  width: 62%;
-  aspect-ratio: 1;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, var(--accent) 58%, transparent);
-  box-shadow: 0 0 22px rgba(var(--glow-rgb), 0.22);
-  animation: ring-out 1.9s var(--ease-out) both;
-}
-.effect-rings > i:nth-child(2) {
-  border-style: dashed;
-  opacity: 0.6;
-  animation-delay: 0.18s;
-}
-.effect-rings > i:nth-child(3) {
-  animation-delay: 0.42s;
-}
-.effect-embers {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-}
-.effect-embers > i {
-  position: absolute;
-  left: var(--x);
-  bottom: -4%;
-  width: var(--s);
-  height: var(--s);
-  border-radius: 50%;
-  background: radial-gradient(circle, #fff4cc, var(--accent) 55%, transparent);
-  box-shadow: 0 0 8px rgba(var(--glow-rgb), 0.8);
-  opacity: 0;
-  animation: ember-rise 2.4s ease-out calc(0.2s + var(--d)) both;
-}
-.effect-seal {
-  position: absolute;
-  right: 4%;
-  bottom: 6%;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  width: 9.5cqw;
-  aspect-ratio: 1;
-  padding: 0.6cqw;
-  gap: 0;
-  place-items: center;
-  border-radius: 0.6cqw;
-  background: linear-gradient(145deg, #c04a39, #8c2b21);
-  color: #ffe9c8;
-  font: 4.4cqw/1 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
-  text-shadow: none;
-  box-shadow:
-    inset 0 0 0 0.35cqw #8c2b21,
-    inset 0 0 0 0.6cqw #e8b98c88,
-    0 2px 10px #00000066;
-  rotate: -7deg;
-  animation: seal-stamp 0.5s var(--ease-spring) 1.05s both;
-}
-.effect-seal > b {
+.ink-stamp strong {
+  position: relative;
+  font-family: 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
+  font-size: 32cqw;
+  line-height: 1.1;
   font-weight: 400;
+  color: #f8e7b9;
+  -webkit-text-stroke: 0.7cqw #2a1d14;
+  paint-order: stroke fill;
+  text-shadow:
+    0 0.5cqw 1.2cqw #000a,
+    0 0 3cqw #fff3cf55;
+  animation: glyph-arrive var(--stamp-enter) var(--ease-out) var(--stamp-delay)
+    both;
 }
-.effect-slash {
+/* A larger, fading echo of the word reads as the zoom blur of a stamp coming down. */
+.ink-stamp strong::after {
+  content: attr(data-text);
   position: absolute;
   inset: 0;
-  overflow: hidden;
-}
-.effect-slash > i {
-  position: absolute;
-  top: 50%;
-  left: -10%;
-  width: 120%;
-  height: 0.55cqw;
-  margin-top: -0.3cqw;
-  background: linear-gradient(90deg, transparent, #ffd9a8, #fff4e0, #ffb98a, transparent);
-  box-shadow: 0 0 18px #ff9a6a99;
-  rotate: -9deg;
-  transform-origin: 50% 50%;
+  color: #fff3cf;
+  -webkit-text-stroke: 0;
   opacity: 0;
-  animation: slash-sweep 0.7s var(--ease-out) both;
+  animation: glyph-echo calc(var(--stamp-enter) + 120ms) ease-out
+    var(--stamp-delay) both;
 }
-.effect-slash > i + i {
-  rotate: 7deg;
-  animation-delay: 0.1s;
-  height: 0.3cqw;
+.effect-mate strong,
+.effect-result strong {
+  font-size: 18cqw;
 }
-.effect-check .effect-inscription strong {
-  font-size: 14cqw;
-  color: #ffdda4;
-  text-shadow:
-    0 2px 0 #7a2a1c,
-    0 0 22px #e0603b99;
+.ink-stamp-context,
+.effect-detail {
+  position: relative;
+  font-size: 3cqw;
+  line-height: 1.6;
+  max-width: 90%;
+  color: #302a25;
+  background: #fff3d9ed;
+  border-radius: 4px;
+  padding: 0.2cqw 1.4cqw;
+  animation: glyph-arrive var(--stamp-enter) var(--ease-out)
+    calc(var(--stamp-delay) + 80ms) both;
 }
-.effect-check .effect-overline {
+.ink-stamp-context:empty {
   display: none;
 }
-.effect-check .effect-veil {
-  background: radial-gradient(
-    ellipse at center,
-    #2a140cf2 0%,
-    #2a140cc4 30%,
-    #2a140c00 64%
-  );
-}
-.effect-check.black .effect-inscription strong {
-  color: #e8ecef;
-  text-shadow:
-    0 2px 0 #2c353c,
-    0 0 22px #8ca0af99;
-}
-/* The board itself flinches when the king is attacked or falls. */
-.board-frame.fx-check {
-  animation: board-flinch 0.5s var(--ease-out);
-}
-.board-frame.fx-mate {
-  animation: board-slam 0.8s var(--ease-out);
-}
-@keyframes board-flinch {
-  0%,
-  100% {
-    translate: 0 0;
-  }
-  18% {
-    translate: -3px 1px;
-  }
-  38% {
-    translate: 3px -1px;
-  }
-  60% {
-    translate: -2px 0;
-  }
-  80% {
-    translate: 1px 0;
-  }
-}
-@keyframes board-slam {
-  0% {
-    translate: 0 0;
-    scale: 1;
-  }
-  10% {
-    translate: 0 3px;
-    scale: 0.992;
-  }
-  26% {
-    translate: -5px -2px;
-    scale: 1.004;
-  }
-  44% {
-    translate: 4px 2px;
-  }
-  62% {
-    translate: -2px -1px;
-  }
-  100% {
-    translate: 0 0;
-    scale: 1;
-  }
-}
-@keyframes fx-life {
-  0% {
-    opacity: 0;
-  }
-  8%,
-  84% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-@keyframes veil-in {
+@keyframes glyph-arrive {
   from {
     opacity: 0;
-    scale: 1.25;
-  }
-}
-@keyframes brush-land {
-  0% {
-    opacity: 0;
-    transform: scale(1.7) translateY(-0.06em) rotate(-4deg);
-    filter: blur(0.12em);
+    scale: 1.8;
+    filter: blur(12px);
   }
   55% {
     opacity: 1;
-    filter: blur(0);
   }
-  78% {
-    transform: scale(0.97) rotate(0.6deg);
-  }
-  100% {
+  to {
     opacity: 1;
-    transform: scale(1);
+    scale: 1;
     filter: blur(0);
+  }
+}
+@keyframes glyph-echo {
+  from {
+    opacity: 0.55;
+    scale: 1.6;
+    filter: blur(6px);
+  }
+  to {
+    opacity: 0;
+    scale: 1.15;
+    filter: blur(2px);
+  }
+}
+@keyframes ring-arrive {
+  from {
+    opacity: 0;
+    scale: 1.3;
+    rotate: -24deg;
+  }
+  to {
+    opacity: 1;
+    scale: 1;
+    rotate: 0deg;
+  }
+}
+@keyframes slash-arrive {
+  from {
+    opacity: 0;
+    clip-path: inset(0 100% 100% 0);
+  }
+  to {
+    opacity: 1;
+    clip-path: inset(0 0 0 0);
+  }
+}
+@keyframes stamp-fade {
+  to {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ink-ring,
+  .ink-slash,
+  .ink-stamp strong,
+  .ink-stamp strong::after,
+  .ink-stamp-context,
+  .effect-detail {
+    animation-duration: 1ms;
   }
 }
 @keyframes fade-rise {
-  from {
-    opacity: 0;
-    transform: translateY(0.9cqw);
-  }
-}
-@keyframes ring-out {
-  from {
-    opacity: 0;
-    transform: scale(0.45) rotate(-20deg);
-  }
-  35% {
-    opacity: 0.9;
-  }
-  to {
-    opacity: 0.35;
-    transform: scale(1.12) rotate(0);
-  }
-}
-@keyframes ember-rise {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(0.6);
-  }
-  15% {
-    opacity: 0.95;
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--drift), calc(var(--rise) * -9)) scale(1.15);
-  }
-}
-@keyframes seal-stamp {
-  0% {
-    opacity: 0;
-    scale: 2.3;
-    rotate: -22deg;
-  }
-  60% {
-    opacity: 1;
-    scale: 0.92;
-  }
-  100% {
-    opacity: 0.94;
-    scale: 1;
-  }
-}
-@keyframes slash-sweep {
-  0% {
-    opacity: 0;
-    translate: -30% 0;
-  }
-  30% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    translate: 30% 0;
-  }
+  from { opacity: 0; transform: translateY(0.9cqw); }
 }
 
 .mobile-game-actions,
@@ -2714,6 +2561,7 @@ html {
   .piece-position.selected .piece {
     translate: none;
     scale: 1;
+    box-shadow: var(--piece-rest);
   }
 }
 
@@ -4122,4 +3970,109 @@ html {
     max-width: min(480px, calc(100vw - 32px));
     margin: 0;
   }
+}
+
+.board-stage {
+  position: relative;
+}
+.effect-settings {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 12;
+}
+.effect-settings summary {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: pointer;
+  background: var(--card);
+  color: var(--foreground);
+  list-style: none;
+}
+.effect-settings summary::-webkit-details-marker {
+  display: none;
+}
+.effect-settings summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.effect-settings fieldset {
+  position: absolute;
+  right: 0;
+  top: 36px;
+  width: 220px;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 6px 22px #30251722;
+}
+.effect-settings-title {
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0 0 6px;
+}
+.effect-settings label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.effect-settings input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--emphasis);
+}
+.tactics-off .piece.checked {
+  animation: none;
+}
+
+.record-move-cell {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 3px;
+}
+.record-move-cell > button:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.move-row .move-rating {
+  flex: 0 0 auto;
+  padding: 4px 5px;
+  min-width: 28px;
+  min-height: 32px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #735313;
+  background: #efe2bc;
+}
+.move-row .rating-mistake {
+  color: #81420c;
+  background: #f3dbc2;
+}
+.move-row .rating-blunder,
+.move-row .rating-allowed-mate {
+  color: #852d25;
+  background: #f2d6ce;
+}
+.move-row .rating-missed-mate {
+  color: #634274;
+  background: #e9dced;
+}
+.move-row .selected-rating {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+.game-sheet .move-row .move-rating {
+  font-size: 12px;
+  min-height: 36px;
 }

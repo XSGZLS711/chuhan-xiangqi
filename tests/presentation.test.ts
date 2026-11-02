@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import './effect-settings.test';
+import { pieceMotion } from '../lib/motion';
 import {
   capturedBy,
   boardSignature,
@@ -7,6 +9,8 @@ import {
   effectDuration,
   updateFeedback,
   resultEffect,
+  STAMP_TIMING,
+  stampDuration,
 } from '../lib/presentation';
 import {
   initialBoard,
@@ -43,6 +47,23 @@ const snapshot = (r: Room, version: number): PublicRoom => ({
 const capture = (r: Room) =>
   applyAction(r, 'red', { action: 'move', from: 64, to: 1 }, now);
 const initial = initialBoard();
+
+test('普通走子快移后短暂悬停，约两百毫秒内落地', () => {
+  const timing = pieceMotion();
+  assert(timing.slideMs >= 100 && timing.slideMs <= 120);
+  assert(timing.hoverMs > timing.slideMs);
+  assert.equal(timing.landMs - timing.hoverMs, 40);
+  assert.equal(timing.durationMs, 200);
+});
+test('吃子仅延长悬停，保持同样的平移与落地节奏', () => {
+  const move = pieceMotion(),
+    capture = pieceMotion(true);
+  assert.equal(capture.slideMs, move.slideMs);
+  assert.equal(capture.dropMs, move.dropMs);
+  assert(capture.hoverMs > move.hoverMs);
+  assert(capture.landMs >= 260 && capture.landMs <= 290);
+  assert.equal(capture.durationMs, capture.landMs);
+});
 
 test('开局双方吃子栏为空', () => {
   assert.deepEqual(capturedBy(initial, 'red'), []);
@@ -149,6 +170,35 @@ test('普通落子与吃子使用不同音效', () => {
   applyAction(r, 'red', { action: 'move', from: 54, to: 45 }, now);
   assert.deepEqual(updateFeedback(before, snapshot(r, 2)).sounds, ['move']);
 });
+test('吃子印章落在吃子位置，相同版本与聊天不会补播', () => {
+  const r = fresh(),
+    before = snapshot(r, 1);
+  capture(r);
+  const after = snapshot(r, 2);
+  const effect = updateFeedback(before, after).effect;
+  assert.equal(effect?.kind, 'capture');
+  assert.equal(effect?.title, '吃');
+  assert.equal(effect?.side, 'red');
+  assert.equal(effect?.at, 1);
+  assert.equal(branchFeedback(initial, 64, 1, 'red', 'b').effect?.at, 1);
+  assert.equal(updateFeedback(after, snapshot(r, 3)).effect, null);
+  assert.equal(updateFeedback(after, after).effect, null);
+  assert.equal(
+    branchFeedback(initial, 64, 1, 'red', 'branch').effect?.analysis,
+    true,
+  );
+});
+test('印章在 250ms 出现，400ms 成形，保留完整淡出时间', () => {
+  assert.equal(STAMP_TIMING.delayMs, 250);
+  assert.equal(STAMP_TIMING.delayMs + STAMP_TIMING.enterMs, 400);
+  assert.equal(STAMP_TIMING.fadeMs, 400);
+  assert.equal(stampDuration('capture'), 1400);
+  assert.equal(stampDuration('mate'), 1600);
+  assert.equal(
+    effectDuration('capture'),
+    STAMP_TIMING.delayMs + stampDuration('capture'),
+  );
+});
 test('聊天与在线状态更新不重复播放音效', () => {
   const r = fresh();
   capture(r);
@@ -178,15 +228,17 @@ test('真正将死触发绝杀且不叠加将军提示', () => {
   assert.equal(f.effect?.side, 'red');
 });
 test('认输、超时、困毙与和棋不会误显示绝杀', () => {
-  for (const result of [
-    { winner: 'red', reason: '黑方认输' },
-    { winner: 'black', reason: '超时' },
-    { winner: 'red', reason: '困毙' },
-    { winner: 'draw', reason: '双方同意和棋' },
-  ] as Result[]) {
+  for (const [result, title] of [
+    [{ winner: 'red', reason: '黑方认输' }, '认输'],
+    [{ winner: 'black', reason: '超时' }, '超时'],
+    [{ winner: 'red', reason: '困毙' }, '困毙'],
+    [{ winner: 'black', reason: '长将判负' }, '长将判负'],
+    [{ winner: 'draw', reason: '双方同意和棋' }, '和棋'],
+  ] as [Result, string][]) {
     const effect = resultEffect(result, 'test');
     assert.equal(effect.kind, 'result');
-    assert.notEqual(effect.title, '绝杀');
+    // The stamp names the ending; the loser must never see a victory title.
+    assert.equal(effect.title, title);
     assert(effect.detail.includes(result.reason));
   }
 });

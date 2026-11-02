@@ -551,3 +551,65 @@
     font-size: 24px;
   }
 }
+
+.recent-games {
+  grid-column: 1 / -1;
+  width: 100%;
+  border-top: 1px solid var(--border);
+  padding-top: 18px;
+}
+.recent-games summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 600;
+}
+.recent-games summary span {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.recent-games p {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin: 12px 0;
+}
+.recent-games ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  max-height: 360px;
+  overflow-y: auto;
+}
+.recent-games li + li {
+  border-top: 1px solid var(--border);
+}
+.recent-games a {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  text-decoration: none;
+  color: var(--foreground);
+}
+.recent-games a > span:first-child {
+  display: grid;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
+}
+.recent-games strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+.recent-games small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.archive-result {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--emphasis);
+}

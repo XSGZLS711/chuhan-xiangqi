@@ -17,7 +17,11 @@ import {
   displayNotation,
 } from '@/lib/mobile-game';
 import { useGameViewport } from '@/lib/use-game-viewport';
-import { GameAudio } from '@/lib/game-audio';
+import { useAutoArchive } from '@/lib/use-auto-archive';
+import EffectSettings from '@/components/effect-settings';
+import { useEffectSettings } from '@/lib/use-effect-settings';
+import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
+import { GameAudio, soundDelay } from '@/lib/game-audio';
 import {
   updateFeedback,
   branchFeedback,
@@ -99,6 +103,8 @@ const timeOptions = [
   { value: '30', label: '每方 30 分钟' },
 ];
 export default function Home() {
+  const { settings, setSetting } = useEffectSettings();
+  const sound = settings.sound;
   const [room, setRoom] = useState<PublicRoom | null>(null),
     [roomId, setRoomId] = useState(''),
     [ready, setReady] = useState(false),
@@ -115,13 +121,18 @@ export default function Home() {
   const [message, setMessage] = useState(''),
     [selected, setSelected] = useState<number | null>(null),
     [flipped, setFlipped] = useState(false),
-    [sound, setSound] = useState(true),
     [tick, setTick] = useState(Date.now()),
     [review, setReview] = useState<number | null>(null),
     [analysis, setAnalysis] = useState<Analysis | null>(null),
     [chat, setChat] = useState(''),
     [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null),
     [sheet, setSheet] = useState<'record' | null>(null);
+  const archiveError = useAutoArchive(
+    room,
+    room ? `friend:${room.id}:${room.round}` : null,
+    { kind: 'friend' },
+    room?.you ?? null,
+  );
   const viewportStyle = useGameViewport(!!room);
   const roomRef = useRef<PublicRoom | null>(null),
     nameRef = useRef(name),
@@ -138,6 +149,7 @@ export default function Home() {
   }, [name]);
   useEffect(() => {
     soundRef.current = sound;
+    if (!sound) audioRef.current?.silence();
   }, [sound]);
   useEffect(() => {
     viewModeRef.current = analysis
@@ -177,10 +189,7 @@ export default function Home() {
     if (prev?.id === r.id && prev.version !== r.version) {
       const feedback = updateFeedback(prev, r);
       feedback.sounds.forEach((kind, index) =>
-        playSound(
-          kind,
-          index ? 0.36 : kind === 'move' || kind === 'capture' ? 0.18 : 0,
-        ),
+        playSound(kind, soundDelay(feedback.sounds, index)),
       );
       if (feedback.reset) setBoardEffect(null);
       if (feedback.effect && viewModeRef.current === 'live')
@@ -219,7 +228,6 @@ export default function Home() {
     setRoomId(new URLSearchParams(location.search).get('room') || '');
     try {
       setName(localStorage.getItem('chuhan-name') || '棋友');
-      setSound(localStorage.getItem('chuhan-sound') !== 'off');
     } catch {}
     const initialize = async () => {
       try {
@@ -413,7 +421,7 @@ export default function Home() {
         );
         setBoardEffect(feedback.effect);
         feedback.sounds.forEach((kind, index) =>
-          playSound(kind, index ? 0.36 : 0.18),
+          playSound(kind, soundDelay(feedback.sounds, index)),
         );
       } else void action('move', { from: selected, to: n });
       setSelected(null);
@@ -445,14 +453,16 @@ export default function Home() {
     if (sent) setChat('');
     return sent;
   }
+  function changeSetting(key: SettingKey, value: boolean) {
+    setSetting(key, value);
+    if (key === 'sound') {
+      soundRef.current = value;
+      if (value) unlockSound();
+      else audioRef.current?.silence();
+    }
+  }
   function toggleSound() {
-    setSound(!sound);
-    soundRef.current = !sound;
-    if (sound) audioRef.current?.silence();
-    else unlockSound();
-    try {
-      localStorage.setItem('chuhan-sound', sound ? 'off' : 'on');
-    } catch {}
+    changeSetting('sound', !sound);
   }
   function startAnalysis() {
     setSheet(null);
@@ -825,6 +835,11 @@ export default function Home() {
           ) : null}
         </div>
       )}
+      {archiveError && (
+        <p className="notice" role="alert">
+          {archiveError}
+        </p>
+      )}
       {message && (
         <div className="notice" role="status">
           <span>{message}</span>
@@ -851,15 +866,17 @@ export default function Home() {
             )}
             {player(flipped ? 'red' : 'black')}
             <div className="board-stage">
+              <EffectSettings settings={settings} onChange={changeSetting} />
               <ChessBoard
                 board={board}
                 selected={selected}
-                targets={targets}
+                targets={settings.hints ? targets : []}
                 last={last}
                 onSquare={square}
                 flipped={flipped}
                 checkSide={check}
-                effect={boardEffect}
+                effect={visibleEffect(boardEffect, settings)}
+                captureEffects={settings.moveEffects}
                 animationContext={`${room?.id ?? 'local'}:${room?.round ?? 0}:${analysis ? 'analysis' : review !== null ? 'review' : 'live'}`}
                 animate={!!analysis || review === null}
               />
