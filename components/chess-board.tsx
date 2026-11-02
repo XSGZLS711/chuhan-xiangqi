@@ -31,6 +31,10 @@ type Frame = {
   } | null;
 };
 const SHARDS = [0, 1, 2, 3, 4, 5, 6, 7];
+/** A move drawn on the board: the engine's choice or the move actually played. */
+export type BoardArrow = { from: number; to: number; tone: 'best' | 'played' };
+/** A small label pinned to a square, such as a move rating or a hint ring. */
+export type BoardMark = { at: number; text: string; tone: string };
 const css = (vars: Record<string, string | number>) => vars as CSSProperties;
 
 export default function ChessBoard({
@@ -45,6 +49,8 @@ export default function ChessBoard({
   animationContext = 'live',
   animate = true,
   captureEffects = true,
+  arrows = [],
+  marks = [],
 }: {
   board: Board;
   flipped?: boolean;
@@ -57,6 +63,8 @@ export default function ChessBoard({
   animationContext?: string;
   animate?: boolean;
   captureEffects?: boolean;
+  arrows?: BoardArrow[];
+  marks?: BoardMark[];
 }) {
   const signature = boardSignature(board);
   const [frame, setFrame] = useState<Frame>({
@@ -289,6 +297,53 @@ export default function ChessBoard({
             ))}
           </div>
         )}
+        {arrows.length > 0 && (
+          <svg
+            className="board-arrows"
+            viewBox="0 0 900 1000"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {arrows.map((arrow) => {
+              const point = (n: number) => {
+                  const v = view(n);
+                  return [50 + (v % 9) * 100, 50 + Math.floor(v / 9) * 100];
+                },
+                [x1, y1] = point(arrow.from),
+                [x2, y2] = point(arrow.to),
+                length = Math.hypot(x2 - x1, y2 - y1),
+                ux = (x2 - x1) / length,
+                uy = (y2 - y1) / length,
+                // Stop short of the target so its piece stays readable.
+                tipX = x2 - ux * 18,
+                tipY = y2 - uy * 18,
+                baseX = tipX - ux * 46,
+                baseY = tipY - uy * 46;
+              return (
+                <g
+                  key={`${arrow.tone}:${arrow.from}:${arrow.to}`}
+                  className={`board-arrow ${arrow.tone}`}
+                >
+                  <circle cx={x1} cy={y1} r="13" />
+                  <line x1={x1} y1={y1} x2={baseX} y2={baseY} />
+                  <path
+                    d={`M${tipX} ${tipY}L${baseX - uy * 30} ${baseY + ux * 30}L${baseX + uy * 30} ${baseY - ux * 30}Z`}
+                  />
+                </g>
+              );
+            })}
+          </svg>
+        )}
+        {marks.map((mark) => (
+          <span
+            key={`${mark.at}:${mark.tone}`}
+            className={`board-mark ${mark.tone}`}
+            style={position(mark.at)}
+            aria-hidden="true"
+          >
+            {mark.text && <b>{mark.text}</b>}
+          </span>
+        ))}
         <BoardEffect effect={effect} />
       </fieldset>
     </div>

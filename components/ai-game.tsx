@@ -54,6 +54,7 @@ import {
 import { BrowserEngine, aiBase, prepareAiPage } from '@/lib/ai-engine';
 import { useAutoArchive } from '@/lib/use-auto-archive';
 import { getArchivedGame } from '@/lib/archive-storage';
+import ReviewScreen from '@/components/review-screen';
 import {
   replayArchive,
   archiveGame,
@@ -621,6 +622,22 @@ export default function AiGame() {
           </button>
         )}
       </main>
+    );
+  // A finished game opens in the full review screen; unfinished games keep the inline replay.
+  if (reviewing && analysisGame && !branch && !setup)
+    return (
+      <ReviewScreen
+        game={analysisGame}
+        history={room.history}
+        finalBoard={room.board}
+        flipped={match.human === 'black'}
+        ply={index}
+        onPly={navigate}
+        analysis={whole}
+        onExplore={explore}
+        onExit={archived ? () => window.location.assign('../') : backToLive}
+        exitLabel={archived ? '返回棋社' : '返回对局'}
+      />
     );
   return (
     <main

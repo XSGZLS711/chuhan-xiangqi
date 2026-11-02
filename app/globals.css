@@ -1726,6 +1726,92 @@ p {
 .intersection {
   z-index: 4;
 }
+/* Review overlays: move arrows and labels sit over the pieces, under the touch targets. */
+.board-arrows {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 3;
+  pointer-events: none;
+}
+.board-arrow.best {
+  --arrow: #3c9a58;
+}
+.board-arrow.played {
+  --arrow: #e08a2e;
+}
+.board-arrow line {
+  stroke: var(--arrow);
+  stroke-width: 15;
+  stroke-linecap: round;
+  opacity: 0.86;
+}
+.board-arrow path {
+  fill: var(--arrow);
+  opacity: 0.92;
+}
+.board-arrow circle {
+  fill: #fffaf0;
+  stroke: var(--arrow);
+  stroke-width: 6;
+}
+.board-mark {
+  position: absolute;
+  z-index: 3;
+  width: 10.7%;
+  height: 9.6%;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+.board-mark b {
+  position: absolute;
+  top: -10%;
+  right: -12%;
+  min-width: 46%;
+  padding: 1px 4px;
+  border-radius: 999px;
+  font-size: clamp(9px, 2.6cqi, 13px);
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: center;
+  color: #fff;
+  background: #b9832a;
+  box-shadow: 0 1px 3px #0005;
+}
+.board-mark.rating-mistake b {
+  background: #d27126;
+}
+.board-mark.rating-blunder b,
+.board-mark.rating-allowed-mate b {
+  background: #c8432f;
+}
+.board-mark.rating-missed-mate b {
+  background: #85569f;
+}
+.board-mark.best b {
+  background: #3c9a58;
+}
+/* Practice hint: a ring around the piece that should move, nothing more. */
+.board-mark.hint {
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 3px #fffaf0,
+    0 0 0 6px #3c9a58;
+  animation: hint-ring 1.2s ease-in-out infinite alternate;
+}
+@keyframes hint-ring {
+  to {
+    box-shadow:
+      0 0 0 4px #fffaf0,
+      0 0 0 9px #3c9a5899;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .board-mark.hint {
+    animation: none;
+  }
+}
 .pieces-layer {
   position: absolute;
   inset: 0;
