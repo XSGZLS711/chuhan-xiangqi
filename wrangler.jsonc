@@ -1,0 +1,37 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "chuhan-xiangqi",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-05-15",
+  "observability": { "enabled": true },
+  // Serve the site from your own domain once it is on Cloudflare:
+  // "routes": [{ "pattern": "chess.example.com", "custom_domain": true }],
+  "assets": {
+    // Pages are static; only /api/* wakes the Worker, so page views cost nothing.
+    "html_handling": "auto-trailing-slash",
+    "run_worker_first": ["/api/*"]
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "chuhan-xiangqi",
+      // Production database. Local development ignores the id and uses a local copy.
+      "database_id": "b3d25de9-4e07-4d19-a3ba-935b21fb1c5b",
+      "migrations_dir": "drizzle"
+    }
+  ],
+  "env": {
+    "staging": {
+      "name": "chuhan-xiangqi-staging",
+      "observability": { "enabled": true },
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "chuhan-xiangqi-staging",
+          "database_id": "8e0a4377-ad05-4245-ae69-bca90843f398",
+          "migrations_dir": "drizzle"
+        }
+      ]
+    }
+  }
+}

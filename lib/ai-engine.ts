@@ -10,67 +10,16 @@ export function aiBase(): URL {
   return url;
 }
 
+/**
+ * The engine needs SharedArrayBuffer, which browsers only allow on a
+ * cross-origin-isolated page. The Worker sends the required headers for /ai/.
+ */
 export async function prepareAiPage(): Promise<void> {
-  // A server that sets the isolation headers itself needs neither the worker
-  // nor a trailing slash.
-  if (window.crossOriginIsolated) return;
-  if (!window.location.pathname.endsWith('/')) {
-    // Static hosts only scope the isolation worker to ".../ai/". Retry once;
-    // a server that strips the slash again must not trap the tab in a loop.
-    const key = 'chuhan-ai-slash';
-    let retried = false;
-    try {
-      retried = sessionStorage.getItem(key) === window.location.pathname;
-      sessionStorage.setItem(key, window.location.pathname);
-    } catch {}
-    if (!retried) {
-      window.location.replace(
-        window.location.pathname +
-          '/' +
-          window.location.search +
-          window.location.hash,
-      );
-      await new Promise<void>(() => {});
-    }
-    throw new Error('无法在此地址启动本地棋手，请从首页的「人机对弈」进入。');
-  }
-  if (!window.isSecureContext || !('serviceWorker' in navigator)) {
+  if (!window.crossOriginIsolated) {
     throw new Error(
       '此浏览器无法启动本地棋手，请用新版 Safari、Chrome 或 Edge 打开。',
     );
   }
-  const script = new URL('isolation-worker.js', aiBase());
-  const controlled =
-    navigator.serviceWorker.controller?.scriptURL === script.href;
-  await navigator.serviceWorker.register(script, {
-    scope: './',
-    updateViaCache: 'none',
-  });
-  if (controlled)
-    throw new Error(
-      '浏览器未能开启本地计算，请退出无痕模式或更换浏览器后重试。',
-    );
-  await new Promise<void>((resolve, reject) => {
-    const timer = setTimeout(() => {
-      cleanup();
-      reject(new Error('本地棋手准备超时，请刷新重试。'));
-    }, 12000);
-    const check = () => {
-      if (navigator.serviceWorker.controller?.scriptURL === script.href) {
-        cleanup();
-        resolve();
-      }
-    };
-    const cleanup = () => {
-      clearTimeout(timer);
-      navigator.serviceWorker.removeEventListener('controllerchange', check);
-    };
-    navigator.serviceWorker.addEventListener('controllerchange', check);
-    check();
-  });
-  window.location.reload();
-  // Navigation will destroy this page before an engine can be created.
-  await new Promise<void>(() => {});
 }
 
 export type SearchOptions = {
