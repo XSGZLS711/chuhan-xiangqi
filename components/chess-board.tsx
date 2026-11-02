@@ -7,14 +7,19 @@ import {
   type BoardEffect as Effect,
 } from '@/lib/presentation';
 import BoardEffect from '@/components/board-effect';
+import { pieceMotion } from '@/lib/motion';
 
 type Frame = {
   sig: string;
   board: Board;
   context: string;
   flipped: boolean;
-  /** The piece that just travelled, with its slide time in ms. */
-  move: { id: string; key: string; ms: number } | null;
+  /** The piece that just travelled, with its timing in ms. */
+  move: {
+    id: string;
+    key: string;
+    timing: ReturnType<typeof pieceMotion>;
+  } | null;
   /** Restored by an undo; fades back in once the mover has left its square. */
   revived: string | null;
   ghost: {
@@ -73,14 +78,8 @@ export default function ChessBoard({
       animate && frame.context === animationContext && frame.flipped === flipped
         ? boardTransition(frame.board, board)
         : null;
-    const distance = transition
-      ? Math.hypot(
-          (transition.to % 9) - (transition.from % 9),
-          Math.floor(transition.to / 9) - Math.floor(transition.from / 9),
-        )
-      : 0;
-    const ms = Math.round(Math.min(440, 190 + 48 * distance));
-    const delay = Math.round(ms * 0.78);
+    const timing = pieceMotion(!!transition?.captured);
+    const delay = timing.landMs;
     setFrame({
       sig: signature,
       board,
@@ -90,7 +89,7 @@ export default function ChessBoard({
         ? {
             id: transition.piece.id,
             key: `${transition.piece.id}:${transition.from}:${transition.to}`,
-            ms,
+            timing,
           }
         : null,
       revived: transition?.revived?.id ?? null,
@@ -214,9 +213,12 @@ export default function ChessBoard({
                   ...position(n),
                   ...(moved || revived
                     ? css({
-                        '--slide': `${frame.move?.ms ?? 240}ms`,
+                        '--slide': `${frame.move?.timing.slideMs}ms`,
+                        '--motion-duration': `${frame.move?.timing.durationMs}ms`,
                         ...(moved
-                          ? { transitionDuration: `${frame.move?.ms}ms` }
+                          ? {
+                              transitionDuration: `${frame.move?.timing.slideMs}ms`,
+                            }
                           : {}),
                       })
                     : {}),

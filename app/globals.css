@@ -1782,7 +1782,7 @@ p {
   z-index: 6;
 }
 .piece-position.moving .piece {
-  animation: piece-hop calc(var(--slide, 240ms) + 170ms) var(--ease-out) both;
+  animation: piece-hop var(--motion-duration) var(--ease-out) both;
 }
 @keyframes piece-hop {
   0% {

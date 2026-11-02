@@ -49,7 +49,7 @@ import {
   type EngineInfo,
 } from '@/lib/ai-game';
 import { BrowserEngine, aiBase, prepareAiPage } from '@/lib/ai-engine';
-import { GameAudio } from '@/lib/game-audio';
+import { GameAudio, soundDelay } from '@/lib/game-audio';
 import {
   branchFeedback,
   effectDuration,
@@ -186,10 +186,7 @@ export default function AiGame() {
     if (!previous) return;
     const feedback = updateFeedback(previous, current);
     feedback.sounds.forEach((kind, order) =>
-      playSound(
-        kind,
-        order ? 0.36 : kind === 'move' || kind === 'capture' ? 0.18 : 0,
-      ),
+      playSound(kind, soundDelay(feedback.sounds, order)),
     );
     if (feedback.reset) setBoardEffect(null);
     if (feedback.effect && viewRef.current.live)
@@ -371,7 +368,7 @@ export default function AiGame() {
         );
         setBoardEffect(feedback.effect);
         feedback.sounds.forEach((kind, index) =>
-          playSound(kind, index ? 0.36 : 0.18),
+          playSound(kind, soundDelay(feedback.sounds, index)),
         );
       } else setMatch((current) => playAiMove(current, selected, n));
       setSelected(null);

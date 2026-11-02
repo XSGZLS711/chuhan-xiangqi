@@ -17,7 +17,7 @@ import {
   displayNotation,
 } from '@/lib/mobile-game';
 import { useGameViewport } from '@/lib/use-game-viewport';
-import { GameAudio } from '@/lib/game-audio';
+import { GameAudio, soundDelay } from '@/lib/game-audio';
 import {
   updateFeedback,
   branchFeedback,
@@ -177,10 +177,7 @@ export default function Home() {
     if (prev?.id === r.id && prev.version !== r.version) {
       const feedback = updateFeedback(prev, r);
       feedback.sounds.forEach((kind, index) =>
-        playSound(
-          kind,
-          index ? 0.36 : kind === 'move' || kind === 'capture' ? 0.18 : 0,
-        ),
+        playSound(kind, soundDelay(feedback.sounds, index)),
       );
       if (feedback.reset) setBoardEffect(null);
       if (feedback.effect && viewModeRef.current === 'live')
@@ -413,7 +410,7 @@ export default function Home() {
         );
         setBoardEffect(feedback.effect);
         feedback.sounds.forEach((kind, index) =>
-          playSound(kind, index ? 0.36 : 0.18),
+          playSound(kind, soundDelay(feedback.sounds, index)),
         );
       } else void action('move', { from: selected, to: n });
       setSelected(null);

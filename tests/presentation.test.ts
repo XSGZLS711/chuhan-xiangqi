@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import './game-audio.test';
 import {
   capturedBy,
   boardSignature,
