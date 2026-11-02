@@ -3821,9 +3821,10 @@ html {
   background: var(--card);
   box-shadow: 0 6px 22px #30251722;
 }
-.effect-settings legend {
+.effect-settings-title {
   font-size: 12px;
-  padding: 0 4px;
+  line-height: 1.5;
+  margin: 0 0 6px;
 }
 .effect-settings label {
   display: flex;

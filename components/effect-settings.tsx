@@ -23,7 +23,10 @@ export default function EffectSettings({
         <SlidersHorizontal size={17} />
       </summary>
       <fieldset>
-        <legend>对局设置</legend>
+        <legend className="sr-only">对局设置</legend>
+        <p className="effect-settings-title" aria-hidden="true">
+          对局设置
+        </p>
         {labels.map(([key, text]) => (
           <label key={key}>
             <span>{text}</span>
