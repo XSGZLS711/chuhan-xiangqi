@@ -1,4 +1,4 @@
-import { parseEngineInfo, type EngineInfo } from './ai-game';
+import { engineMove, parseEngineInfo, type EngineInfo } from './ai-game';
 import type { Side } from './xiangqi';
 
 /** Directory of the AI room, with or without a trailing slash in the address. */
@@ -30,6 +30,7 @@ export type SearchOptions = {
   skill: number;
   signal: AbortSignal;
   onInfo?: (info: EngineInfo) => void;
+  searchMoves?: readonly string[];
 };
 const aborted = () => new DOMException('Search cancelled', 'AbortError');
 
@@ -115,6 +116,15 @@ export class BrowserEngine {
     await this.ready;
     if (o.signal.aborted) throw aborted();
     if (this.dead) throw this.fatalError ?? aborted();
+    if (
+      o.searchMoves &&
+      (!o.searchMoves.length ||
+        o.searchMoves.some((token) => {
+          const move = engineMove(token);
+          return !move || move.from === move.to;
+        }))
+    )
+      throw new Error('无效的限定搜索着法');
     return new Promise((resolve, reject) => {
       let stopTimer: ReturnType<typeof setTimeout> | undefined;
       const timer = setTimeout(
@@ -161,7 +171,10 @@ export class BrowserEngine {
       o.signal.addEventListener('abort', stop, { once: true });
       this.send(`setoption name Skill Level value ${o.skill}`);
       this.send(o.position);
-      this.send(`go movetime ${o.time} depth ${o.depth}`);
+      // This vendored engine consumes every token following searchmoves as a move.
+      this.send(
+        `go movetime ${o.time} depth ${o.depth}${o.searchMoves ? ` searchmoves ${o.searchMoves.join(' ')}` : ''}`,
+      );
     });
   }
 }

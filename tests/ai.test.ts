@@ -159,6 +159,7 @@ test('Cancelled search drains bestmove before starting next position and suppres
     const third = engine.search({
       ...options,
       position: 'position startpos moves a4a5',
+      searchMoves: ['a7a6'],
       signal: three.signal,
     });
     await tick();
@@ -172,8 +173,21 @@ test('Cancelled search drains bestmove before starting next position and suppres
     await tick();
     assert(!worker.commands.includes('position never-send'));
     assert.equal(worker.commands.filter((c) => c.startsWith('go ')).length, 2);
+    assert.equal(
+      worker.commands.at(-1),
+      'go movetime 100 depth 4 searchmoves a7a6',
+    );
     worker.emit('bestmove a7a6');
     assert.equal(await third, 'a7a6');
+    await assert.rejects(
+      engine.search({
+        ...options,
+        position: 'position startpos',
+        signal: three.signal,
+        searchMoves: [],
+      }),
+      /限定搜索/,
+    );
     const pending = engine.search({
       ...options,
       position: 'position startpos',

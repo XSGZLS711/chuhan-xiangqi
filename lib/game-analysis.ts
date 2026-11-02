@@ -7,6 +7,7 @@ import type { Side } from './xiangqi';
  */
 export type AnalysisScore =
   | { kind: 'cp'; value: number }
+  | { kind: 'result'; winner: Side | 'draw' }
   | { kind: 'mate'; winner: Side; plies: number };
 export type PositionEvaluation = {
   score: AnalysisScore;
@@ -46,6 +47,9 @@ export type MoveIdentity = { ply: number; side: Side; move: string };
 export type MoveAnalysis = MoveIdentity & {
   before: PositionEvaluation;
   after: PositionEvaluation;
+  /** Separate search at the original root, restricted to the actual move. */
+  played?: PositionEvaluation;
+  playedWinProbability?: number;
   recommendedMove: string | null;
   beforeWinProbability: number;
   afterWinProbability: number;
@@ -93,6 +97,8 @@ function validScore(score: AnalysisScore) {
     validSide(score.winner);
     if (!Number.isInteger(score.plies) || score.plies < 0)
       throw new Error('杀棋距离必须为非负整数');
+  } else if (score.kind === 'result') {
+    if (score.winner !== 'draw') validSide(score.winner);
   } else throw new Error('无效评分类型');
 }
 function validMove(move: string) {
@@ -122,6 +128,8 @@ export function scoreToWinProbability(
   if (!Number.isFinite(cpScale) || cpScale <= 0)
     throw new Error('分数换算尺度必须为有限正数');
   if (score.kind === 'mate') return score.winner === side ? 1 : 0;
+  if (score.kind === 'result')
+    return score.winner === 'draw' ? 0.5 : score.winner === side ? 1 : 0;
   const signed = (side === 'red' ? score.value : -score.value) / cpScale;
   // Keep exponentials non-positive to avoid overflow on either side.
   if (signed >= 0) return 1 / (1 + Math.exp(-signed));
@@ -148,6 +156,7 @@ export function analyseMove(
   input: MoveIdentity & {
     before: PositionEvaluation;
     after: PositionEvaluation;
+    played?: PositionEvaluation;
   },
   config = DEFAULT_ANALYSIS_CONFIG,
 ): MoveAnalysis {
@@ -158,8 +167,14 @@ export function analyseMove(
   validMove(input.move);
   const before = copyEvaluation(input.before),
     after = copyEvaluation(input.after);
-  if (before.score.kind === 'mate' && before.score.plies === 0)
-    throw new Error('已将死的局面不能继续评级走子');
+  if (
+    before.score.kind === 'result' ||
+    (before.score.kind === 'mate' && before.score.plies === 0)
+  )
+    throw new Error('已终局的局面不能继续评级走子');
+  const played = input.played && copyEvaluation(input.played);
+  if (played && played.pv[0] !== input.move)
+    throw new Error('限定搜索与实际着法不一致');
   const beforeWinProbability = scoreToWinProbability(
     before.score,
     input.side,
@@ -172,14 +187,18 @@ export function analyseMove(
   );
   const winProbabilityLoss = Math.max(
     0,
-    beforeWinProbability - afterWinProbability,
+    beforeWinProbability -
+      (played
+        ? scoreToWinProbability(played.score, input.side, config.cpScale)
+        : afterWinProbability),
   );
   const winsMate = (score: AnalysisScore) =>
     score.kind === 'mate' && score.winner === input.side;
   const losesMate = (score: AnalysisScore) =>
     score.kind === 'mate' && score.winner !== input.side;
-  const missedMate = winsMate(before.score) && !winsMate(after.score);
-  const allowedMate = !losesMate(before.score) && losesMate(after.score);
+  const compared = played?.score ?? after.score;
+  const missedMate = winsMate(before.score) && !winsMate(compared);
+  const allowedMate = !losesMate(before.score) && losesMate(compared);
   // A winning mate thrown into a losing mate is both; show 送杀 first.
   const rating = allowedMate
     ? 'allowed-mate'
@@ -192,6 +211,16 @@ export function analyseMove(
     move: input.move,
     before,
     after,
+    ...(played
+      ? {
+          played,
+          playedWinProbability: scoreToWinProbability(
+            played.score,
+            input.side,
+            config.cpScale,
+          ),
+        }
+      : {}),
     recommendedMove: before.pv[0] ?? null,
     beforeWinProbability,
     afterWinProbability,
@@ -232,11 +261,15 @@ export function completeMoveAnalysis(
   ply: number,
   before: PositionEvaluation,
   after: PositionEvaluation,
+  played?: PositionEvaluation,
 ): GameAnalysis {
   const entry = game.moves[ply - 1];
   if (!Number.isInteger(ply) || !entry || entry.ply !== ply)
     throw new Error('存档中没有这一步');
-  const analysis = analyseMove({ ...entry, before, after }, game.model.config);
+  const analysis = analyseMove(
+    { ...entry, before, after, played },
+    game.model.config,
+  );
   return {
     ...game,
     moves: game.moves.map((move) =>
