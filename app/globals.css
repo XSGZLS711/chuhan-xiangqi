@@ -546,22 +546,12 @@ button:not(:disabled):active {
 .piece.black {
   color: var(--piece-black);
 }
-.move-dot {
-  width: 24%;
-  height: 24%;
+.move-dot,
+.capture-target {
+  width: 20%;
+  height: 20%;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #6c9a63, #3f6b3e);
-  box-shadow:
-    0 0 0 5px #5b8a5226,
-    0 0 0 1px #ffffff55 inset,
-    0 1px 3px #1e3a1e55;
-  animation: dot-pop 0.28s var(--ease-spring) both;
-}
-@keyframes dot-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.2);
-  }
+  background: rgba(120, 180, 80, 0.55);
 }
 .intersection.last-to::after,
 .intersection.last-from::after {
@@ -1753,26 +1743,20 @@ p {
 }
 .animate-pieces .piece-position {
   transition:
-    left 240ms var(--ease-slide),
-    top 240ms var(--ease-slide);
+    left var(--slide) var(--ease-slide),
+    top var(--slide) var(--ease-slide);
+}
+.piece-position .piece {
+  transition-duration: 0s;
 }
 .piece-position.selected {
   z-index: 3;
 }
 .piece-position.selected .piece {
   translate: 0 -7%;
-  scale: 1.09;
+  scale: 1.18;
   box-shadow: var(--piece-lift);
-}
-.piece-position.selected .piece::before {
-  content: '';
-  position: absolute;
-  inset: -9%;
-  border-radius: 50%;
-  border: 2px solid #b8402c;
-  box-shadow: 0 0 10px #b8402c55;
-  animation: select-ring 1.5s ease-out infinite;
-  pointer-events: none;
+  transition-duration: var(--selection-lift);
 }
 .piece-position.latest-piece {
   z-index: 2;
@@ -1782,48 +1766,23 @@ p {
   z-index: 6;
 }
 .piece-position.moving .piece {
-  animation: piece-hop var(--motion-duration) var(--ease-out) both;
+  animation: piece-hop var(--drop) ease-out var(--hover) backwards;
 }
 @keyframes piece-hop {
-  0% {
+  from {
+    translate: 0 -7%;
+    scale: 1.18;
+    box-shadow: var(--piece-lift);
+  }
+  to {
     translate: 0 0;
     scale: 1;
     box-shadow: var(--piece-rest);
-  }
-  28% {
-    translate: 0 -9%;
-    scale: 1.14;
-    box-shadow: var(--piece-lift);
-  }
-  66% {
-    translate: 0 -3%;
-    scale: 1.06;
-    box-shadow: var(--piece-lift);
-  }
-  84% {
-    translate: 0 1%;
-    scale: 0.965;
-    box-shadow: var(--piece-rest);
-  }
-  100% {
-    translate: 0 0;
-    scale: 1;
-    box-shadow: var(--piece-rest);
-  }
-}
-@keyframes select-ring {
-  0% {
-    opacity: 0.95;
-    scale: 0.94;
-  }
-  100% {
-    opacity: 0;
-    scale: 1.32;
   }
 }
 /* An undone capture returns once the capturing piece has stepped away. */
 .piece-position.revived .piece {
-  animation: piece-revive 0.55s var(--ease-spring) calc(var(--slide, 240ms) * 0.55)
+  animation: piece-revive 0.55s var(--ease-spring) calc(var(--slide) * 0.55)
     both;
 }
 @keyframes piece-revive {
@@ -1845,35 +1804,10 @@ p {
     rotate: 0deg;
   }
 }
-.capture-target {
-  width: 104%;
-  height: 104%;
-  border: 2px solid #b6432e;
-  border-radius: 50%;
-  box-shadow:
-    0 0 0 4px #b6432e1f,
-    inset 0 0 8px #b6432e40;
-  animation: target-pulse 1.3s ease-in-out infinite;
-}
-@keyframes target-pulse {
-  0%,
-  100% {
-    box-shadow:
-      0 0 0 3px #b6432e1f,
-      inset 0 0 6px #b6432e40;
-    scale: 0.97;
-  }
-  50% {
-    box-shadow:
-      0 0 0 7px #b6432e14,
-      inset 0 0 10px #b6432e55;
-    scale: 1.03;
-  }
-}
 /* The captured piece waits under the arriving one, then bursts apart. */
 .capture-ghost {
   z-index: 1;
-  animation: ghost-above 600ms var(--impact-delay, 180ms) forwards;
+  animation: ghost-above 600ms var(--impact-delay) forwards;
 }
 @keyframes ghost-above {
   from,
@@ -1882,7 +1816,7 @@ p {
   }
 }
 .capture-ghost .piece {
-  animation: captured-piece 520ms var(--ease-out) var(--impact-delay, 180ms) both;
+  animation: captured-piece 520ms var(--ease-out) var(--impact-delay) both;
 }
 .capture-impact {
   position: absolute;
@@ -1892,7 +1826,7 @@ p {
   box-shadow:
     0 0 14px #ffd98a99,
     inset 0 0 12px #ffe6a755;
-  animation: capture-ring 560ms var(--ease-out) var(--impact-delay, 180ms) both;
+  animation: capture-ring 560ms var(--ease-out) var(--impact-delay) both;
 }
 .capture-shard {
   position: absolute;
@@ -1906,7 +1840,7 @@ p {
   box-shadow: 0 0 6px #ffd98a99;
   transform-origin: 50% 50%;
   opacity: 0;
-  animation: capture-shard 520ms var(--ease-out) var(--impact-delay, 180ms) both;
+  animation: capture-shard 520ms var(--ease-out) var(--impact-delay) both;
 }
 @keyframes captured-piece {
   0% {
@@ -2714,6 +2648,7 @@ html {
   .piece-position.selected .piece {
     translate: none;
     scale: 1;
+    box-shadow: var(--piece-rest);
   }
 }
 

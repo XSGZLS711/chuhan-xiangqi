@@ -7,7 +7,7 @@ import {
   type BoardEffect as Effect,
 } from '@/lib/presentation';
 import BoardEffect from '@/components/board-effect';
-import { pieceMotion } from '@/lib/motion';
+import { PIECE_MOTION, pieceMotion } from '@/lib/motion';
 
 type Frame = {
   sig: string;
@@ -104,6 +104,19 @@ export default function ChessBoard({
         : null,
     });
   }
+  const move = frame.move;
+  useEffect(() => {
+    if (!move) return;
+    // Fallback for reduced motion, where CSS emits no animationend event.
+    const timer = setTimeout(
+      () =>
+        setFrame((current) =>
+          current.move === move ? { ...current, move: null } : current,
+        ),
+      move.timing.durationMs + 50,
+    );
+    return () => clearTimeout(timer);
+  }, [move]);
   const ghost = frame.ghost;
   useEffect(() => {
     if (!ghost) return;
@@ -126,7 +139,14 @@ export default function ChessBoard({
   };
   return (
     <div className={`board-frame ${effect ? `fx-${effect.kind}` : ''}`}>
-      <fieldset className="chess-board" aria-label="中国象棋棋盘">
+      <fieldset
+        className="chess-board"
+        aria-label="中国象棋棋盘"
+        style={css({
+          '--slide': `${PIECE_MOTION.slideMs}ms`,
+          '--selection-lift': `${PIECE_MOTION.selectionMs}ms`,
+        })}
+      >
         <svg viewBox="0 0 900 1000" aria-hidden="true" className="board-lines">
           <g fill="none" stroke="currentColor" strokeWidth="1.8">
             <rect x="50" y="50" width="800" height="900" strokeWidth="3" />
@@ -211,15 +231,10 @@ export default function ChessBoard({
                 data-piece-id={p.id}
                 style={{
                   ...position(n),
-                  ...(moved || revived
+                  ...(moved
                     ? css({
-                        '--slide': `${frame.move?.timing.slideMs}ms`,
-                        '--motion-duration': `${frame.move?.timing.durationMs}ms`,
-                        ...(moved
-                          ? {
-                              transitionDuration: `${frame.move?.timing.slideMs}ms`,
-                            }
-                          : {}),
+                        '--hover': `${frame.move?.timing.hoverMs}ms`,
+                        '--drop': `${frame.move?.timing.dropMs}ms`,
                       })
                     : {}),
                 }}
@@ -228,6 +243,20 @@ export default function ChessBoard({
                 <span
                   key={moved ? frame.move?.key : 'idle'}
                   className={`piece ${p.side} ${p.kind === 'k' && checkSide === p.side ? 'checked' : ''}`}
+                  onAnimationEnd={(event) => {
+                    if (event.animationName === 'piece-hop')
+                      setFrame((current) =>
+                        current.move === move
+                          ? { ...current, move: null }
+                          : current,
+                      );
+                    if (event.animationName === 'piece-revive')
+                      setFrame((current) =>
+                        current.revived === p.id
+                          ? { ...current, revived: null }
+                          : current,
+                      );
+                  }}
                 >
                   <span>{label(p)}</span>
                 </span>

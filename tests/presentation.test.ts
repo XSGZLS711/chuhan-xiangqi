@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import './game-audio.test';
+import { pieceMotion } from '../lib/motion';
 import {
   capturedBy,
   boardSignature,
@@ -44,6 +45,23 @@ const snapshot = (r: Room, version: number): PublicRoom => ({
 const capture = (r: Room) =>
   applyAction(r, 'red', { action: 'move', from: 64, to: 1 }, now);
 const initial = initialBoard();
+
+test('普通走子快移后悬停，最后六十毫秒落地', () => {
+  const timing = pieceMotion();
+  assert(timing.slideMs >= 130 && timing.slideMs <= 150);
+  assert.equal(timing.hoverMs, 240);
+  assert.equal(timing.landMs - timing.hoverMs, 60);
+  assert.equal(timing.durationMs, 300);
+});
+test('吃子仅延长悬停，保持同样的平移与落地节奏', () => {
+  const move = pieceMotion(),
+    capture = pieceMotion(true);
+  assert.equal(capture.slideMs, move.slideMs);
+  assert.equal(capture.dropMs, move.dropMs);
+  assert(capture.hoverMs > move.hoverMs);
+  assert(capture.landMs >= 350 && capture.landMs <= 380);
+  assert.equal(capture.durationMs, capture.landMs);
+});
 
 test('开局双方吃子栏为空', () => {
   assert.deepEqual(capturedBy(initial, 'red'), []);
