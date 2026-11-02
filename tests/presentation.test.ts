@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import './game-audio.test';
 import { pieceMotion } from '../lib/motion';
 import {
   capturedBy,

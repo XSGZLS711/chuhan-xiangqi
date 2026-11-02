@@ -24,7 +24,8 @@
     "test:ai": "esbuild tests/ai.test.ts tests/ai-engine.test.ts --bundle --platform=node --format=esm --outdir=work/ai-tests --out-extension:.js=.mjs && node --test work/ai-tests/ai.test.mjs && node work/ai-tests/ai-engine.test.mjs",
     "test:ui": "esbuild tests/presentation.test.ts --bundle --platform=node --format=esm --outfile=work/presentation.test.mjs && node work/presentation.test.mjs",
     "test:mobile": "esbuild tests/mobile-game.test.ts --bundle --platform=node --format=esm --outfile=work/mobile-game.test.mjs && node work/mobile-game.test.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:audio": "esbuild tests/game-audio.test.ts --bundle --platform=node --format=esm --outfile=work/game-audio.test.mjs && node work/game-audio.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "1.7.0",

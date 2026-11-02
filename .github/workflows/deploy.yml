@@ -29,6 +29,7 @@ jobs:
       - run: npm test
       - run: npm run test:identity
       - run: npm run test:ui
+      - run: npm run test:audio
       - run: npm run test:mobile
       - run: npm run test:ai
       - run: npm run build
