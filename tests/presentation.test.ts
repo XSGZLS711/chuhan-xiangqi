@@ -226,15 +226,17 @@ test('真正将死触发绝杀且不叠加将军提示', () => {
   assert.equal(f.effect?.side, 'red');
 });
 test('认输、超时、困毙与和棋不会误显示绝杀', () => {
-  for (const result of [
-    { winner: 'red', reason: '黑方认输' },
-    { winner: 'black', reason: '超时' },
-    { winner: 'red', reason: '困毙' },
-    { winner: 'draw', reason: '双方同意和棋' },
-  ] as Result[]) {
+  for (const [result, title] of [
+    [{ winner: 'red', reason: '黑方认输' }, '认输'],
+    [{ winner: 'black', reason: '超时' }, '超时'],
+    [{ winner: 'red', reason: '困毙' }, '困毙'],
+    [{ winner: 'black', reason: '长将判负' }, '长将判负'],
+    [{ winner: 'draw', reason: '双方同意和棋' }, '和棋'],
+  ] as [Result, string][]) {
     const effect = resultEffect(result, 'test');
     assert.equal(effect.kind, 'result');
-    assert.notEqual(effect.title, '绝杀');
+    // The stamp names the ending; the loser must never see a victory title.
+    assert.equal(effect.title, title);
     assert(effect.detail.includes(result.reason));
   }
 });

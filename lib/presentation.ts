@@ -134,6 +134,7 @@ export function resultEffect(
   analysis = false,
 ): BoardEffect {
   const mate = result.reason === '将死';
+  // Name how the game ended, not who won: both players and spectators see this stamp.
   return {
     id,
     kind: mate ? 'mate' : 'result',
@@ -141,9 +142,11 @@ export function resultEffect(
       ? '绝杀'
       : result.winner === 'draw'
         ? '和棋'
-        : result.reason === '困毙'
-          ? '困毙'
-          : '胜局',
+        : result.reason.endsWith('认输')
+          ? '认输'
+          : ['困毙', '超时', '长将判负'].includes(result.reason)
+            ? result.reason
+            : '终局',
     detail:
       (analysis ? '推演 · ' : '') +
       (result.winner === 'draw'
