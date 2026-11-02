@@ -17,6 +17,7 @@ import {
   displayNotation,
 } from '@/lib/mobile-game';
 import { useGameViewport } from '@/lib/use-game-viewport';
+import { useAutoArchive } from '@/lib/use-auto-archive';
 import EffectSettings from '@/components/effect-settings';
 import { useEffectSettings } from '@/lib/use-effect-settings';
 import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
@@ -126,6 +127,12 @@ export default function Home() {
     [chat, setChat] = useState(''),
     [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null),
     [sheet, setSheet] = useState<'record' | null>(null);
+  const archiveError = useAutoArchive(
+    room,
+    room ? `friend:${room.id}:${room.round}` : null,
+    { kind: 'friend' },
+    room?.you ?? null,
+  );
   const viewportStyle = useGameViewport(!!room);
   const roomRef = useRef<PublicRoom | null>(null),
     nameRef = useRef(name),
@@ -827,6 +834,11 @@ export default function Home() {
             </>
           ) : null}
         </div>
+      )}
+      {archiveError && (
+        <p className="notice" role="alert">
+          {archiveError}
+        </p>
       )}
       {message && (
         <div className="notice" role="status">

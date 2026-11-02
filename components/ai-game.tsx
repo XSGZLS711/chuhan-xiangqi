@@ -49,6 +49,9 @@ import {
   type EngineInfo,
 } from '@/lib/ai-game';
 import { BrowserEngine, aiBase, prepareAiPage } from '@/lib/ai-engine';
+import { useAutoArchive } from '@/lib/use-auto-archive';
+import { getArchivedGame } from '@/lib/archive-storage';
+import { replayArchive, archiveLabel, type ArchivedGame } from '@/lib/archive';
 import EffectSettings from '@/components/effect-settings';
 import { useEffectSettings } from '@/lib/use-effect-settings';
 import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
@@ -80,9 +83,15 @@ type AnalysisResult = { key: string; info: EngineInfo };
 export default function AiGame() {
   const { settings, setSetting } = useEffectSettings();
   const sound = settings.sound;
+  const [sessionId] = useState(() => crypto.randomUUID());
+  const [archiveId, setArchiveId] = useState(() =>
+    new URLSearchParams(location.search).get('game'),
+  );
+  const [archived, setArchived] = useState<ArchivedGame | null>(null);
+  const [archiveLoadError, setArchiveLoadError] = useState('');
   const [match, setMatch] = useState(() => createAiMatch('red', 'medium'));
   const [started, setStarted] = useState(false);
-  const [setup, setSetup] = useState(true);
+  const [setup, setSetup] = useState(!archiveId);
   const [human, setHuman] = useState<Side>('red');
   const [level, setLevel] = useState<AiLevel>('medium');
   const [engineState, setEngineState] = useState<'loading' | 'ready' | 'error'>(
@@ -108,6 +117,42 @@ export default function AiGame() {
   const viewRef = useRef({ live: true, branch: false });
   const viewport = useGameViewport(started);
   const { room } = match;
+  const archiveError = useAutoArchive(
+    room,
+    started && !archived && !archiveId ? `ai:${sessionId}:${room.round}` : null,
+    { kind: 'ai', level: match.level },
+    match.human,
+  );
+  useEffect(() => {
+    if (!archiveId) return;
+    let active = true;
+    void getArchivedGame(archiveId)
+      .then((game) => {
+        const restored = replayArchive(game);
+        if (!active) return;
+        setArchived(game);
+        setMatch({
+          room: restored,
+          human: game.viewerSide ?? 'red',
+          level: game.mode.kind === 'ai' ? game.mode.level : 'medium',
+          revision: 0,
+        });
+        setReview(0);
+        setStarted(true);
+        setSetup(false);
+        setSelected(null);
+        setBranch(null);
+      })
+      .catch((error: unknown) => {
+        if (active)
+          setArchiveLoadError(
+            error instanceof Error ? error.message : '无法读取这盘对局',
+          );
+      });
+    return () => {
+      active = false;
+    };
+  }, [archiveId]);
   const index =
     review === null
       ? room.history.length
@@ -132,7 +177,7 @@ export default function AiGame() {
   const evaluationKey = `${match.revision}:${position}`;
   const info = evaluation?.key === evaluationKey ? evaluation.info : null;
   const line = info ? describeLine(board, turn, info.pv) : [];
-  const live = review === null && !branch;
+  const live = review === null && !branch && !archived;
   const aiTurn = started && live && !room.result && room.turn !== match.human;
   const canMove =
     started &&
@@ -140,7 +185,8 @@ export default function AiGame() {
     (!!branch || (live && !room.result && room.turn === match.human));
   const targets = selected === null ? [] : legalTargets(board, selected);
   const canUndo =
-    room.history.some((m) => m.side === match.human) || !!room.result;
+    !archived &&
+    (room.history.some((m) => m.side === match.human) || !!room.result);
   const ended = live && !!room.result;
 
   function unlockSound() {
@@ -164,8 +210,11 @@ export default function AiGame() {
   }
 
   useEffect(() => {
-    viewRef.current = { live: review === null && !branch, branch: !!branch };
-  }, [review, branch]);
+    viewRef.current = {
+      live: review === null && !branch && !archived,
+      branch: !!branch,
+    };
+  }, [review, branch, archived]);
   useEffect(() => {
     soundRef.current = sound;
     if (!sound) audioRef.current?.silence();
@@ -315,6 +364,10 @@ export default function AiGame() {
     else window.location.assign('../');
   }
   function start() {
+    setArchived(null);
+    setArchiveId(null);
+    setArchiveLoadError('');
+    window.history.replaceState(null, '', location.pathname);
     setMatch((current) =>
       createAiMatch(human, level, started ? current.room.round + 1 : 1),
     );
@@ -328,7 +381,7 @@ export default function AiGame() {
   }
   function backToLive() {
     setBoardEffect(null);
-    setReview(null);
+    setReview(archived ? room.history.length : null);
     setBranch(null);
     setSelected(null);
     setSheet(null);
@@ -480,19 +533,43 @@ export default function AiGame() {
           </div>
           <div className="player-name-block">
             <strong>
-              <span className="player-name">{me ? '我方' : '象棋 AI'}</span>
-              {!me && (
+              <span className="player-name">
+                {archived ? archived.players[side] : me ? '我方' : '象棋 AI'}
+              </span>
+              {!me && (!archived || archived.mode.kind === 'ai') && (
                 <em className="player-tag">{AI_LEVELS[match.level].label}</em>
               )}
             </strong>
           </div>
           <CapturedTray board={board} side={side} />
-          {!me && <Bot size={20} aria-label="电脑棋手" />}
+          {!me && (!archived || archived.mode.kind === 'ai') && (
+            <Bot size={20} aria-label="电脑棋手" />
+          )}
         </div>
       </div>
     );
   }
 
+  if (archiveId && !archived)
+    return (
+      <main className="app-shell">
+        <a href="../">返回棋社</a>
+        <p role={archiveLoadError ? 'alert' : 'status'}>
+          {archiveLoadError || '正在读取本地对局…'}
+        </p>
+        {archiveLoadError && (
+          <button
+            onClick={() => {
+              setArchiveId(null);
+              setSetup(true);
+              window.history.replaceState(null, '', location.pathname);
+            }}
+          >
+            开始人机对弈
+          </button>
+        )}
+      </main>
+    );
   return (
     <main
       className={`app-shell table-view ai-room ${started ? 'in-room' : ''} ${ended ? 'game-ended' : ''}`}
@@ -514,9 +591,12 @@ export default function AiGame() {
         <a href="../" aria-label="返回棋社">
           <ArrowLeft size={20} />
         </a>
-        <strong>人机练习</strong>
+        <strong>{archived ? '对局复盘' : '人机练习'}</strong>
         <span>
-          {AI_LEVELS[match.level].label} · 第 {room.round} 局
+          {archived?.mode.kind === 'friend'
+            ? '好友对弈'
+            : AI_LEVELS[match.level].label}{' '}
+          · 第 {room.round} 局
         </span>
         <button onClick={() => setSetup(true)} aria-label="设置新的一局">
           <Settings2 size={20} />
@@ -534,6 +614,17 @@ export default function AiGame() {
           )}
         </span>
       </output>
+      {archived && (
+        <p className="archive-banner">
+          本地复盘 · {archived.players.red} / {archived.players.black} ·{' '}
+          {archiveLabel(archived).result} · {archived.result.reason}
+        </p>
+      )}
+      {archiveError && (
+        <p className="ai-error" role="alert">
+          {archiveError}
+        </p>
+      )}
       {error && (
         <div className="ai-error" role="alert">
           <span>{error}</span>
@@ -607,7 +698,9 @@ export default function AiGame() {
                   </button>
                 </>
               )}
-              <button onClick={backToLive}>返回对局</button>
+              <button onClick={backToLive}>
+                {archived ? '返回复盘' : '返回对局'}
+              </button>
             </div>
           )}
           {ended && (
@@ -639,7 +732,7 @@ export default function AiGame() {
             </button>
             <button onClick={branch ? backToLive : explore}>
               <GitBranch size={18} />
-              {branch ? '返回对局' : '推演'}
+              {branch ? (archived ? '返回复盘' : '返回对局') : '推演'}
             </button>
             <button
               disabled={!!room.result}
@@ -865,7 +958,7 @@ export default function AiGame() {
             </div>
           </fieldset>
           <p className="ai-setup-note">
-            悔棋会退回到你上一次落子前；练习棋局仅保留在当前页面。
+            悔棋会退回到你上一次落子前；已结束的对局会自动保存在当前浏览器，未结束的棋局仅保留在当前页面。
           </p>
           {error && (
             <p className="ai-setup-error" role="alert">

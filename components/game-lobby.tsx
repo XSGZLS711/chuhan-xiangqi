@@ -1,5 +1,6 @@
 'use client';
 /* oxlint-disable next/no-html-link-for-pages -- The AI entry is a separate document with its own browser isolation. */
+import RecentGames from './recent-games';
 import { ArrowRight, Bot, GitBranch, Users } from 'lucide-react';
 
 export default function GameLobby({
@@ -55,6 +56,7 @@ export default function GameLobby({
           <GitBranch size={16} /> 先随手推演
         </button>
       </div>
+      <RecentGames />
     </section>
   );
 }

@@ -544,3 +544,10 @@
     font-size: 11px;
   }
 }
+
+.archive-banner {
+  margin: 0;
+  padding: 8px 2px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
