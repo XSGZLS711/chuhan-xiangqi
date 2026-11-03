@@ -17,12 +17,86 @@
       content="#191c1b"
       media="(prefers-color-scheme: dark)"
     />
+    <!-- What search engines and link previews read; the page then switches to the
+         visitor's language (meta.home.* in lib/locales). -->
     <meta
       name="description"
-      content="邀请好友在线下中国象棋。无限悔棋、独立推演、棋谱复盘，打开链接即可入座。"
+      content="Free xiangqi (Chinese chess) in your browser: send a friend a link to play, practice against the computer and review your games move by move. No sign-up needed. 免费在线中国象棋：发链接约好友对弈、和 AI 练习、逐步复盘，无需注册。"
     />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
-    <title>楚汉棋社 · 好友象棋对战</title>
+    <title>
+      Play Xiangqi Online with Friends or AI · Chuhan Xiangqi 楚汉棋社
+    </title>
+    <!-- No canonical or og:url here: invitations are /?room=… links, and Facebook would
+         send a shared invitation to the canonical address instead of the room. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="楚汉棋社 Chuhan Xiangqi" />
+    <meta
+      property="og:title"
+      content="Play Xiangqi Online with Friends or AI · Chuhan Xiangqi 楚汉棋社"
+    />
+    <meta
+      property="og:description"
+      content="Free xiangqi (Chinese chess) in your browser: send a friend a link to play, practice against the computer and review your games move by move. No sign-up needed. 免费在线中国象棋：发链接约好友对弈、和 AI 练习、逐步复盘，无需注册。"
+    />
+    <meta
+      property="og:image"
+      content="https://chuhanxiangqi.com/og-image.png"
+    />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="The 楚汉棋社 Chuhan Xiangqi seal and name beside three xiangqi pieces on a board"
+    />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:locale:alternate" content="en_US" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta
+      name="twitter:title"
+      content="Play Xiangqi Online with Friends or AI · Chuhan Xiangqi 楚汉棋社"
+    />
+    <meta
+      name="twitter:description"
+      content="Free xiangqi (Chinese chess) in your browser: send a friend a link to play, practice against the computer and review your games move by move. No sign-up needed. 免费在线中国象棋：发链接约好友对弈、和 AI 练习、逐步复盘，无需注册。"
+    />
+    <meta
+      name="twitter:image"
+      content="https://chuhanxiangqi.com/og-image.png"
+    />
+    <meta
+      name="twitter:image:alt"
+      content="The 楚汉棋社 Chuhan Xiangqi seal and name beside three xiangqi pieces on a board"
+    />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "name": "Chuhan Xiangqi",
+            "alternateName": "楚汉棋社",
+            "url": "https://chuhanxiangqi.com/"
+          },
+          {
+            "@type": "WebApplication",
+            "name": "Chuhan Xiangqi",
+            "alternateName": "楚汉棋社",
+            "url": "https://chuhanxiangqi.com/",
+            "image": "https://chuhanxiangqi.com/og-image.png",
+            "description": "Free xiangqi (Chinese chess) in your browser: send a friend a link to play, practice against the computer and review your games move by move.",
+            "applicationCategory": "GameApplication",
+            "genre": "Xiangqi",
+            "operatingSystem": "Any",
+            "browserRequirements": "Requires JavaScript",
+            "inLanguage": ["zh-CN", "en"],
+            "isAccessibleForFree": true,
+            "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
