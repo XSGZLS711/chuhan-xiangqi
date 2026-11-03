@@ -1,4 +1,5 @@
 import { en } from './locales/en';
+import { vi } from './locales/vi';
 import { zh, type MessageKey } from './locales/zh';
 import type { NotationStyle } from './notation';
 import { NAME, REASON } from './tokens';
@@ -9,7 +10,7 @@ import type { Piece, Side } from './xiangqi';
  * `MessageKey`, so a missing string fails `typecheck`), then list it in `LOCALES`
  * and `BUNDLES` below.
  */
-export type Locale = 'zh' | 'en';
+export type Locale = 'zh' | 'en' | 'vi';
 export type { MessageKey };
 export type Params = Record<string, string | number>;
 export type LocaleMeta = {
@@ -26,8 +27,8 @@ export type LocaleBundle = {
   meta: LocaleMeta;
   messages: Record<MessageKey, string>;
 };
-const BUNDLES: Record<Locale, LocaleBundle> = { zh, en };
-export const LOCALES: readonly Locale[] = ['zh', 'en'];
+const BUNDLES: Record<Locale, LocaleBundle> = { zh, en, vi };
+export const LOCALES: readonly Locale[] = ['zh', 'en', 'vi'];
 export const DEFAULT_LOCALE: Locale = 'zh';
 export const LOCALE_STORAGE_KEY = 'chuhan-locale';
 
@@ -65,10 +66,11 @@ export function tn(
 export const hasMessage = (key: string): key is MessageKey =>
   Object.hasOwn(zh.messages, key);
 
-/** What `navigator.languages` says: any Chinese reads Chinese, everyone else English. */
+/** What `navigator.languages` says: the first choice's language when we speak it (any
+ * Chinese reads Chinese, `vi-VN` reads Vietnamese), everyone else English. */
 export function detectLocale(languages: readonly string[] | undefined): Locale {
   const first = languages?.find(Boolean);
-  return first && /^zh\b/i.test(first) ? 'zh' : 'en';
+  return parseLocale(first?.split('-')[0].toLowerCase()) ?? 'en';
 }
 export const parseLocale = (value: unknown): Locale | null =>
   LOCALES.find((locale) => locale === value) ?? null;
