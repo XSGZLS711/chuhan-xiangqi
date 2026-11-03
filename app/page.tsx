@@ -811,7 +811,7 @@ export default function Home() {
             )}
           </button>
           <button
-            className="text-button"
+            className="text-button rules-button"
             aria-label={t('room.rules')}
             title={t('room.rules')}
             onClick={() => setModal('rules')}
@@ -819,7 +819,6 @@ export default function Home() {
             <BookOpen size={17} />{' '}
             <span className="tool-label">{t('room.rules')}</span>
           </button>
-          {/* In a game the language sits in the board's settings menu: the side column is narrow. */}
           {lobby && <LanguageSwitch />}
           <AccountMenu account={account} />
         </div>

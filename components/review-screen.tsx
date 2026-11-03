@@ -25,7 +25,6 @@ import { errorText } from '@/lib/errors';
 import { playerName, reasonText, sideName } from '@/lib/i18n';
 import type { useGameAnalysis } from '@/lib/use-game-analysis';
 import { useLocale } from '@/lib/use-locale';
-import LanguageSwitch from '@/components/language-switch';
 import {
   gamePhases,
   moveComparison,
@@ -789,7 +788,6 @@ export default function ReviewScreen({
             <GitBranch />
           </button>
         )}
-        <LanguageSwitch />
       </header>
       <div className="review-stage">
         <div className="review-board">

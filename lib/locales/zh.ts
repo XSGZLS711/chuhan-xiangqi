@@ -459,8 +459,6 @@ export const zhMessages = {
   'ai.setup.red': '执红 · 先手',
   'ai.setup.black': '执黑 · 后手',
   'ai.setup.level': '棋手难度',
-  'ai.setup.note':
-    '悔棋会退回到你上一次落子前；已结束的对局会自动保存在当前浏览器，未结束的棋局仅保留在当前页面。',
   'ai.setup.reload': '重新加载棋手',
   'ai.setup.start': '开始对弈',
   'ai.setup.continue': '继续当前对局',

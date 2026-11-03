@@ -477,8 +477,6 @@ const messages: Record<MessageKey, string> = {
   'ai.setup.red': 'Đỏ · đi trước',
   'ai.setup.black': 'Đen · đi sau',
   'ai.setup.level': 'Độ khó',
-  'ai.setup.note':
-    'Đi lại sẽ đưa bạn về trước nước đi gần nhất của bạn. Ván đã kết thúc được tự động lưu trên trình duyệt này; ván đang chơi chỉ giữ trên trang này.',
   'ai.setup.reload': 'Tải lại máy cờ',
   'ai.setup.start': 'Bắt đầu chơi',
   'ai.setup.continue': 'Tiếp tục ván hiện tại',

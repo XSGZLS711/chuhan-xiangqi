@@ -1,6 +1,5 @@
 import { useRef } from 'react';
 import { Check, Languages } from 'lucide-react';
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { LOCALES, localeMeta, type Locale } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 
@@ -35,19 +34,4 @@ export default function LanguageSwitch() {
       </ul>
     </details>
   );
-}
-
-/** The other languages as menu items, for the phone's game menu. */
-export function LocaleMenuItems() {
-  const { locale, setLocale } = useLocale();
-  return LOCALES.filter((code) => code !== locale).map((code) => (
-    <DropdownMenuItem
-      key={code}
-      lang={localeMeta(code).htmlLang}
-      onClick={() => setLocale(code)}
-    >
-      <Languages />
-      <span>{localeMeta(code).name}</span>
-    </DropdownMenuItem>
-  ));
 }

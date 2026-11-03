@@ -55,7 +55,6 @@ import {
 import { errorInfo, errorText, type ErrorInfo } from '@/lib/errors';
 import { playerName, reasonText, sideName } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
-import LanguageSwitch, { LocaleMenuItems } from '@/components/language-switch';
 import { BrowserEngine, aiBase, prepareAiPage } from '@/lib/ai-engine';
 import { reportClientError } from '@/lib/telemetry';
 import { useAutoArchive } from '@/lib/use-auto-archive';
@@ -1006,7 +1005,6 @@ export default function AiGame() {
               <ArrowLeft />
               <span>{t('ai.back')}</span>
             </DropdownMenuItem>
-            <LocaleMenuItems />
           </DropdownMenuContent>
         </DropdownMenu>
         <button
@@ -1130,7 +1128,6 @@ export default function AiGame() {
               ))}
             </div>
           </fieldset>
-          <p className="ai-setup-note">{t('ai.setup.note')}</p>
           {error && (
             <p className="ai-setup-error" role="alert">
               {errorText(locale, error)}
@@ -1157,7 +1154,6 @@ export default function AiGame() {
               {t('ai.setup.continue')}
             </button>
           )}
-          <LanguageSwitch />
         </DialogContent>
       </Dialog>
       <Dialog open={confirmResign} onOpenChange={setConfirmResign}>

@@ -480,8 +480,6 @@ const messages: Record<MessageKey, string> = {
   'ai.setup.red': 'Red · moves first',
   'ai.setup.black': 'Black · moves second',
   'ai.setup.level': 'Difficulty',
-  'ai.setup.note':
-    'Undo takes you back to before your last move. Finished games are saved in this browser automatically; a game in progress stays on this page only.',
   'ai.setup.reload': 'Reload the engine',
   'ai.setup.start': 'Start playing',
   'ai.setup.continue': 'Continue the current game',
