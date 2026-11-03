@@ -46,7 +46,7 @@ Cloudflare Worker（Hono）——静态资源 + API + 登录
 - [ ] 在真实浏览器里用两台设备走一局，并打开 `/ai/` 下一局，确认引擎能启动（我这边的内置浏览器跑不了 WebAssembly 引擎）。
 - [x] 正式环境已由你本人迁移并部署。
 - [x] GitHub Secrets（`CLOUDFLARE_API_TOKEN`、`CLOUDFLARE_ACCOUNT_ID`）已配置。
-- [ ] 自己的域名（购买后在 `wrangler.jsonc` 的 `routes` 里配置）。
+- [x] 自己的域名 `chuhanxiangqi.com`（2026-11-03 在 Cloudflare 注册）：正式环境 https://chuhanxiangqi.com ，预发 https://staging.chuhanxiangqi.com 。
 - [ ] 提交并合并 `m0-unified-worker`。
 - **完成标准**：线上域名同源跑通创建房间、入座、走棋、AI 页；旧站不再更新，保持最后一次发布状态。
 
