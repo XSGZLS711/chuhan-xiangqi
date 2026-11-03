@@ -1,7 +1,13 @@
 'use client';
 import './lobby.css';
 import { useEffect, useRef, useState } from 'react';
-import { apiError, gameFetch, invitationUrl } from '@/lib/client-api';
+import { apiError, invitationUrl, type ApiError } from '@/lib/client-api';
+import {
+  createRoom,
+  openSession,
+  startRoomSync,
+  type RoomSync,
+} from '@/lib/room-sync';
 import { errorInfo, errorText, type ErrorInfo } from '@/lib/errors';
 import { playerName, reasonText, sideName, type MessageKey } from '@/lib/i18n';
 import { historyMoveText } from '@/lib/notation';
@@ -168,6 +174,7 @@ export default function Home() {
     viewModeRef = useRef<'live' | 'review' | 'analysis'>('live'),
     locked = useRef(false),
     orientationRoom = useRef(''),
+    syncRef = useRef<RoomSync | null>(null),
     alive = useRef(true);
   useEffect(() => {
     nameRef.current = name;
@@ -235,20 +242,6 @@ export default function Home() {
       orientationRoom.current = r.id;
     }
   }
-  /** With `since`, the server holds the answer until the room moves past that version. */
-  async function fetchRoom(id: string, since?: number) {
-    const query = since === undefined ? '' : '&since=' + since;
-    const res = await gameFetch(
-      '/api/game?room=' + encodeURIComponent(id) + query,
-      { cache: 'no-store', signal: AbortSignal.timeout(12000) },
-    );
-    const data = (await res.json()) as PublicRoom & {
-      error?: string;
-      code?: string;
-    };
-    if (!res.ok) throw apiError(data, res.status, 'unavailable');
-    return data as PublicRoom;
-  }
   useEffect(() => {
     alive.current = true;
     setRoomId(new URLSearchParams(location.search).get('room') || '');
@@ -257,11 +250,7 @@ export default function Home() {
     } catch {}
     const initialize = async () => {
       try {
-        const res = await gameFetch('/api/game', {
-          cache: 'no-store',
-          signal: AbortSignal.timeout(12000),
-        });
-        if (!res.ok) throw new Error();
+        await openSession();
         setReady(true);
         setConnection('online');
       } catch {
@@ -278,19 +267,11 @@ export default function Home() {
       clearInterval(timer);
     };
   }, []);
+  // The room's own socket, or held polls where it cannot get through (`lib/room-sync.ts`).
   useEffect(() => {
     if (!roomId || !ready) return;
-    let disposed = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const poll = async () => {
-      const started = Date.now();
-      try {
-        const known = roomRef.current;
-        const r = await fetchRoom(
-          roomId,
-          known?.id === roomId ? known.version : undefined,
-        );
-        if (disposed) return;
+    const sync = startRoomSync(roomId, {
+      onRoom(r) {
         update(r);
         if (
           !r.you &&
@@ -299,64 +280,29 @@ export default function Home() {
           new URLSearchParams(location.search).get('spectate') !== '1'
         ) {
           autoJoin.current = roomId;
-          const res = await gameFetch('/api/game', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              action: 'join',
-              room: roomId,
-              version: r.version,
-              name: nameRef.current,
-            }),
-          });
-          const joined = (await res.json()) as PublicRoom & {
-            error?: string;
-            code?: string;
-          };
-          if (disposed) return;
-          if (res.ok) update(joined);
-          else {
+          sync.send('join', { name: nameRef.current }).catch((e: ApiError) => {
             autoJoin.current = '';
-            if (res.status !== 409)
-              setMessage(
-                problem(
-                  apiError(joined, res.status, 'join-failed'),
-                  'join-failed',
-                ),
-              );
-          }
+            if (e.status !== 409) setMessage(problem(e, 'join-failed'));
+          });
         }
-      } catch (e) {
-        if (!disposed) {
-          setConnection('offline');
-          setMessage(problem(e, 'connection-lost'));
-        }
-      } finally {
-        // Spaced from the start of the last request, so an answer that comes back at
-        // once never makes the page ask faster than it did before polls were held.
-        if (!disposed)
-          timer = setTimeout(
-            poll,
-            Math.max(0, started + (document.hidden ? 5000 : 1400) - Date.now()),
-          );
-      }
-    };
-    void poll();
+      },
+      onLost(e) {
+        setConnection('offline');
+        setMessage(problem(e, 'connection-lost'));
+      },
+    });
+    syncRef.current = sync;
     return () => {
-      disposed = true;
-      clearTimeout(timer);
+      sync.stop();
+      syncRef.current = null;
     };
   }, [roomId, ready]);
   async function reconnect() {
     setConnection('loading');
     try {
-      const res = await gameFetch('/api/game', {
-        cache: 'no-store',
-        signal: AbortSignal.timeout(10000),
-      });
-      if (!res.ok) throw new Error();
+      await openSession(undefined, 10000);
       setReady(true);
-      if (roomId) update(await fetchRoom(roomId));
+      if (roomId && syncRef.current) update(await syncRef.current.refresh());
       setConnection('online');
       setMessage(note('msg.restored', { sticky: true }));
     } catch {
@@ -372,26 +318,13 @@ export default function Home() {
     locked.current = true;
     setBusy(true);
     try {
-      const current = roomRef.current;
-      const res = await gameFetch('/api/game', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: AbortSignal.timeout(12000),
-        body: JSON.stringify({
-          action: kind,
-          room: current?.id,
-          version: current?.version,
-          ...extra,
-        }),
-      });
-      const data = (await res.json()) as PublicRoom & {
-        error?: string;
-        code?: string;
-      };
-      if (!res.ok) {
-        if (res.status === 409 && current) update(await fetchRoom(current.id));
-        throw apiError(data, res.status, 'action-failed');
-      }
+      const sync = syncRef.current;
+      if (kind !== 'create' && !sync)
+        throw apiError(null, 0, 'network-unstable');
+      const data =
+        kind === 'create'
+          ? await createRoom(String(extra.name), Number(extra.clockMinutes))
+          : await sync!.send(kind, extra);
       update(data);
       setSelected(null);
       setMessage(null);

@@ -25,6 +25,17 @@
       "migrations_dir": "drizzle"
     }
   ],
+  // Friend rooms made since M2: one Durable Object each (SQLite storage, the only kind the
+  // free plan has), and one per player listing the rooms they sit in.
+  "durable_objects": {
+    "bindings": [
+      { "name": "ROOMS", "class_name": "GameRoom" },
+      { "name": "SEATS", "class_name": "PlayerSeats" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["GameRoom", "PlayerSeats"] }
+  ],
   "env": {
     "staging": {
       "name": "chuhan-xiangqi-staging",
@@ -43,6 +54,15 @@
           "database_id": "8e0a4377-ad05-4245-ae69-bca90843f398",
           "migrations_dir": "drizzle"
         }
+      ],
+      "durable_objects": {
+        "bindings": [
+          { "name": "ROOMS", "class_name": "GameRoom" },
+          { "name": "SEATS", "class_name": "PlayerSeats" }
+        ]
+      },
+      "migrations": [
+        { "tag": "v1", "new_sqlite_classes": ["GameRoom", "PlayerSeats"] }
       ]
     }
   }

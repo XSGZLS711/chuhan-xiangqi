@@ -13,8 +13,9 @@ const CHECK_MS = 600;
 // A database or a read session on one: either can prepare a statement.
 type Db = Pick<D1Database, 'prepare'>;
 
+/** Returns the rows written, for the local usage count. */
 export async function touchPresence(db: Db, key: string, now: number) {
-  await db
+  const result = await db
     .prepare(
       `INSERT INTO presence (id, seen_at) VALUES (?, ?)
        ON CONFLICT(id) DO UPDATE SET seen_at = excluded.seen_at
@@ -22,6 +23,7 @@ export async function touchPresence(db: Db, key: string, now: number) {
     )
     .bind(key, now, now - REFRESH_MS)
     .run();
+  return result.meta.rows_written ?? 0;
 }
 
 export async function present(

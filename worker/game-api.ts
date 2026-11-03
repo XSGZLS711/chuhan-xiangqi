@@ -1,7 +1,9 @@
-import { validateRequestOrigin } from './identity';
+import { randomHex, validateRequestOrigin } from './identity';
 import { player } from './accounts';
 import { database } from './db';
 import { HOLD_MS, present, touchPresence, waitForChange } from './room-poll';
+import { LIVE_ROOM, PLAYER_HEADER, liveRoom } from './room-object';
+import { isLocal, usage } from './usage';
 import { errorBody } from '../lib/errors';
 import {
   Room,
@@ -45,7 +47,8 @@ async function publicState(
   const db = database(),
     side = playerSide(room, id),
     now = Date.now();
-  if (side) await touchPresence(db, room.id + ':' + id, now);
+  if (side)
+    usage.d1RowsWritten += await touchPresence(db, room.id + ':' + id, now);
   const [red, black = false] = await present(
     db,
     [room.players.red, room.players.black].flatMap((seat) =>
@@ -73,7 +76,17 @@ async function handleGet(req: Request) {
     cookie = identityValue.cookie;
     const params = new URL(req.url).searchParams;
     const id = params.get('room');
+    if (params.has('usage') && isLocal(req)) return reply(usage, cookie);
     if (!id) return reply({ ready: true }, cookie);
+    if (LIVE_ROOM.test(id)) {
+      const since = params.get('since');
+      const out = await liveRoom(id).view(
+        identityValue.id,
+        since === null ? null : Number(since),
+        params.has('wire'),
+      );
+      return reply(out.body, cookie, out.status);
+    }
     const { db, ...current } = await readRoom(id);
     let { room, version } = current;
     // The page already has this version: wait here for the next change rather than
@@ -94,6 +107,7 @@ async function handleGet(req: Request) {
         )
         .bind(JSON.stringify(room), Date.now(), id, version)
         .run();
+      usage.d1RowsWritten += saved.meta.rows_written ?? 0;
       if (saved.meta.changes) version++;
       else {
         const fresh = await readRoom(id);
@@ -124,25 +138,33 @@ async function handlePost(req: Request) {
     const now = Date.now();
     if (a.action === 'create') {
       const clock = Number(a.clockMinutes ?? 0);
-      if (![0, 10, 20, 30].includes(clock)) throw new GameError('bad-clock');
-      const id = Array.from(crypto.getRandomValues(new Uint8Array(10)), (n) =>
-        n.toString(16).padStart(2, '0'),
-      ).join('');
-      const room = newRoom(
-        id,
-        { id: me.id, name: cleanName(a.name) },
-        clock,
-        now,
-      );
-      await database()
+      // The local server also takes clocks under a minute, so a test can see one run out.
+      const testClock = isLocal(req) && clock > 0 && clock <= 1;
+      if (![0, 10, 20, 30].includes(clock) && !testClock)
+        throw new GameError('bad-clock');
+      const seat = { id: me.id, name: cleanName(a.name) };
+      // New rooms live in a Durable Object. A local test can still make a D1 room.
+      if (!(a.store === 'd1' && isLocal(req))) {
+        const id = randomHex(12);
+        const out = await liveRoom(id).create(id, seat, clock);
+        return reply(out.body, cookie, out.status);
+      }
+      const id = randomHex(10);
+      const room = newRoom(id, seat, clock, now);
+      const saved = await database()
         .prepare(
           'INSERT INTO rooms (id,state,version,updated_at) VALUES (?,?,0,?)',
         )
         .bind(id, JSON.stringify(room), now)
         .run();
+      usage.d1RowsWritten += saved.meta.rows_written ?? 0;
       return reply(await publicState(room, 0, me.id), cookie);
     }
     const id = typeof a.room === 'string' ? a.room : '';
+    if (LIVE_ROOM.test(id)) {
+      const out = await liveRoom(id).act(me.id, a, a.wire === true);
+      return reply(out.body, cookie, out.status);
+    }
     const { db, room, version } = await readRoom(id);
     if (a.version !== version) throw new GameError('room-changed', 409);
     if (expireClock(room, now)) {
@@ -152,6 +174,7 @@ async function handlePost(req: Request) {
         )
         .bind(JSON.stringify(room), now, id, version)
         .run();
+      usage.d1RowsWritten += saved.meta.rows_written ?? 0;
       if (!saved.meta.changes) throw new GameError('room-changed-retry', 409);
       return reply(await publicState(room, version + 1, me.id), cookie);
     }
@@ -162,6 +185,7 @@ async function handlePost(req: Request) {
       )
       .bind(JSON.stringify(room), now, id, version)
       .run();
+    usage.d1RowsWritten += saved.meta.rows_written ?? 0;
     if (!saved.meta.changes) throw new GameError('opponent-acted', 409);
     return reply(await publicState(room, version + 1, me.id), cookie);
   } catch (error) {
@@ -182,6 +206,7 @@ async function withOrigin(
   req: Request,
   handler: (req: Request) => Promise<Response>,
 ) {
+  usage.worker++;
   try {
     validateRequestOrigin(req);
     return await handler(req);
@@ -194,4 +219,20 @@ export async function GET(req: Request) {
 }
 export async function POST(req: Request) {
   return withOrigin(req, handlePost);
+}
+/** A page's socket to a Durable Object room. Browsers always send `Origin` on a socket, and
+ * no CORS stands between another site and this one, so the origin must be present and ours. */
+export async function SOCKET(req: Request) {
+  return withOrigin(req, async () => {
+    if (!req.headers.get('origin')) throw new GameError('cross-site', 403);
+    const url = new URL(req.url),
+      id = url.searchParams.get('room') ?? '';
+    if (req.headers.get('upgrade')?.toLowerCase() !== 'websocket')
+      throw new GameError('bad-request', 426);
+    if (!LIVE_ROOM.test(id)) throw new GameError('bad-room-link', 404);
+    const me = await player(req, database());
+    const headers = new Headers(req.headers);
+    headers.set(PLAYER_HEADER, me.id);
+    return liveRoom(id).fetch(new Request(url, { headers }));
+  });
 }
