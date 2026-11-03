@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>隐私说明 · 楚汉棋社</title>
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="canonical" href="https://chuhanxiangqi.com/privacy" />
     <style>
       :root {
         --background: #f4f0e9;
@@ -98,6 +99,22 @@
         <li>网站托管在 Cloudflare，Cloudflare 会按它自己的政策处理访问日志。</li>
       </ul>
 
+      <h2>访问统计和错误报告</h2>
+      <ul>
+        <li>
+          每打开一次页面，浏览器会向本站发一条访问记录：打开的是哪一页（大厅、棋室、人机对弈或复盘），从哪个网站点进来（只记网站名，比如
+          discord.com），浏览器语言和界面语言，是不是触屏，以及 Cloudflare 判断的国家或地区。
+        </li>
+        <li>
+          页面出错或象棋引擎没能启动时，浏览器会发一条错误报告：错误信息和出错的位置（调用栈），页面路径（不含网址里的房间号或对局号），浏览器的
+          User-Agent 和语言。
+        </li>
+        <li>
+          这两种记录都不带 Cookie，不含账号、名字、邮箱或 IP 地址，分不出是谁发的。它们只写进 Cloudflare 的 Workers
+          日志，最多保留 7 天后自动删除，不另外保存，也不交给任何人。
+        </li>
+      </ul>
+
       <h2>删除账号</h2>
       <p>
         登录后点右上角的账号，选「删除账号」。账号、登录方式、存在账号下的对局和所有设备上的登录状态会立即删除；棋室记录里只剩一个不再对应任何人的随机编号。浏览器里保存的「最近对局」不受影响，可以在浏览器设置里清除网站数据。
@@ -124,9 +141,8 @@
       <h2>其他</h2>
       <p>本站不面向 13 岁以下的儿童。</p>
       <p>
-        有问题请在
-        <a href="https://github.com/XSGZLS711/chuhan-xiangqi/issues">GitHub</a>
-        上留言。
+        有问题请发邮件到
+        <a href="mailto:feedback@chuhanxiangqi.com">feedback@chuhanxiangqi.com</a>。
       </p>
 
       <hr />
@@ -154,6 +170,18 @@
           The site is hosted on Cloudflare, which handles access logs under its own policy.
         </p>
         <p>
+          <strong>Visit counts and error reports</strong>: each page load sends this site one
+          visit record: which page (lobby, friend room, computer game or review), the site you came
+          from (only its name, such as discord.com), your browser and interface languages, whether
+          the screen is a touch screen, and the country or region Cloudflare sees. When a page fails
+          or the xiangqi engine cannot start, the browser sends an error report: the error message
+          and where it happened (the stack), the page path (without the room or game number in the
+          address), and your browser's user agent and language. Neither carries a cookie, an
+          account, a name, an email or an IP address, so they cannot tell players apart. They go
+          only to Cloudflare's Workers logs, which delete them after at most 7 days; they are not
+          stored anywhere else or shared with anyone.
+        </p>
+        <p>
           <strong>Deleting your account</strong>: open the account menu (top right) and choose
           删除账号 (Delete account). The account, its sign-in method, the games stored under it
           and all sessions are removed at once. Games saved in a browser stay there until you
@@ -173,7 +201,7 @@
         </p>
         <p>
           Not intended for children under 13. Questions:
-          <a href="https://github.com/XSGZLS711/chuhan-xiangqi/issues">GitHub issues</a>.
+          <a href="mailto:feedback@chuhanxiangqi.com">feedback@chuhanxiangqi.com</a>.
         </p>
       </div>
     </main>

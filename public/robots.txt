@@ -1,0 +1,6 @@
+# Staging and the workers.dev addresses serve this same file; they send
+# X-Robots-Tag: noindex instead (see _headers), which needs crawling allowed.
+User-agent: *
+Disallow: /api/
+
+Sitemap: https://chuhanxiangqi.com/sitemap.xml

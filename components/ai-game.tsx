@@ -57,6 +57,7 @@ import { playerName, reasonText, sideName } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 import LanguageSwitch, { LocaleMenuItems } from '@/components/language-switch';
 import { BrowserEngine, aiBase, prepareAiPage } from '@/lib/ai-engine';
+import { reportClientError } from '@/lib/telemetry';
 import { useAutoArchive } from '@/lib/use-auto-archive';
 import { findArchivedGame } from '@/lib/archive-sync';
 import ReviewScreen from '@/components/review-screen';
@@ -317,6 +318,7 @@ export default function AiGame() {
         if (!disposed) {
           setEngineState('error');
           setError(errorInfo(e, 'engine-prepare-failed'));
+          reportClientError('engine', e);
         }
       }
     })();

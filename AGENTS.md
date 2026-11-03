@@ -7,6 +7,7 @@ Plan: `ROADMAP.md`. Competitor study notes live only on the owner's machine in `
 ## Rules
 - Reply to the user in Chinese. Report test results honestly; say what was not verified.
 - Work on a branch; `main` auto-deploys staging. Push and open a PR when the user asks. Cloud sessions may push their own branch and open PRs, never merge.
+- Workers Logs keeps only what the code logs: invocation logs are off in `wrangler.jsonc` (both environments), because they record request headers and the IP, and `public/privacy.html` promises we keep neither. Leave them off; turning them on means rewording the privacy page with the owner first.
 - Deploys, secrets and remote migrations belong to the owner (`npm run deploy`, `deploy:staging`, `wrangler deploy`, `wrangler secret put`, `db:migrate:staging`, `db:migrate:production`): hand the user the command to run. The D1 ids in `wrangler.jsonc` stay as they are.
 - Keep `lib/xiangqi.ts`, `lib/game.ts` and `lib/presentation.ts` pure (no DOM, no React): the long-term goal is a WeChat mini program on the same core.
 - Run `npm run format` (oxfmt) only on files you changed.
@@ -27,6 +28,9 @@ Plan: `ROADMAP.md`. Competitor study notes live only on the owner's machine in `
 - `components/chess-board.tsx`, `components/board-effect.tsx`, `lib/motion.ts`, `lib/game-audio.ts`, `app/globals.css`: board, motion, effects, sound.
 - `lib/i18n.ts`, `lib/locales/`, `lib/use-locale.ts`, `lib/notation.ts`, `lib/errors.ts`, `lib/room-note.ts`, `components/language-switch.tsx`: the interface languages (see "i18n" below).
 - `worker/`: `game-api.ts` rooms; `identity.ts` the cookie; `google.ts` OAuth (pure); `accounts.ts` accounts, sessions and seat moves in D1; `auth.ts` the routes. Schema in `db/schema.ts`, migrations in `drizzle/` via `npm run db:generate`.
+- `lib/telemetry.ts`, `worker/client-error.ts`, `worker/visit.ts`: error reports (`POST /api/client-error`, including the AI engine failing to start) and page-load counts (`POST /api/visit`). Same-origin, sent without cookies, size- and rate-limited, written only to Workers Logs (`console.error` / `console.log`), never to D1. The privacy page lists what they carry.
+- `components/site-links.tsx`: the privacy page and the feedback address (`mailto:feedback@chuhanxiangqi.com`) at the foot of the lobby, for everyone; the account menu has them too.
+- Search and sharing: the `<head>` of `index.html` and `ai/index.html`, `public/robots.txt`, `public/sitemap.xml`; the share card `public/og-image.png` is exported from `assets/og-image.svg`. Staging and workers.dev send `X-Robots-Tag: noindex` (host rules in `public/_headers`).
 
 ## i18n
 The interface speaks Chinese (`zh`, the default of every pure function), English (`en`) and Vietnamese (`vi`). The browser picks from the first entry of `navigator.languages` (`zh-*` reads Chinese, `vi` / `vi-VN` Vietnamese, anything else English); the choice is saved under `localStorage` `chuhan-locale` and switches live (no reload, no request) from the lobby and review headers, the board's settings menu in a game on a wide screen (the side-column header has no room for another button), and the phone's game menu. Both entry points (`/`, `/ai/`) share it through `LocaleProvider` (`lib/use-locale.ts`); there is no module-level "current language".

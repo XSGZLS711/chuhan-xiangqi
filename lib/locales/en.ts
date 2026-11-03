@@ -167,6 +167,7 @@ const messages: Record<MessageKey, string> = {
   'account.wait': 'One moment…',
   'account.signOut': 'Sign out',
   'account.privacy': 'Privacy',
+  'account.feedback': 'Feedback',
   'account.delete': 'Delete account',
   'account.signIn.label': 'Sign in with Google',
   'account.signIn': 'Sign in',
