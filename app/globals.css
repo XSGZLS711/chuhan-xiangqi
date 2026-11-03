@@ -4527,8 +4527,9 @@ html {
   .header-tools .locale-menu .tool-label {
     display: none;
   }
-  /* Latin letters are wider than the seal-script name this header was drawn for. */
-  html:lang(en) .brand {
+  /* Latin letters are wider than the seal-script name this header was drawn for. Every
+   * language but Chinese is written in them, so these rules match `:not(:lang(zh))`. */
+  html:not(:lang(zh)) .brand {
     font-size: 18px;
     letter-spacing: 1px;
     gap: 8px;
@@ -4538,36 +4539,94 @@ html {
 
 /* Words in the stamp are sized for one or two brushed characters. A Latin word is longer, so
  * it shrinks to keep inside the ring (about 0.55em per letter). */
-html:lang(en) .ink-word {
+html:not(:lang(zh)) .ink-word {
   font-size: min(32cqw, calc(84cqw / var(--word-len, 5)));
 }
-html:lang(en) .effect-mate .ink-word {
+html:not(:lang(zh)) .effect-mate .ink-word {
   font-size: min(22cqw, calc(84cqw / var(--word-len, 4)));
 }
-html:lang(en) .effect-result .ink-word {
+html:not(:lang(zh)) .effect-result .ink-word {
   font-size: min(18cqw, calc(84cqw / var(--word-len, 8)));
 }
 
+/* Vietnamese letters carry one or two marks (ế, ợ, ữ). Microsoft YaHei does not list the
+ * Vietnamese code page, and the Chinese serif and brush faces are not known to carry these
+ * letters, so a browser would draw them from another font in the middle of a word. In
+ * Vietnamese the faces each platform ships for it come first: the system sans for text and
+ * buttons, Times New Roman / Noto Serif for headings and the stamp. They are on the device,
+ * so nothing is fetched (nothing for COEP to block). */
+html:lang(vi) body {
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Noto Sans',
+    'Helvetica Neue', Arial, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+html:lang(vi)
+  :is(
+    .table-heading h1,
+    h2,
+    .panel-heading h3,
+    .panel-heading [data-slot='tabs-trigger'],
+    .offer-panel h3,
+    .chess-dialog [data-slot='dialog-title'],
+    .chess-dialog [data-slot='alert-dialog-title'],
+    .game-sheet-heading [data-slot='sheet-title'],
+    .account-menu summary,
+    .avatar,
+    .lobby-intro h1,
+    .ink-word
+  ) {
+  font-family: 'Times New Roman', 'Noto Serif', 'Songti SC', serif;
+}
+/* "Đi lại và chơi tiếp" is wider than the endgame row's middle button (friend room and AI
+ * page): the words wrap, as in the primary button beside it, instead of running past the
+ * border. */
+html:lang(vi) .endgame-buttons button {
+  white-space: normal;
+}
+/* The review report's long middle labels left the scores too little room on a phone, and
+ * "0 / 0 / 0" or "92 điểm" broke across lines: the scores stay whole, the label wraps. */
+html:lang(vi) .report-table td {
+  white-space: nowrap;
+}
+/* At phone width the explore view (no room yet) has no room for the "Luật chơi" label beside
+ * the brand, and "Chơi với máy và phân tích thế cờ" would squeeze the button next to it: the
+ * rules button keeps its icon and its name for screen readers, and the two buttons share the
+ * row evenly, wrapping their words. */
+@media (max-width: 660px) {
+  html:lang(vi) .is-analysis:not(.in-room) .header-tools .tool-label {
+    display: none;
+  }
+  html:lang(vi) .is-analysis:not(.in-room) .invite-panel {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  html:lang(vi) .is-analysis:not(.in-room) .invite-panel > .secondary-button {
+    white-space: normal;
+    line-height: 1.25;
+  }
+}
+
 /* "Player You Edit" is longer than 棋友 我方 改名; the name keeps a few letters when the bar is tight. */
-html:lang(en) .table-view .player-name {
+html:not(:lang(zh)) .table-view .player-name {
   min-width: 6ch;
 }
 
-/* In the narrow table-view column the English brand and "New game" would otherwise wrap. */
-html:lang(en) .table-view .brand {
+/* In the narrow table-view column the Latin brand and "New game" would otherwise wrap. */
+html:not(:lang(zh)) .table-view .brand {
   font-size: 22px;
   letter-spacing: 1.5px;
 }
-html:lang(en) .header-tools .text-button {
+html:not(:lang(zh)) .header-tools .text-button {
   white-space: nowrap;
 }
 
-/* Language choice in the board's settings menu. */
+/* Language choice in the board's settings menu. Each name stays on one line; when the names
+ * do not fit beside the label, they move to a row of their own, right-aligned. */
 .effect-language {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 6px 12px;
   min-height: 40px;
   margin-top: 4px;
   padding-top: 6px;
@@ -4577,6 +4636,7 @@ html:lang(en) .header-tools .text-button {
 .effect-language > div {
   display: flex;
   gap: 4px;
+  margin-left: auto;
 }
 .effect-language button {
   min-height: 30px;
@@ -4586,6 +4646,7 @@ html:lang(en) .header-tools .text-button {
   background: transparent;
   color: var(--foreground);
   font-size: 12px;
+  white-space: nowrap;
 }
 .effect-language button[aria-pressed='true'] {
   border-color: var(--primary);
@@ -4593,15 +4654,15 @@ html:lang(en) .header-tools .text-button {
   color: var(--primary);
 }
 
-/* In the narrow side column the English brand and the tool buttons do not fit on one row:
+/* In the narrow side column the Latin brand and the tool buttons do not fit on one row:
  * the tools drop to a second row, right-aligned, instead of pushing the account button out
  * of view. Chinese fits as it always did. */
 @media (min-aspect-ratio: 23/20) and (min-width: 760px) and (min-height: 501px) {
-  html:lang(en) .table-view .site-header {
+  html:not(:lang(zh)) .table-view .site-header {
     flex-wrap: wrap;
     row-gap: 0;
   }
-  html:lang(en) .table-view .header-tools {
+  html:not(:lang(zh)) .table-view .header-tools {
     margin-left: auto;
   }
 }
