@@ -703,7 +703,6 @@ export default function AiGame() {
             <Settings2 size={17} />
             {t('ai.newGame')}
           </button>
-          <LanguageSwitch />
           <AccountMenu account={account} />
         </div>
       </header>

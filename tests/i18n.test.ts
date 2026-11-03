@@ -3,6 +3,7 @@ import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import EffectSettings from '../components/effect-settings';
 import GameRecord from '../components/game-record';
 import { engineMove } from '../lib/ai-game';
 import {
@@ -385,6 +386,37 @@ test('棋谱列表：英文显示 WXF，没有语言提供者时仍是中文', (
   );
   assert(chinese.includes('炮二平五') && chinese.includes('上一步'));
   assert.equal(renderToStaticMarkup(record()), chinese);
+});
+
+test('棋盘设置菜单里能选语言，两种语言各用自己的名字，当前的标记出来', () => {
+  const settings = {
+    sound: true,
+    hints: true,
+    moveEffects: true,
+    resultEffects: true,
+  };
+  const menu = (locale: 'zh' | 'en') =>
+    renderToStaticMarkup(
+      createElement(
+        LocaleProvider,
+        { page: 'home', initialLocale: locale },
+        createElement(EffectSettings, { settings, onChange: () => {} }),
+      ),
+    );
+  const english = menu('en');
+  assert(english.includes('>中文<') && english.includes('>English<'));
+  assert(english.includes('Language'));
+  assert.match(english, /aria-pressed="true"[^>]*>English</);
+  const chinese = menu('zh');
+  assert(chinese.includes('语言'));
+  assert.match(chinese, /aria-pressed="true"[^>]*>中文</);
+  // Without a provider the menu is Chinese, as before.
+  assert.equal(
+    renderToStaticMarkup(
+      createElement(EffectSettings, { settings, onChange: () => {} }),
+    ),
+    chinese,
+  );
 });
 
 // ---- Stored tokens are shown in the viewer's language, and only then ----

@@ -4561,3 +4561,47 @@ html:lang(en) .table-view .brand {
 html:lang(en) .header-tools .text-button {
   white-space: nowrap;
 }
+
+/* Language choice in the board's settings menu. */
+.effect-language {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.effect-language > div {
+  display: flex;
+  gap: 4px;
+}
+.effect-language button {
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 12px;
+}
+.effect-language button[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: var(--accent);
+  color: var(--primary);
+}
+
+/* In the narrow side column the English brand and the tool buttons do not fit on one row:
+ * the tools drop to a second row, right-aligned, instead of pushing the account button out
+ * of view. Chinese fits as it always did. */
+@media (min-aspect-ratio: 23/20) and (min-width: 760px) and (min-height: 501px) {
+  html:lang(en) .table-view .site-header {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  html:lang(en) .table-view .header-tools {
+    margin-left: auto;
+  }
+}

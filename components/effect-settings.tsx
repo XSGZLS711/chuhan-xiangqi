@@ -1,5 +1,5 @@
 import { SlidersHorizontal } from 'lucide-react';
-import type { MessageKey } from '@/lib/i18n';
+import { LOCALES, localeMeta, type MessageKey } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 import type {
   EffectSettings as Settings,
@@ -19,7 +19,7 @@ export default function EffectSettings({
   settings: Settings;
   onChange: (key: SettingKey, value: boolean) => void;
 }) {
-  const { t } = useLocale();
+  const { locale, setLocale, t } = useLocale();
   return (
     <details className="effect-settings">
       <summary aria-label={t('fx.title')} title={t('fx.title')}>
@@ -40,6 +40,23 @@ export default function EffectSettings({
             />
           </label>
         ))}
+        {/* The board's header has no room for a language button beside the account one. */}
+        <div className="effect-language">
+          <span>{t('locale.label')}</span>
+          <div>
+            {LOCALES.map((code) => (
+              <button
+                key={code}
+                type="button"
+                lang={localeMeta(code).htmlLang}
+                aria-pressed={code === locale}
+                onClick={() => setLocale(code)}
+              >
+                {localeMeta(code).name}
+              </button>
+            ))}
+          </div>
+        </div>
       </fieldset>
     </details>
   );

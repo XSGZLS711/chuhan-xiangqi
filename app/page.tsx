@@ -877,7 +877,8 @@ export default function Home() {
             <BookOpen size={17} />{' '}
             <span className="tool-label">{t('room.rules')}</span>
           </button>
-          <LanguageSwitch />
+          {/* In a game the language sits in the board's settings menu: the side column is narrow. */}
+          {lobby && <LanguageSwitch />}
           <AccountMenu account={account} />
         </div>
       </header>
