@@ -35,7 +35,7 @@ import {
   type LineStep,
   type Phase,
 } from '@/lib/review';
-import { explainMove } from '@/lib/explain';
+import { explainMove, type Commentary } from '@/lib/explain';
 import {
   legalMove,
   legalTargets,
@@ -45,13 +45,12 @@ import {
   type Side,
 } from '@/lib/xiangqi';
 
-type Tab = 'chart' | 'analysis' | 'report' | 'practice' | 'commentary';
+type Tab = 'chart' | 'analysis' | 'report' | 'practice';
 const TABS: [Tab, string][] = [
   ['chart', '局势图'],
   ['analysis', '分析'],
   ['report', '报告'],
   ['practice', '练习'],
-  ['commentary', '解说'],
 ];
 type Line = { kind: 'best' | 'actual'; step: number; playing: boolean };
 type Practice = {
@@ -108,9 +107,6 @@ export default function ReviewScreen({
     () => moveComparison(history, data, ply),
     [history, data, ply],
   );
-  const [commentarySide, setCommentarySide] = useState<Side>(
-    game.viewerSide ?? 'red',
-  );
   // Commentary only for rated moves: a good move needs no excuse.
   const commentary = useMemo(
     () =>
@@ -123,18 +119,21 @@ export default function ReviewScreen({
     () => (practice ? moveComparison(history, data, practice.ply) : null),
     [history, data, practice],
   );
+  const drillCommentary = useMemo(
+    () =>
+      drill?.result?.rating ? explainMove(drill.played, drill.result) : null,
+    [drill],
+  );
   const done = data?.moves.filter((m) => m.status === 'complete').length ?? 0;
 
   // The review opens straight into analysis, like a coach who has already watched.
   useEffect(() => {
     if (analysis.enabled && analysis.status === 'idle') analysis.start();
   }, [analysis]);
+  // Lines step through the drill's position while practising, else the game's.
+  const lines = practice ? drill : compared;
   const steps: LineStep[] =
-    line && compared
-      ? line.kind === 'best'
-        ? compared.best
-        : compared.actual
-      : [];
+    line && lines ? (line.kind === 'best' ? lines.best : lines.actual) : [];
   const playing = !!line?.playing && line.step < steps.length;
   useEffect(() => {
     if (!playing) return;
@@ -157,6 +156,7 @@ export default function ReviewScreen({
         event.target.closest('input, [role="slider"]')
       )
         return;
+      if (tab !== 'chart' && tab !== 'analysis') return;
       if (event.key === 'ArrowLeft') go(ply - 1);
       if (event.key === 'ArrowRight') go(ply + 1);
     }
@@ -176,7 +176,20 @@ export default function ReviewScreen({
       move = drill.played;
     boardFlipped = move.side === 'black';
     score = scoreAt(data, practice.ply - 1);
-    if (
+    if (line) {
+      const shown = line.step
+          ? steps[Math.min(line.step, steps.length) - 1]
+          : null,
+        next = steps[line.step];
+      board = shown?.board ?? move.before;
+      last = shown ?? (practice.ply > 1 ? history[practice.ply - 2] : null);
+      if (next)
+        arrows.push({
+          from: next.from,
+          to: next.to,
+          tone: line.kind === 'best' ? 'best' : 'played',
+        });
+    } else if (
       (practice.state === 'solved' || practice.state === 'revealed') &&
       best
     ) {
@@ -299,7 +312,7 @@ export default function ReviewScreen({
     );
   }
 
-  function lineMoves() {
+  function lineMoves(exit = true) {
     if (!line) return null;
     return (
       <div className="line-moves">
@@ -321,104 +334,36 @@ export default function ReviewScreen({
             </li>
           ))}
         </ol>
-        <button className="line-exit" onClick={() => setLine(null)}>
-          回到实战局面
-        </button>
+        {exit && (
+          <button className="line-exit" onClick={() => setLine(null)}>
+            回到实战局面
+          </button>
+        )}
       </div>
     );
   }
 
-  function commentaryTab() {
-    const list = report[commentarySide].mistakes;
-    const current = list.find((m) => m.ply === ply);
+  /** Why the game move fell short and why the engine's move works. Demos live in the
+   * comparison rows (analysis) or the action bar (practice), never in the card. */
+  function commentaryCard(commentary: Commentary, best: string) {
     return (
-      <div className="review-commentary">
-        <div className="practice-sides">
-          {(['red', 'black'] as Side[]).map((s) => (
-            <button
-              key={s}
-              aria-pressed={commentarySide === s}
-              onClick={() => setCommentarySide(s)}
-            >
-              {sideLabel(s)}失误 {report[s].mistakes.length}
-            </button>
+      <article className="commentary-card" aria-live="polite">
+        <h4>问题在哪</h4>
+        <ul>
+          {commentary.problem.map((text) => (
+            <li key={text}>{text}</li>
           ))}
-        </div>
-        {list.length ? (
-          <ul className="commentary-list">
-            {list.map((m) => (
-              <li key={m.ply}>
-                <button aria-current={m.ply === ply} onClick={() => go(m.ply)}>
-                  <span>{moveNumber(m.ply, m.side)}</span> {m.text}
-                  <i className={`move-rating rating-${m.rating}`}>
-                    {RATING_LABELS[m.rating]}
-                  </i>
-                </button>
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="review-empty">
-            {done < total
-              ? '分析完成后列出失误。'
-              : `${sideLabel(commentarySide)}没有明显失误。`}
-          </p>
+        </ul>
+        <h4>为什么推荐{best}</h4>
+        <ul>
+          {commentary.reason.map((text) => (
+            <li key={text}>{text}</li>
+          ))}
+        </ul>
+        {!commentary.certain && (
+          <small>没有找到明确的战术原因，以上是引擎对局面的判断。</small>
         )}
-        {current && commentary && compared ? (
-          <article className="commentary-card" aria-live="polite">
-            <header>
-              <strong>
-                {moveNumber(ply, current.side)} {current.text}
-              </strong>
-              <i className={`move-rating rating-${current.rating}`}>
-                {RATING_LABELS[current.rating]}
-              </i>
-              <span>
-                推荐 {compared.best[0]?.text ?? '—'}{' '}
-                <b className="best-star">★</b>
-              </span>
-            </header>
-            <h4>问题在哪</h4>
-            <ul>
-              {commentary.problem.map((text) => (
-                <li key={text}>{text}</li>
-              ))}
-            </ul>
-            <h4>为什么推荐{compared.best[0]?.text ?? ''}</h4>
-            <ul>
-              {commentary.reason.map((text) => (
-                <li key={text}>{text}</li>
-              ))}
-            </ul>
-            {!commentary.certain && (
-              <small>没有找到明确的战术原因，以上是引擎对局面的判断。</small>
-            )}
-            <div className="commentary-actions">
-              <button
-                aria-pressed={line?.kind === 'actual'}
-                onClick={() =>
-                  setLine({ kind: 'actual', step: 0, playing: true })
-                }
-              >
-                <Play /> 演示实战变化
-              </button>
-              <button
-                aria-pressed={line?.kind === 'best'}
-                onClick={() =>
-                  setLine({ kind: 'best', step: 0, playing: true })
-                }
-              >
-                <Play /> 演示推荐变化
-              </button>
-            </div>
-            {lineMoves()}
-          </article>
-        ) : (
-          list.length > 0 && (
-            <p className="review-empty">点一处失误，查看为什么错、该怎么走。</p>
-          )
-        )}
-      </div>
+      </article>
     );
   }
 
@@ -471,12 +416,7 @@ export default function ReviewScreen({
           </div>
           {lineControls('best', best)}
         </div>
-        {commentary && (
-          <p className="compare-note">
-            {commentary.problem[0]}
-            <button onClick={() => setTab('commentary')}>完整解说</button>
-          </p>
-        )}
+        {commentary && commentaryCard(commentary, best[0]?.text ?? '')}
         {lineMoves()}
       </div>
     );
@@ -568,8 +508,10 @@ export default function ReviewScreen({
 
   function practiceTab() {
     const best = drill?.best[0];
+    const finished =
+      practice?.state === 'solved' || practice?.state === 'revealed';
     const message = !practice
-      ? '选一处失误，回到当时的局面重新走。'
+      ? '选一道题，回到当时的局面重新走。'
       : practice.state === 'solved'
         ? `正确！${best?.text ?? ''} 正是引擎首选。`
         : practice.state === 'revealed'
@@ -579,94 +521,217 @@ export default function ReviewScreen({
             : `轮到${drillSide ? sideLabel(drillSide) : ''}走：找出比实战更好的一步。`;
     return (
       <div className="review-practice">
-        <div className="practice-head">
-          <div className="practice-sides">
+        <div className="practice-picker">
+          <select
+            id="practice-side"
+            aria-label="练习哪一方的失误"
+            value={practiceSide}
+            onChange={(event) => {
+              const side = event.target.value as Side,
+                first = report[side].mistakes[0];
+              setPracticeSide(side);
+              if (first) startDrill(first.ply);
+              else {
+                setLine(null);
+                setPractice(null);
+              }
+            }}
+          >
             {(['red', 'black'] as Side[]).map((s) => (
-              <button
-                key={s}
-                aria-pressed={practiceSide === s}
-                onClick={() => {
-                  setPracticeSide(s);
-                  setPractice(null);
-                }}
-              >
+              <option key={s} value={s}>
                 {sideLabel(s)}失误 {report[s].mistakes.length}
-              </button>
+              </option>
             ))}
-          </div>
+          </select>
+          {mistakes.length > 0 && (
+            <select
+              id="practice-question"
+              aria-label="选择题目"
+              value={practice?.ply ?? ''}
+              onChange={(event) => startDrill(Number(event.target.value))}
+            >
+              {!practice && (
+                <option value="" disabled>
+                  选择题目
+                </option>
+              )}
+              {mistakes.map((m, i) => (
+                <option key={m.ply} value={m.ply}>
+                  第 {i + 1}/{mistakes.length} 题 · {moveNumber(m.ply, m.side)}{' '}
+                  {m.text}（{RATING_LABELS[m.rating]}）
+                </option>
+              ))}
+            </select>
+          )}
+        </div>
+        {mistakes.length ? (
           <p
             className={`practice-message ${practice?.state ?? ''}`}
             aria-live="polite"
           >
             {message}
           </p>
-        </div>
-        {mistakes.length ? (
-          <ul className="practice-list">
-            {mistakes.map((m) => (
-              <li key={m.ply}>
-                <button
-                  aria-current={practice?.ply === m.ply}
-                  onClick={() => startDrill(m.ply)}
-                >
-                  <span>{moveNumber(m.ply, m.side)}</span> {m.text}
-                  <i className={`move-rating rating-${m.rating}`}>
-                    {RATING_LABELS[m.rating]}
-                  </i>
-                </button>
-              </li>
-            ))}
-          </ul>
         ) : (
           <p className="review-empty">
             {done < total
-              ? '分析完成后列出失误。'
+              ? '分析完成后出题。'
               : `${sideLabel(practiceSide)}没有明显失误。`}
           </p>
         )}
-        {practice && (
-          <div className="practice-actions">
-            <button
-              onClick={() => setPractice({ ...practice, hint: true })}
-              disabled={
-                practice.hint ||
-                practice.state === 'solved' ||
-                practice.state === 'revealed'
-              }
-            >
-              <Lightbulb /> 提示
-            </button>
-            <button
-              onClick={() =>
-                setPractice({ ...practice, state: 'revealed', selected: null })
-              }
-              disabled={
-                practice.state === 'solved' || practice.state === 'revealed'
-              }
-            >
-              <Eye /> 答案
-            </button>
-            <button
-              onClick={() =>
-                setPractice({
-                  ...practice,
-                  state: 'trying',
-                  hint: false,
-                  selected: null,
-                })
-              }
-            >
-              <RotateCcw /> 重走
-            </button>
-            <button
-              disabled={drillIndex < 0 || drillIndex >= mistakes.length - 1}
-              onClick={() => startDrill(mistakes[drillIndex + 1].ply)}
-            >
-              <SkipForward /> 下一个
-            </button>
-          </div>
-        )}
+        {/* The explanation waits until the player has tried: no spoilers. */}
+        {finished &&
+          drillCommentary &&
+          commentaryCard(drillCommentary, best?.text ?? '')}
+        {lineMoves(false)}
       </div>
+    );
+  }
+
+  /** One bar under the panel, holding only what the current view can do. */
+  function actionBar() {
+    if (tab === 'report') return null;
+    if (tab === 'practice') {
+      if (!practice)
+        return mistakes.length ? (
+          <footer className="review-nav">
+            <button
+              className="primary"
+              onClick={() => startDrill(mistakes[0].ply)}
+            >
+              开始练习
+            </button>
+          </footer>
+        ) : null;
+      if (line) {
+        const step = line.step;
+        return (
+          <footer className="review-nav">
+            <button
+              className="icon"
+              aria-label="上一着"
+              disabled={!step}
+              onClick={() =>
+                setLine({ ...line, step: step - 1, playing: false })
+              }
+            >
+              <ChevronLeft />
+            </button>
+            <button
+              onClick={() =>
+                setLine(
+                  playing
+                    ? { ...line, playing: false }
+                    : {
+                        ...line,
+                        step: step >= steps.length ? 0 : step,
+                        playing: true,
+                      },
+                )
+              }
+            >
+              {playing ? <Pause /> : <Play />} {playing ? '暂停' : '播放'}
+            </button>
+            <button
+              className="icon"
+              aria-label="下一着"
+              disabled={step >= steps.length}
+              onClick={() =>
+                setLine({ ...line, step: step + 1, playing: false })
+              }
+            >
+              <ChevronRight />
+            </button>
+            <button onClick={() => setLine(null)}>结束演示</button>
+          </footer>
+        );
+      }
+      const finished =
+          practice.state === 'solved' || practice.state === 'revealed',
+        next =
+          drillIndex >= 0 && drillIndex < mistakes.length - 1
+            ? mistakes[drillIndex + 1]
+            : null;
+      return (
+        <footer className="review-nav">
+          {finished ? (
+            <>
+              <button
+                onClick={() =>
+                  setPractice({
+                    ...practice,
+                    state: 'trying',
+                    hint: false,
+                    selected: null,
+                  })
+                }
+              >
+                <RotateCcw /> 再做一次
+              </button>
+              <button
+                disabled={!drill?.best.length}
+                onClick={() =>
+                  setLine({ kind: 'best', step: 0, playing: true })
+                }
+              >
+                <Play /> 演示变化
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                disabled={practice.hint}
+                onClick={() => setPractice({ ...practice, hint: true })}
+              >
+                <Lightbulb /> 提示
+              </button>
+              <button
+                onClick={() =>
+                  setPractice({
+                    ...practice,
+                    state: 'revealed',
+                    selected: null,
+                  })
+                }
+              >
+                <Eye /> 答案
+              </button>
+            </>
+          )}
+          <button
+            className={finished ? 'primary' : ''}
+            disabled={!next}
+            onClick={() => next && startDrill(next.ply)}
+          >
+            <SkipForward /> {next ? '下一题' : '最后一题'}
+          </button>
+        </footer>
+      );
+    }
+    return (
+      <footer className="review-nav">
+        <button
+          className="icon"
+          onClick={() => go(0)}
+          disabled={!ply}
+          aria-label="回到开局"
+        >
+          <ChevronFirst />
+        </button>
+        <button onClick={() => go(ply - 1)} disabled={!ply}>
+          <ChevronLeft /> 上一步
+        </button>
+        <button onClick={() => go(ply + 1)} disabled={ply >= total}>
+          下一步 <ChevronRight />
+        </button>
+        <button
+          className="icon"
+          onClick={() => go(total)}
+          disabled={ply >= total}
+          aria-label="到终局"
+        >
+          <ChevronLast />
+        </button>
+      </footer>
     );
   }
 
@@ -685,6 +750,16 @@ export default function ReviewScreen({
         <span className="review-ply">
           {ply} / {total}
         </span>
+        {(tab === 'chart' || tab === 'analysis') && (
+          <button
+            className="review-icon"
+            onClick={onExplore}
+            aria-label="从这里推演"
+            title="从这里推演"
+          >
+            <GitBranch />
+          </button>
+        )}
       </header>
       <div className="review-stage">
         <div className="review-board">
@@ -737,8 +812,9 @@ export default function ReviewScreen({
               aria-selected={tab === key}
               onClick={() => {
                 setTab(key);
+                setLine(null);
                 if (key !== 'practice') setPractice(null);
-                if (key !== 'analysis' && key !== 'commentary') setLine(null);
+                else if (!practice && mistakes[0]) startDrill(mistakes[0].ply);
               }}
             >
               {name}
@@ -766,34 +842,9 @@ export default function ReviewScreen({
           {tab === 'analysis' && analysisTab()}
           {tab === 'report' && reportTab()}
           {tab === 'practice' && practiceTab()}
-          {tab === 'commentary' && commentaryTab()}
         </section>
       </div>
-      <footer className="review-nav">
-        <button onClick={() => go(0)} disabled={!ply} aria-label="回到开局">
-          <ChevronFirst />
-        </button>
-        <button onClick={() => go(ply - 1)} disabled={!ply}>
-          <ChevronLeft /> 上一步
-        </button>
-        <button onClick={() => go(ply + 1)} disabled={ply >= total}>
-          下一步 <ChevronRight />
-        </button>
-        <button
-          onClick={() => go(total)}
-          disabled={ply >= total}
-          aria-label="到终局"
-        >
-          <ChevronLast />
-        </button>
-        <button
-          onClick={onExplore}
-          disabled={!!practice}
-          aria-label="从这里推演"
-        >
-          <GitBranch /> 推演
-        </button>
-      </footer>
+      {actionBar()}
     </main>
   );
 }
