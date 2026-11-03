@@ -40,6 +40,8 @@ export default defineConfig({
     // Two HTML pages (friends, AI). The Worker environment has its own entry.
     client: {
       build: {
+        // Minifying drops the bundled packages' notices, so they are listed here.
+        license: { fileName: 'third-party-licenses.md' },
         rolldownOptions: {
           input: {
             main: fileURLToPath(new URL('./index.html', import.meta.url)),

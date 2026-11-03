@@ -101,8 +101,10 @@ Cloudflare Worker（Hono）——静态资源 + API + 登录
 ## 需要你本人完成的事
 1. 注册域名与 Cloudflare 账号；在 GitHub 仓库配置部署用的 API Token（Secrets）。
 2. 申请 Google OAuth 客户端（免费）。
-3. 决定项目开源许可：内置的 Fairy-Stockfish 是 GPL-3.0，**仓库目前没有 LICENSE 文件**。
-   最省事的做法是整个项目以 GPL-3.0 开源（适合免费个人项目）。这不是法律意见，发布前请自行确认。
+3. [x] 许可已定（2026-11-03）：界面以后闭源。引擎作为单独的程序使用（Web Worker 里的 WASM，只通过 UCI 文本通信），
+   照 GPL-3.0 附上许可证、作者和确切版本的对应源码链接（`public/ai/engine/`，未修改），并在人机页和隐私说明里注明；
+   打包进页面的其他依赖的许可由构建生成到 `/third-party-licenses.md`。仓库转私有前，要把隐私说明里指向 GitHub issues
+   的联系方式换掉。这不是法律意见。
 
 ## 主要风险
 - 免费额度在用户增长后会成为瓶颈，需要预留每月 5 美元的升级预算。

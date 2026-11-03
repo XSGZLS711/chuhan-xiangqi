@@ -43,7 +43,7 @@ Fairy-Stockfish 以 WebAssembly 在独立 Worker 内计算，选择象棋规则�
 
 `/ai/` 需要 SharedArrayBuffer，因此页面必须“跨源隔离”。Worker 通过 `public/_headers` 为 `/ai` 与 `/ai/*`（含引擎文件）下发 COOP/COEP，不再需要 Service Worker；开发服务器在 `vite.config.ts` 里用中间件下发相同的头。需要支持 WebAssembly SIMD 与 SharedArrayBuffer 的现代浏览器，加载失败会提示重试；不支持的内置浏览器请改用系统浏览器。
 
-引擎版本、对应源码、构建说明及 GPL-3.0 许可见 `public/ai/engine/SOURCE.md`、`Copying.txt` 与 `AUTHORS`。
+引擎版本、对应源码、构建说明及 GPL-3.0 许可见 `public/ai/engine/SOURCE.md`、`Copying.txt` 与 `AUTHORS`。打包进页面的其他依赖及其许可由构建生成到 `dist/client/third-party-licenses.md`，随网站发布。
 
 ## 开发与验证
 
