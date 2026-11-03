@@ -613,3 +613,20 @@
   font-weight: 600;
   color: var(--emphasis);
 }
+/* Privacy and feedback at the foot of the lobby (components/site-links.tsx). */
+.site-links {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin: 0;
+  font-size: 12px;
+}
+.site-links a {
+  padding: 6px 2px;
+  color: var(--muted-foreground);
+  text-decoration: none;
+}
+.site-links a:hover {
+  color: var(--primary);
+}

@@ -2,8 +2,10 @@ import { Hono } from 'hono';
 import { errorBody } from '../lib/errors';
 import { deleteGame, listGames, saveGame } from './archive-api';
 import { googleCallback, logout, me, removeAccount, startGoogle } from './auth';
+import { clientError } from './client-error';
 import { database } from './db';
 import { GET, POST } from './game-api';
+import { visit } from './visit';
 
 // Static pages are served by the assets binding; only /api/* reaches this Worker.
 const app = new Hono();
@@ -23,6 +25,8 @@ app.post('/api/auth/logout', (c) => logout(c.req.raw));
 app.get('/api/games', (c) => listGames(c.req.raw, database()));
 app.post('/api/games', (c) => saveGame(c.req.raw, database()));
 app.delete('/api/games', (c) => deleteGame(c.req.raw, database()));
+app.post('/api/client-error', (c) => clientError(c.req.raw));
+app.post('/api/visit', (c) => visit(c.req.raw));
 app.all('/api/*', (c) => c.json(errorBody('no-such-endpoint'), 404));
 app.onError((error, c) => {
   console.error(
