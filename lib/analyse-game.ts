@@ -5,6 +5,7 @@ import {
   squareToEngine,
   type EngineInfo,
 } from './ai-game';
+import { AppError, errorInfo } from './errors';
 import type { Room } from './game';
 import {
   completeMoveAnalysis,
@@ -12,6 +13,7 @@ import {
   type GameAnalysis,
   type PositionEvaluation,
 } from './game-analysis';
+import { REASON } from './tokens';
 import {
   legalMove,
   moveBoard,
@@ -40,10 +42,10 @@ export function analysisEvaluation(
   turn: Side,
 ): PositionEvaluation {
   if (!Number.isInteger(info.depth) || info.depth < 1)
-    throw new Error('引擎未返回完整搜索评分');
+    throw new AppError('analysis-incomplete-score');
   if (info.mate !== undefined) {
     if (!Number.isInteger(info.mate) || info.mate === 0)
-      throw new Error('非终局的杀棋评分无效');
+      throw new AppError('analysis-bad-mate');
     const winner = info.mate > 0 ? 'red' : 'black';
     // UCI reports full moves. Winner-to-move mates have odd half-move distance.
     const plies = 2 * Math.abs(info.mate) - (winner === turn ? 1 : 0);
@@ -54,7 +56,7 @@ export function analysisEvaluation(
     };
   }
   if (info.cp === undefined || !Number.isFinite(info.cp))
-    throw new Error('引擎未返回可用评分');
+    throw new AppError('analysis-no-score');
   return {
     score: { kind: 'cp', value: info.cp },
     depth: info.depth,
@@ -107,7 +109,7 @@ async function evaluate(
   abort(signal);
   const result = latest as PositionEvaluation | null;
   if (!result || best !== result.pv[0] || (actual && best !== actual))
-    throw new Error(`第 ${index + 1} 步未获得完整评分，请重试`);
+    throw new AppError('analysis-ply-incomplete', { n: index + 1 });
   return result;
 }
 function terminalAfter(room: Room, ply: number): PositionEvaluation | null {
@@ -122,7 +124,7 @@ function terminalAfter(room: Room, ply: number): PositionEvaluation | null {
   if (!result) return null;
   return {
     score:
-      result.reason === '将死' && result.winner !== 'draw'
+      result.reason === REASON.mate && result.winner !== 'draw'
         ? { kind: 'mate', winner: result.winner, plies: 0 }
         : { kind: 'result', winner: result.winner },
     depth: 0,
@@ -158,7 +160,7 @@ export async function analyseGame(
         entry.side !== room.history[i].side,
     )
   )
-    throw new Error('分析结果与存档棋谱不匹配');
+    throw new AppError('analysis-mismatch');
   for (let index = 0; index < moves.length; index++) {
     abort(signal);
     if (analysis.moves[index].status === 'complete') continue;
@@ -188,7 +190,7 @@ export async function analyseGame(
         (error instanceof DOMException && error.name === 'AbortError')
       )
         throw error;
-      const message = error instanceof Error ? error.message : '引擎分析失败';
+      const { message } = errorInfo(error, 'analysis-engine-failed');
       analysis = {
         ...analysis,
         moves: analysis.moves.map((entry, i) =>

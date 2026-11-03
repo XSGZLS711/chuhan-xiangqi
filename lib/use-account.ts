@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import type { MessageKey } from './i18n';
+import { useLocale } from './use-locale';
 import {
   deleteAccount,
   fetchAccount,
@@ -13,10 +15,12 @@ const failedSignIn = () =>
   new URLSearchParams(location.search).get('login') === 'failed';
 
 export function useAccount() {
+  const { t } = useLocale();
   const [status, setStatus] = useState<AccountStatus | null>(null);
   const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState(() =>
-    failedSignIn() ? 'Google 登录没有完成，请再试一次。' : '',
+  // A dictionary key, not a sentence, so a language switch rewrites it in place.
+  const [notice, setNotice] = useState<MessageKey | null>(() =>
+    failedSignIn() ? 'account.notice.signin' : null,
   );
   useEffect(() => {
     if (failedSignIn()) {
@@ -37,7 +41,7 @@ export function useAccount() {
       live = false;
     };
   }, []);
-  async function leave(request: () => Promise<void>, failure: string) {
+  async function leave(request: () => Promise<void>, failure: MessageKey) {
     setBusy(true);
     try {
       await request();
@@ -51,19 +55,15 @@ export function useAccount() {
     google: status?.google ?? false,
     user: status?.user ?? null,
     busy,
-    notice,
-    clearNotice: () => setNotice(''),
+    notice: notice && t(notice),
+    clearNotice: () => setNotice(null),
     signIn: () =>
       location.assign(signInPath(location.pathname + location.search)),
     /** Reloads afterwards so rooms see this browser as anonymous again. */
-    signOut: () => leave(signOutAccount, '退出登录没有成功，请再试一次。'),
+    signOut: () => leave(signOutAccount, 'account.notice.signout'),
     deleteAccount: () => {
-      if (
-        confirm(
-          '删除账号后，账号和登录记录会被永久删除，所有设备都会退出登录。本机保存的对局不受影响。确定删除吗？',
-        )
-      )
-        void leave(deleteAccount, '删除账号没有成功，请再试一次。');
+      if (confirm(t('account.confirmDelete')))
+        void leave(deleteAccount, 'account.notice.delete');
     },
   };
 }

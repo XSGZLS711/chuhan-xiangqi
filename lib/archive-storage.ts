@@ -1,3 +1,4 @@
+import { AppError } from './errors';
 import {
   mergeGame,
   newestGames,
@@ -127,7 +128,7 @@ export function createArchiveStore(
         fallback.list(),
       ]);
       if (one.status === 'rejected' && two.status === 'rejected')
-        throw new Error('当前浏览器无法读取本地对局');
+        throw new AppError('local-storage-unreadable');
       return newestGames([
         ...(one.status === 'fulfilled' ? one.value : []),
         ...(two.status === 'fulfilled' ? two.value : []),
@@ -158,7 +159,6 @@ export function gameArchive(): ArchiveBackend {
 }
 export async function getArchivedGame(id: string): Promise<ArchivedGame> {
   const game = (await gameArchive().list()).find((entry) => entry.id === id);
-  if (!game)
-    throw new Error('找不到这盘本地对局，可能已被清理或保存在另一台设备上。');
+  if (!game) throw new AppError('local-game-missing');
   return game;
 }

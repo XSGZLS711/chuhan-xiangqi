@@ -2,6 +2,7 @@ import { validateRequestOrigin } from './identity';
 import { player } from './accounts';
 import { database } from './db';
 import { HOLD_MS, present, touchPresence, waitForChange } from './room-poll';
+import { errorBody } from '../lib/errors';
 import {
   Room,
   PublicRoom,
@@ -24,8 +25,7 @@ function reply(data: unknown, cookie = '', status = 200) {
   });
 }
 function validRoom(id: string) {
-  if (!/^[a-f0-9]{20}$/.test(id))
-    throw new GameError('房间链接不正确，请重新复制邀请链接。', 404);
+  if (!/^[a-f0-9]{20}$/.test(id)) throw new GameError('bad-room-link', 404);
 }
 async function readRoom(id: string) {
   validRoom(id);
@@ -34,7 +34,7 @@ async function readRoom(id: string) {
     .prepare('SELECT state, version FROM rooms WHERE id = ?')
     .bind(id)
     .first<{ state: string; version: number }>();
-  if (!row) throw new GameError('没有找到这间棋室，请核对邀请链接。', 404);
+  if (!row) throw new GameError('room-not-found', 404);
   return { db, room: JSON.parse(row.state) as Room, version: row.version };
 }
 async function publicState(
@@ -110,22 +110,21 @@ async function handlePost(req: Request) {
   let cookie = '';
   try {
     const raw = await req.text();
-    if (raw.length > 4096) throw new GameError('请求内容过长。', 413);
+    if (raw.length > 4096) throw new GameError('request-too-large', 413);
     let a: Record<string, unknown>;
     try {
       a = JSON.parse(raw);
     } catch {
-      throw new GameError('请求格式不正确。');
+      throw new GameError('bad-request');
     }
     if (!a || typeof a !== 'object' || Array.isArray(a))
-      throw new GameError('请求格式不正确。');
+      throw new GameError('bad-request');
     const me = await player(req, database());
     cookie = me.cookie;
     const now = Date.now();
     if (a.action === 'create') {
       const clock = Number(a.clockMinutes ?? 0);
-      if (![0, 10, 20, 30].includes(clock))
-        throw new GameError('请选择有效的对局时长。');
+      if (![0, 10, 20, 30].includes(clock)) throw new GameError('bad-clock');
       const id = Array.from(crypto.getRandomValues(new Uint8Array(10)), (n) =>
         n.toString(16).padStart(2, '0'),
       ).join('');
@@ -145,8 +144,7 @@ async function handlePost(req: Request) {
     }
     const id = typeof a.room === 'string' ? a.room : '';
     const { db, room, version } = await readRoom(id);
-    if (a.version !== version)
-      throw new GameError('棋局刚有变化，已同步，请再试一次。', 409);
+    if (a.version !== version) throw new GameError('room-changed', 409);
     if (expireClock(room, now)) {
       const saved = await db
         .prepare(
@@ -154,8 +152,7 @@ async function handlePost(req: Request) {
         )
         .bind(JSON.stringify(room), now, id, version)
         .run();
-      if (!saved.meta.changes)
-        throw new GameError('棋局刚有变化，请稍后重试。', 409);
+      if (!saved.meta.changes) throw new GameError('room-changed-retry', 409);
       return reply(await publicState(room, version + 1, me.id), cookie);
     }
     applyAction(room, me.id, a, now);
@@ -165,8 +162,7 @@ async function handlePost(req: Request) {
       )
       .bind(JSON.stringify(room), now, id, version)
       .run();
-    if (!saved.meta.changes)
-      throw new GameError('对方刚刚进行了操作，已同步，请再试一次。', 409);
+    if (!saved.meta.changes) throw new GameError('opponent-acted', 409);
     return reply(await publicState(room, version + 1, me.id), cookie);
   } catch (error) {
     return failure(error, cookie);
@@ -174,12 +170,12 @@ async function handlePost(req: Request) {
 }
 function failure(error: unknown, cookie: string) {
   if (error instanceof GameError)
-    return reply({ error: error.message }, cookie, error.status);
+    return reply(errorBody(error.code), cookie, error.status);
   console.error(
     'Game request failed',
     error instanceof Error ? error.message : 'Unknown error',
   );
-  return reply({ error: '棋室暂时连接不上，请稍后重试。' }, cookie, 503);
+  return reply(errorBody('unavailable'), cookie, 503);
 }
 
 async function withOrigin(

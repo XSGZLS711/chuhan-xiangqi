@@ -10,9 +10,9 @@ export function useAutoArchive(
   mode: ArchiveMode,
   viewerSide: Side | null,
   signedIn: boolean,
-): string {
+): boolean {
   const queued = useRef(new Set<string>());
-  const [error, setError] = useState('');
+  const [error, setError] = useState(false);
   useEffect(() => {
     if (!room?.result || !room.players.black || !id) return;
     const key = JSON.stringify([
@@ -30,13 +30,14 @@ export function useAutoArchive(
     });
     void gameArchive()
       .save(game)
-      .then(() => setError(''))
+      .then(() => setError(false))
       .catch(() => {
         queued.current.delete(key);
-        setError('这盘棋暂未保存：浏览器的本地存储不可用或空间已满。');
+        setError(true);
       });
     // Signed in, the account keeps a copy too. The lobby resends any that failed.
     if (signedIn) void uploadGame(game).catch(() => {});
   }, [room, id, mode, viewerSide, signedIn]);
-  return room?.result && id ? error : '';
+  // True when this game could not be saved here; the page shows `archive.saveFailed`.
+  return !!room?.result && !!id && error;
 }

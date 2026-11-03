@@ -6,9 +6,10 @@ import {
   ChevronsLeft,
   ChevronsRight,
 } from 'lucide-react';
-import { RATING_LABELS, type GameAnalysis } from '@/lib/game-analysis';
+import { ratingLabel, type GameAnalysis } from '@/lib/game-analysis';
+import { historyMoveText } from '@/lib/notation';
+import { useLocale } from '@/lib/use-locale';
 import type { Move } from '@/lib/xiangqi';
-import { displayNotation } from '@/lib/mobile-game';
 
 export default function GameRecord({
   history,
@@ -27,6 +28,7 @@ export default function GameRecord({
   ratedPly?: number | null;
   onRatingSelect?: (ply: number) => void;
 }) {
+  const { locale, t, notation } = useLocale();
   const list = useRef<HTMLDivElement>(null);
   const shown = useRef(0);
   // Keep the move being viewed (or the newest one) inside the scrolling list.
@@ -56,9 +58,9 @@ export default function GameRecord({
       {history.length ? (
         <>
           <div className="record-header">
-            <span>回合</span>
-            <span>红方</span>
-            <span>黑方</span>
+            <span>{t('record.header.turn')}</span>
+            <span>{t('record.header.red')}</span>
+            <span>{t('record.header.black')}</span>
           </div>
           <div className="move-list" ref={list}>
             {rows.map((n) => (
@@ -76,17 +78,20 @@ export default function GameRecord({
                         className={`${move.side} ${index === step + 1 ? 'current-move' : ''}`}
                         onClick={() => onNavigate(step + 1)}
                       >
-                        {displayNotation(move.text)}
-                        {move.check && <small>将</small>}
+                        {historyMoveText(move, notation)}
+                        {move.check && <small>{t('record.check')}</small>}
                       </button>
                       {rating && onRatingSelect && (
                         <button
                           className={`move-rating rating-${rating} ${ratedPly === step + 1 ? 'selected-rating' : ''}`}
-                          aria-label={`第 ${step + 1} 步，${RATING_LABELS[rating]}，查看走前推荐着`}
+                          aria-label={t('record.rated', {
+                            n: step + 1,
+                            rating: ratingLabel(locale, rating),
+                          })}
                           aria-pressed={ratedPly === step + 1}
                           onClick={() => onRatingSelect(step + 1)}
                         >
-                          {RATING_LABELS[rating]}
+                          {ratingLabel(locale, rating)}
                         </button>
                       )}
                     </div>
@@ -100,19 +105,19 @@ export default function GameRecord({
         </>
       ) : (
         <div className="empty-record">
-          <p>棋谱从第一步开始记录</p>
+          <p>{t('record.empty')}</p>
         </div>
       )}
       <div className="replay-nav">
         <button
-          aria-label="回到开局"
+          aria-label={t('record.nav.start')}
           disabled={!history.length}
           onClick={() => onNavigate(0)}
         >
           <ChevronsLeft size={18} />
         </button>
         <button
-          aria-label="上一步"
+          aria-label={t('record.nav.prev')}
           disabled={!index}
           onClick={() => onNavigate(index - 1)}
         >
@@ -122,14 +127,14 @@ export default function GameRecord({
           {index} / {history.length}
         </span>
         <button
-          aria-label="下一步"
+          aria-label={t('record.nav.next')}
           disabled={index >= history.length}
           onClick={() => onNavigate(index + 1)}
         >
           <ChevronRight size={18} />
         </button>
         <button
-          aria-label="回到最新局面"
+          aria-label={t('record.nav.latest')}
           disabled={!history.length}
           onClick={onLive}
         >

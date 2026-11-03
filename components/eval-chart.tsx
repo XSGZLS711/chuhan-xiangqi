@@ -1,7 +1,10 @@
 import { useId, type CSSProperties } from 'react';
-import { RATING_LABELS, type AnalysisScore } from '@/lib/game-analysis';
+import { ratingLabel, type AnalysisScore } from '@/lib/game-analysis';
+import { useLocale } from '@/lib/use-locale';
 import {
+  phaseLabel,
   redShare,
+  scoreParts,
   scoreText,
   type GamePhases,
   type ReviewPoint,
@@ -25,6 +28,7 @@ export function EvalChart({
   phases: GamePhases;
   onPly: (ply: number) => void;
 }) {
+  const { locale, t } = useLocale();
   const id = useId();
   const plies = Math.max(1, series.length - 1);
   const peak = Math.max(0, ...series.map((p) => Math.abs(p.value ?? 0)));
@@ -51,13 +55,13 @@ export function EvalChart({
           className="chart-scale red"
           style={css({ '--y': `${(y(scale) / H) * 100}%` })}
         >
-          红优 {scale}
+          {t('chart.red', { scale })}
         </span>
         <span
           className="chart-scale"
           style={css({ '--y': `${(y(-scale) / H) * 100}%` })}
         >
-          黑优 {scale}
+          {t('chart.black', { scale })}
         </span>
         {/* Inset so the first and last moves are not clipped by the frame. */}
         <div className="eval-chart-plot">
@@ -122,7 +126,7 @@ export function EvalChart({
           </svg>
           {phases.middle !== null && (
             <span className="chart-phase-tag" style={pct(phases.middle, scale)}>
-              中局
+              {phaseLabel(locale, 'middle')}
             </span>
           )}
           {phases.end !== null && (
@@ -130,7 +134,7 @@ export function EvalChart({
               className="chart-phase-tag end"
               style={pct(phases.end, scale)}
             >
-              残局
+              {phaseLabel(locale, 'end')}
             </span>
           )}
           {series.map(
@@ -141,7 +145,10 @@ export function EvalChart({
                   key={p.ply}
                   className={`chart-dot rating-${p.rating}`}
                   style={pct(p.ply, p.value)}
-                  title={`第 ${p.ply} 步 · ${RATING_LABELS[p.rating]}`}
+                  title={t('chart.dot', {
+                    ply: p.ply,
+                    rating: ratingLabel(locale, p.rating, true),
+                  })}
                 />
               ),
           )}
@@ -159,17 +166,21 @@ export function EvalChart({
             max={series.length - 1}
             step={1}
             value={ply}
-            aria-label="局势图：选择步数"
-            aria-valuetext={`第 ${ply} 步 · ${!current || current.value === null ? '分析中' : scoreText({ kind: 'cp', value: current.value })}`}
+            aria-label={t('chart.range')}
+            aria-valuetext={t('chart.value', {
+              ply,
+              score:
+                !current || current.value === null
+                  ? scoreText(null, locale)
+                  : scoreText({ kind: 'cp', value: current.value }, locale),
+            })}
             onChange={(event) => onPly(Number(event.target.value))}
           />
         </div>
       </div>
       <div className="eval-chart-ticks" aria-hidden="true">
-        <span>开局</span>
-        <span>
-          第 {ply} / {series.length - 1} 步
-        </span>
+        <span>{t('chart.start')}</span>
+        <span>{t('chart.ply', { ply, total: series.length - 1 })}</span>
       </div>
     </div>
   );
@@ -183,14 +194,15 @@ export function EvalBar({
   score: AnalysisScore | null;
   flipped: boolean;
 }) {
+  const { locale, t } = useLocale();
   const share = redShare(score);
-  const [side, value = ''] = scoreText(score).split(' ');
+  const { label: side, value } = scoreParts(score, locale);
   return (
     <div className={`eval-bar ${flipped ? 'flipped' : ''}`}>
       <div className="eval-bar-track" aria-hidden="true">
         <span style={css({ '--share': `${share * 100}%` })} />
       </div>
-      <output aria-label={`局势：${scoreText(score)}`}>
+      <output aria-label={t('chart.bar', { score: scoreText(score, locale) })}>
         <b>{side}</b>
         {value && <small>{value}</small>}
       </output>

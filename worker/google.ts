@@ -1,5 +1,7 @@
 /** Google sign-in by the authorization-code flow with PKCE, done entirely in this
  * Worker. We keep no Google tokens: the ID token is read once for who signed in. */
+import { NAME } from '../lib/tokens';
+
 export const GOOGLE_AUTHORIZE = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN = 'https://oauth2.googleapis.com/token';
 const ISSUERS = ['https://accounts.google.com', 'accounts.google.com'];
@@ -29,11 +31,11 @@ export function accountName(value: unknown): string {
     .replace(/\p{Cc}/gu, '')
     .trim();
   const chars = Array.from(name);
-  if (chars.length <= ACCOUNT_NAME) return name || '棋友';
+  if (chars.length <= ACCOUNT_NAME) return name || NAME.player;
   let cut = chars.slice(0, ACCOUNT_NAME).join('');
   const open = Math.max(cut.lastIndexOf('('), cut.lastIndexOf('（'));
   if (open > 0 && !/[)）]/.test(cut.slice(open))) cut = cut.slice(0, open);
-  return cut.trim() || '棋友';
+  return cut.trim() || NAME.player;
 }
 const fromBase64url = (value: string) =>
   Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), (c) =>

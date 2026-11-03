@@ -44,6 +44,7 @@ import {
   engineMove,
   evaluationLabel,
   historyPosition,
+  levelName,
   playAiMove,
   resignAiMatch,
   squareToEngine,
@@ -51,6 +52,10 @@ import {
   type AiLevel,
   type EngineInfo,
 } from '@/lib/ai-game';
+import { errorInfo, errorText, type ErrorInfo } from '@/lib/errors';
+import { playerName, reasonText, sideName } from '@/lib/i18n';
+import { useLocale } from '@/lib/use-locale';
+import LanguageSwitch, { LocaleMenuItems } from '@/components/language-switch';
 import { BrowserEngine, aiBase, prepareAiPage } from '@/lib/ai-engine';
 import { useAutoArchive } from '@/lib/use-auto-archive';
 import { findArchivedGame } from '@/lib/archive-sync';
@@ -82,7 +87,6 @@ import {
   legalTargets,
   moveBoard,
   opposite,
-  sideLabel,
   type Board,
   type Side,
 } from '@/lib/xiangqi';
@@ -92,6 +96,7 @@ type Branch = { boards: Board[]; turns: Side[]; base: string; moves: string[] };
 type AnalysisResult = { key: string; info: EngineInfo };
 
 export default function AiGame() {
+  const { locale, t, tn, notation } = useLocale();
   const { settings, setSetting } = useEffectSettings();
   const account = useAccount();
   const sound = settings.sound;
@@ -100,7 +105,9 @@ export default function AiGame() {
     new URLSearchParams(location.search).get('game'),
   );
   const [archived, setArchived] = useState<ArchivedGame | null>(null);
-  const [archiveLoadError, setArchiveLoadError] = useState('');
+  const [archiveLoadError, setArchiveLoadError] = useState<ErrorInfo | null>(
+    null,
+  );
   const [match, setMatch] = useState(() => createAiMatch('red', 'medium'));
   const [started, setStarted] = useState(false);
   const [setup, setSetup] = useState(!archiveId);
@@ -110,7 +117,7 @@ export default function AiGame() {
     'loading',
   );
   const [engineAttempt, setEngineAttempt] = useState(0);
-  const [error, setError] = useState('');
+  const [error, setError] = useState<ErrorInfo | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [review, setReview] = useState<number | null>(null);
   const [branch, setBranch] = useState<Branch | null>(null);
@@ -158,7 +165,7 @@ export default function AiGame() {
     whole.analysis,
     ratedPly ?? 0,
   );
-  const archiveError = useAutoArchive(
+  const archiveFailed = useAutoArchive(
     room,
     started && !archived && !archiveId ? `ai:${sessionId}:${room.round}` : null,
     { kind: 'ai', level: match.level },
@@ -187,9 +194,7 @@ export default function AiGame() {
       })
       .catch((error: unknown) => {
         if (active)
-          setArchiveLoadError(
-            error instanceof Error ? error.message : '无法读取这盘对局',
-          );
+          setArchiveLoadError(errorInfo(error, 'archive-load-failed'));
       });
     return () => {
       active = false;
@@ -218,7 +223,7 @@ export default function AiGame() {
     : historyPosition(room, index);
   const evaluationKey = `${match.revision}:${position}`;
   const info = evaluation?.key === evaluationKey ? evaluation.info : null;
-  const line = info ? describeLine(board, turn, info.pv) : [];
+  const line = info ? describeLine(board, turn, info.pv, 5, notation) : [];
   const live = review === null && !branch && !archived;
   const aiTurn = started && live && !room.result && room.turn !== match.human;
   const canMove =
@@ -311,7 +316,7 @@ export default function AiGame() {
       } catch (e) {
         if (!disposed) {
           setEngineState('error');
-          setError(e instanceof Error ? e.message : '棋手准备失败，请重试。');
+          setError(errorInfo(e, 'engine-prepare-failed'));
         }
       }
     })();
@@ -352,7 +357,7 @@ export default function AiGame() {
       ? AI_LEVELS[match.level]
       : { time: 900, depth: 14, skill: 20 };
     setSearching(true);
-    setError('');
+    setError(null);
     void engine
       .search({
         position,
@@ -368,7 +373,7 @@ export default function AiGame() {
         const move = token && engineMove(token);
         if (!move || !legalMove(board, move.from, move.to, turn)) {
           setEngineState('error');
-          setError('棋手未返回可用走法，棋局已保留，请重试。');
+          setError(errorInfo(null, 'engine-no-move'));
           return;
         }
         // A result belongs to this exact match object, never a later undo/restart.
@@ -381,7 +386,7 @@ export default function AiGame() {
         if (controller.signal.aborted) return;
         setSearching(false);
         setEngineState('error');
-        setError(e instanceof Error ? e.message : '计算失败，请重试。');
+        setError(errorInfo(e, 'search-failed'));
       });
     return () => controller.abort();
   }, [
@@ -403,7 +408,7 @@ export default function AiGame() {
   /* oxlint-enable react/react-compiler */
   function retryEngine() {
     setEngineState('loading');
-    setError('');
+    setError(null);
     setEngineAttempt((n) => n + 1);
   }
   function closeSetup() {
@@ -414,7 +419,7 @@ export default function AiGame() {
     setRatedPly(null);
     setArchived(null);
     setArchiveId(null);
-    setArchiveLoadError('');
+    setArchiveLoadError(null);
     window.history.replaceState(null, '', location.pathname);
     setMatch((current) =>
       createAiMatch(human, level, started ? current.room.round + 1 : 1),
@@ -490,7 +495,7 @@ export default function AiGame() {
   }
   const scoreText =
     info?.mate !== undefined
-      ? `杀棋 ${Math.abs(info.mate)}`
+      ? t('ai.mate', { n: Math.abs(info.mate) })
       : info?.cp !== undefined
         ? `${info.cp > 0 ? '+' : ''}${(info.cp / 100).toFixed(2)}`
         : '—';
@@ -503,55 +508,65 @@ export default function AiGame() {
           : 50
       : 50 + 44 * Math.tanh((info?.cp ?? 0) / 500);
   const status = branch
-    ? '独立推演'
+    ? t('room.status.exploring')
     : review !== null
-      ? `复盘 · 第 ${index} 步`
+      ? t('play.replay', { n: index })
       : room.result
-        ? `${room.result.winner === 'draw' ? '和棋' : sideLabel(room.result.winner) + '胜'} · ${room.result.reason}`
+        ? t('ai.status.result', {
+            outcome:
+              room.result.winner === 'draw'
+                ? t('result.draw')
+                : t('result.sideWon', {
+                    side: sideName(locale, room.result.winner),
+                  }),
+            reason: reasonText(locale, room.result.reason),
+          })
         : aiTurn
-          ? 'AI 思考中'
+          ? t('ai.thinking')
           : inCheck(board, turn)
-            ? '将军 · 请应将'
-            : '轮到你走';
+            ? t('room.status.checkYou')
+            : t('room.status.yourTurn');
 
   function analysisPanel() {
     return (
       <div className="ai-analysis-panel">
         <div className="ai-analysis-title">
           <Sparkles size={18} />
-          <strong>局势分析</strong>
+          <strong>{t('ai.panel.title')}</strong>
           <button
             className="ai-toggle"
             aria-pressed={analysisOn}
             onClick={() => setAnalysisOn(!analysisOn)}
           >
-            {analysisOn ? '已开启' : '已关闭'}
+            {t(analysisOn ? 'ai.panel.on' : 'ai.panel.off')}
           </button>
         </div>
         {analysisOn ? (
           <>
             <div className="ai-score">
-              <strong>{ended ? status : evaluationLabel(info)}</strong>
+              <strong>{ended ? status : evaluationLabel(info, locale)}</strong>
               <span>{ended ? '' : scoreText}</span>
             </div>
             <div
               className="ai-score-track"
-              aria-label={`局势评分：${evaluationLabel(info)}`}
+              aria-label={t('ai.eval.label', {
+                label: evaluationLabel(info, locale),
+              })}
             >
               <span style={{ width: `${redShare}%` }} />
             </div>
             <div className="ai-score-labels">
-              <span>红方</span>
-              <span>黑方</span>
+              <span>{t('side.red')}</span>
+              <span>{t('side.black')}</span>
             </div>
             <p className="ai-best-move">
               {ended
-                ? '本局已结束，可打开棋谱逐步复盘。'
+                ? t('ai.best.ended')
                 : line.length
-                  ? `推荐：${line[0]}`
+                  ? t('ai.best.recommended', { move: line[0] })
                   : searching
-                    ? '正在计算推荐走法…'
-                    : '落子后自动更新分析'}
+                    ? t('ai.best.searching')
+                    : t('ai.best.idle')}
             </p>
             {!ended && line.length > 1 && (
               <ol className="ai-variation">
@@ -565,13 +580,16 @@ export default function AiGame() {
             )}
             <small>
               {!ended && info
-                ? `搜索深度 ${info.depth}${searching ? ' · 计算中' : ''} · `
+                ? t('ai.depth', {
+                    depth: info.depth,
+                    busy: searching ? t('ai.depth.busy') : '',
+                  })
                 : ''}
-              评分为引擎估计，不代表胜率。
+              {t('ai.disclaimer')}
             </small>
           </>
         ) : (
-          <p className="ai-muted">开启后显示局势评分和推荐走法。</p>
+          <p className="ai-muted">{t('ai.panel.hint')}</p>
         )}
       </div>
     );
@@ -591,16 +609,23 @@ export default function AiGame() {
           <div className="player-name-block">
             <strong>
               <span className="player-name">
-                {archived ? archived.players[side] : me ? '我方' : '象棋 AI'}
+                {playerName(
+                  locale,
+                  archived
+                    ? archived.players[side]
+                    : me
+                      ? t('name.me')
+                      : t('name.ai'),
+                )}
               </span>
               {!me && (!archived || archived.mode.kind === 'ai') && (
-                <em className="player-tag">{AI_LEVELS[match.level].label}</em>
+                <em className="player-tag">{levelName(locale, match.level)}</em>
               )}
             </strong>
           </div>
           <CapturedTray board={board} side={side} />
           {!me && (!archived || archived.mode.kind === 'ai') && (
-            <Bot size={20} aria-label="电脑棋手" />
+            <Bot size={20} aria-label={t('ai.player.computer')} />
           )}
         </div>
       </div>
@@ -610,9 +635,11 @@ export default function AiGame() {
   if (archiveId && !archived)
     return (
       <main className="app-shell">
-        <a href="../">返回棋社</a>
+        <a href="../">{t('ai.back')}</a>
         <p role={archiveLoadError ? 'alert' : 'status'}>
-          {archiveLoadError || '正在读取本地对局…'}
+          {archiveLoadError
+            ? errorText(locale, archiveLoadError)
+            : t('ai.loadingGame')}
         </p>
         {archiveLoadError && (
           <button
@@ -622,7 +649,7 @@ export default function AiGame() {
               window.history.replaceState(null, '', location.pathname);
             }}
           >
-            开始人机对弈
+            {t('ai.startPlaying')}
           </button>
         )}
       </main>
@@ -656,7 +683,7 @@ export default function AiGame() {
                 )
             : backToLive
         }
-        exitLabel={archived && !backToRoom ? '返回棋社' : '返回对局'}
+        exitTo={archived && !backToRoom ? 'club' : 'game'}
       />
     );
   return (
@@ -669,34 +696,40 @@ export default function AiGame() {
       <header className="site-header">
         <a className="brand" href="../">
           <span className="brand-seal">楚</span>
-          <span>楚汉棋社</span>
+          <span>{t('brand.name')}</span>
         </a>
         <div className="header-tools">
           <button className="text-button" onClick={() => setSetup(true)}>
             <Settings2 size={17} />
-            新的一局
+            {t('ai.newGame')}
           </button>
           <AccountMenu account={account} />
         </div>
       </header>
       <div className="ai-mobile-nav">
-        <a href="../" aria-label="返回棋社">
+        <a href="../" aria-label={t('ai.back')}>
           <ArrowLeft size={20} />
         </a>
-        <strong>{archived ? '对局复盘' : '人机练习'}</strong>
+        <strong>{t(archived ? 'ai.review' : 'ai.practice')}</strong>
         <span>
-          {archived?.mode.kind === 'friend'
-            ? '好友对弈'
-            : AI_LEVELS[match.level].label}{' '}
-          · 第 {room.round} 局
+          {t('ai.mobileSub', {
+            mode:
+              archived?.mode.kind === 'friend'
+                ? t('room.friendGame')
+                : levelName(locale, match.level),
+            n: room.round,
+          })}
         </span>
-        <button onClick={() => setSetup(true)} aria-label="设置新的一局">
+        <button
+          onClick={() => setSetup(true)}
+          aria-label={t('ai.newGame.label')}
+        >
           <Settings2 size={20} />
         </button>
       </div>
       <output className="ai-status-line">
         <span>
-          {engineState === 'loading' ? '正在准备棋手…' : status}
+          {engineState === 'loading' ? t('ai.engineLoading') : status}
           {engineState !== 'loading' && aiTurn && visible && (
             <span className="thinking-dots" aria-hidden="true">
               <i />
@@ -710,14 +743,20 @@ export default function AiGame() {
         <div className="ai-review-details">
           {ratedSelection && !branch && (
             <output className="rated-recommendation" aria-live="polite">
-              第 {ratedPly} 步走前 · 推荐：
-              {ratedSelection.recommendation ?? '本次推荐着不可用'}
+              {t('ai.rated', {
+                n: ratedPly ?? 0,
+                move: ratedSelection.recommendation ?? t('ai.rated.none'),
+              })}
             </output>
           )}
           {archived && (
             <p className="archive-banner">
-              本地复盘 · {archived.players.red} / {archived.players.black} ·{' '}
-              {archiveLabel(archived).result} · {archived.result.reason}
+              {t('ai.banner', {
+                red: playerName(locale, archived.players.red),
+                black: playerName(locale, archived.players.black),
+                result: archiveLabel(archived, locale).result,
+                reason: reasonText(locale, archived.result.reason),
+              })}
             </p>
           )}
         </div>
@@ -725,20 +764,23 @@ export default function AiGame() {
       {account.notice && (
         <output className="notice">
           <span>{account.notice}</span>
-          <button aria-label="关闭提示" onClick={account.clearNotice}>
+          <button
+            aria-label={t('notice.dismiss')}
+            onClick={account.clearNotice}
+          >
             <X size={15} />
           </button>
         </output>
       )}
-      {archiveError && (
+      {archiveFailed && (
         <p className="ai-error" role="alert">
-          {archiveError}
+          {t('archive.saveFailed')}
         </p>
       )}
       {error && (
         <div className="ai-error" role="alert">
-          <span>{error}</span>
-          <button onClick={retryEngine}>重试</button>
+          <span>{errorText(locale, error)}</span>
+          <button onClick={retryEngine}>{t('ai.retry')}</button>
         </div>
       )}
       <div className="workspace">
@@ -770,8 +812,8 @@ export default function AiGame() {
             <div className="analysis-controls">
               <span>
                 {branch
-                  ? `推演 ${branch.boards.length - 1} 步`
-                  : `复盘 ${index}/${room.history.length}`}
+                  ? tn('play.exploring', branch.boards.length - 1)
+                  : t('ai.replay', { index, total: room.history.length })}
               </span>
               {branch ? (
                 <button
@@ -788,19 +830,19 @@ export default function AiGame() {
                   }}
                 >
                   <Undo2 size={16} />
-                  退一步
+                  {t('play.backOne')}
                 </button>
               ) : (
                 <>
                   <button
-                    aria-label="复盘上一步"
+                    aria-label={t('play.replay.prev')}
                     disabled={index === 0}
                     onClick={() => navigate(index - 1)}
                   >
                     <ChevronLeft size={18} />
                   </button>
                   <button
-                    aria-label="复盘下一步"
+                    aria-label={t('play.replay.next')}
                     disabled={index === room.history.length}
                     onClick={() => navigate(index + 1)}
                   >
@@ -809,7 +851,7 @@ export default function AiGame() {
                 </>
               )}
               <button onClick={backToLive}>
-                {archived ? '返回复盘' : '返回对局'}
+                {t(archived ? 'ai.backToReview' : 'play.backToGame')}
               </button>
             </div>
           )}
@@ -820,17 +862,17 @@ export default function AiGame() {
                   className="primary-button"
                   onClick={() => setSetup(true)}
                 >
-                  再来一局
+                  {t('room.rematch.again')}
                 </button>
                 <button className="secondary-button" onClick={undo}>
-                  悔棋继续
+                  {t('play.steam.small')}
                 </button>
                 <button
                   className="secondary-button"
                   disabled={!room.history.length}
                   onClick={() => navigate(0)}
                 >
-                  复盘
+                  {t('play.review')}
                 </button>
               </div>
             </div>
@@ -838,23 +880,27 @@ export default function AiGame() {
           <div className="ai-desktop-actions">
             <button disabled={!canUndo} onClick={undo}>
               <Undo2 size={18} />
-              悔棋
+              {t('play.undo')}
             </button>
             <button onClick={branch ? backToLive : explore}>
               <GitBranch size={18} />
-              {branch ? (archived ? '返回复盘' : '返回对局') : '推演'}
+              {branch
+                ? t(archived ? 'ai.backToReview' : 'play.backToGame')
+                : t('play.explore')}
             </button>
             <button
               disabled={!!room.result}
               onClick={() => setConfirmResign(true)}
             >
               <Flag size={18} />
-              认输
+              {t('play.resign')}
             </button>
             <button
               className="ai-sound-toggle"
-              aria-label={sound ? '关闭对局音效' : '开启对局音效'}
-              title={sound ? '关闭音效' : '开启音效'}
+              aria-label={t(
+                sound ? 'room.sound.off.label' : 'room.sound.on.label',
+              )}
+              title={t(sound ? 'room.sound.off' : 'room.sound.on')}
               onClick={toggleSound}
             >
               {sound ? <Volume2 size={18} /> : <VolumeX size={18} />}
@@ -867,8 +913,8 @@ export default function AiGame() {
           {analysisPanel()}
           <section className="panel ai-record-panel">
             <div className="panel-heading">
-              <strong>对局棋谱</strong>
-              <span>{room.history.length} 步</span>
+              <strong>{t('record.title')}</strong>
+              <span>{tn('recent.moves', room.history.length)}</span>
             </div>
             {analysisGame && <GameAnalysisControls analysis={whole} />}
             <GameRecord
@@ -882,7 +928,7 @@ export default function AiGame() {
             />
           </section>
           <p className="ai-engine-credit">
-            本地引擎{' '}
+            {t('ai.engineCredit')}{' '}
             <a
               href="https://github.com/fairy-stockfish/fairy-stockfish.wasm"
               target="_blank"
@@ -896,7 +942,7 @@ export default function AiGame() {
               target="_blank"
               rel="noreferrer"
             >
-              源码与许可
+              {t('ai.license')}
             </a>
           </p>
         </aside>
@@ -904,32 +950,32 @@ export default function AiGame() {
       <button
         className="ai-mobile-evaluation"
         onClick={() => setSheet('analysis')}
-        aria-label="查看局势分析详情"
+        aria-label={t('ai.mobile.eval')}
       >
         <Sparkles size={17} />
         <strong>
           {analysisOn
             ? ended
-              ? '本局结束'
-              : evaluationLabel(info)
-            : '局势分析已关闭'}
+              ? t('ai.mobile.over')
+              : evaluationLabel(info, locale)
+            : t('ai.mobile.off')}
         </strong>
         <span>
           {analysisOn && !ended
             ? line[0]
-              ? `推荐 ${line[0]}`
+              ? t('ai.mobile.best', { move: line[0] })
               : searching
-                ? '分析中…'
+                ? t('ai.mobile.analyzing')
                 : '—'
-            : '查看详情'}
+            : t('ai.mobile.details')}
         </span>
         <ChevronRight size={16} />
       </button>
-      <nav className="mobile-dock ai-dock" aria-label="人机对局工具栏">
+      <nav className="mobile-dock ai-dock" aria-label={t('ai.dock.toolbar')}>
         <DropdownMenu>
           <DropdownMenuTrigger
             className="dock-button dock-menu"
-            aria-label="对局操作"
+            aria-label={t('play.actions')}
           >
             <Menu size={23} />
           </DropdownMenuTrigger>
@@ -941,32 +987,33 @@ export default function AiGame() {
           >
             <DropdownMenuItem onClick={() => setSetup(true)}>
               <RotateCcw />
-              <span>新的一局</span>
+              <span>{t('ai.newGame')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               disabled={!!room.result}
               onClick={() => setConfirmResign(true)}
             >
               <Flag />
-              <span>认输</span>
+              <span>{t('play.resign')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={toggleSound}>
               {sound ? <Volume2 /> : <VolumeX />}
-              <span>{sound ? '关闭音效' : '开启音效'}</span>
+              <span>{t(sound ? 'room.sound.off' : 'room.sound.on')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => location.assign('../')}>
               <ArrowLeft />
-              <span>返回棋社</span>
+              <span>{t('ai.back')}</span>
             </DropdownMenuItem>
+            <LocaleMenuItems />
           </DropdownMenuContent>
         </DropdownMenu>
         <button
           className="dock-button"
           onClick={() => setSheet('record')}
-          aria-label="打开对局棋谱"
+          aria-label={t('dock.openMoves')}
         >
           <ScrollText size={21} />
-          <span>棋谱</span>
+          <span>{t('dock.moves')}</span>
         </button>
         <button
           className={`dock-chat ai-analysis-toggle ${analysisOn ? 'active' : ''}`}
@@ -974,25 +1021,27 @@ export default function AiGame() {
           onClick={() => setAnalysisOn(!analysisOn)}
         >
           <Sparkles size={16} />
-          <span>{analysisOn ? '分析已开' : '开启分析'}</span>
+          <span>
+            {t(analysisOn ? 'ai.dock.analysisOn' : 'ai.dock.analysisOff')}
+          </span>
         </button>
         <button className="dock-button" disabled={!canUndo} onClick={undo}>
           <Undo2 size={21} />
-          <span>悔棋</span>
+          <span>{t('play.undo')}</span>
         </button>
         <button
           className={`dock-button dock-analysis ${branch ? 'active' : ''}`}
           onClick={branch ? backToLive : explore}
         >
           <GitBranch size={21} />
-          <span>{branch ? '返回' : '推演'}</span>
+          <span>{t(branch ? 'dock.back' : 'play.explore')}</span>
         </button>
       </nav>
       <GameSheet
         open={sheet === 'record'}
         onOpenChange={(open) => setSheet(open ? 'record' : null)}
-        title="对局棋谱"
-        description="点击着法回看局面，返回对局后继续练习。"
+        title={t('record.title')}
+        description={t('ai.sheet.moves.description')}
       >
         {analysisGame && <GameAnalysisControls analysis={whole} />}
         <GameRecord
@@ -1008,14 +1057,14 @@ export default function AiGame() {
       <GameSheet
         open={sheet === 'analysis'}
         onOpenChange={(open) => setSheet(open ? 'analysis' : null)}
-        title="局势与推荐"
-        description={
+        title={t('ai.sheet.eval.title')}
+        description={t(
           branch
-            ? '当前独立推演局面的分析'
+            ? 'ai.sheet.eval.branch'
             : review !== null
-              ? '当前复盘局面的分析'
-              : '当前对局的分析'
-        }
+              ? 'ai.sheet.eval.review'
+              : 'ai.sheet.eval.live',
+        )}
       >
         {analysisPanel()}
         <p className="ai-engine-credit">
@@ -1025,7 +1074,7 @@ export default function AiGame() {
             target="_blank"
             rel="noreferrer"
           >
-            源码与许可
+            {t('ai.license')}
           </a>
         </p>
       </GameSheet>
@@ -1038,17 +1087,19 @@ export default function AiGame() {
         <DialogContent className="ai-setup" showCloseButton={false}>
           <button
             className="ai-setup-close"
-            aria-label={started ? '关闭设置' : '退出人机设置'}
+            aria-label={t(
+              started ? 'ai.setup.close.started' : 'ai.setup.close',
+            )}
             onClick={closeSetup}
           >
             <X size={20} />
           </button>
-          <DialogTitle>和 AI 下盘棋</DialogTitle>
+          <DialogTitle>{t('ai.setup.title')}</DialogTitle>
           {started && (
-            <DialogDescription>开始后会替换当前练习棋局。</DialogDescription>
+            <DialogDescription>{t('ai.setup.replaces')}</DialogDescription>
           )}
           <fieldset>
-            <legend>我方执子</legend>
+            <legend>{t('ai.setup.side')}</legend>
             <div className="ai-choice-row">
               {(['red', 'black'] as Side[]).map((side) => (
                 <button
@@ -1057,13 +1108,13 @@ export default function AiGame() {
                   className={human === side ? 'selected' : ''}
                   onClick={() => setHuman(side)}
                 >
-                  {side === 'red' ? '执红 · 先手' : '执黑 · 后手'}
+                  {t(side === 'red' ? 'ai.setup.red' : 'ai.setup.black')}
                 </button>
               ))}
             </div>
           </fieldset>
           <fieldset>
-            <legend>棋手难度</legend>
+            <legend>{t('ai.setup.level')}</legend>
             <div className="ai-choice-row">
               {(Object.keys(AI_LEVELS) as AiLevel[]).map((key) => (
                 <button
@@ -1072,22 +1123,20 @@ export default function AiGame() {
                   className={level === key ? 'selected' : ''}
                   onClick={() => setLevel(key)}
                 >
-                  {AI_LEVELS[key].label}
+                  {levelName(locale, key)}
                 </button>
               ))}
             </div>
           </fieldset>
-          <p className="ai-setup-note">
-            悔棋会退回到你上一次落子前；已结束的对局会自动保存在当前浏览器，未结束的棋局仅保留在当前页面。
-          </p>
+          <p className="ai-setup-note">{t('ai.setup.note')}</p>
           {error && (
             <p className="ai-setup-error" role="alert">
-              {error}
+              {errorText(locale, error)}
             </p>
           )}
           {engineState === 'error' ? (
             <button className="primary-button" onClick={retryEngine}>
-              重新加载棋手
+              {t('ai.setup.reload')}
             </button>
           ) : (
             <button
@@ -1096,22 +1145,23 @@ export default function AiGame() {
               onClick={start}
             >
               <Bot size={18} />
-              {engineState === 'ready' ? '开始对弈' : '正在准备棋手…'}
+              {t(
+                engineState === 'ready' ? 'ai.setup.start' : 'ai.engineLoading',
+              )}
             </button>
           )}
           {started && (
             <button className="ai-cancel" onClick={() => setSetup(false)}>
-              继续当前对局
+              {t('ai.setup.continue')}
             </button>
           )}
+          <LanguageSwitch />
         </DialogContent>
       </Dialog>
       <Dialog open={confirmResign} onOpenChange={setConfirmResign}>
         <DialogContent className="ai-setup">
-          <DialogTitle>确认认输？</DialogTitle>
-          <DialogDescription>
-            结束本局练习。之后仍可悔棋继续或重新开局。
-          </DialogDescription>
+          <DialogTitle>{t('dialog.resign.title')}</DialogTitle>
+          <DialogDescription>{t('ai.resign.body')}</DialogDescription>
           <button
             className="primary-button"
             onClick={() => {
@@ -1120,10 +1170,10 @@ export default function AiGame() {
               backToLive();
             }}
           >
-            确认认输
+            {t('dialog.resign.confirm')}
           </button>
           <button className="ai-cancel" onClick={() => setConfirmResign(false)}>
-            继续对弈
+            {t('ai.resign.keep')}
           </button>
         </DialogContent>
       </Dialog>

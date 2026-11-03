@@ -1,3 +1,4 @@
+import { errorBody, type ErrorCode } from '../lib/errors';
 import {
   ARCHIVE_LIMIT,
   ARCHIVE_MAX_LENGTH,
@@ -10,8 +11,8 @@ import { sameOrigin } from './identity';
 // 最近对局 kept on the account, so another device signed in to it sees the same list.
 const PAGE = 50;
 const noStore = { 'Cache-Control': 'no-store, private' };
-const fail = (error: string, status: number) =>
-  Response.json({ error }, { status, headers: noStore });
+const fail = (code: ErrorCode, status: number) =>
+  Response.json(errorBody(code), { status, headers: noStore });
 const done = () => new Response(null, { status: 204, headers: noStore });
 
 /** The account behind a same-origin request, or the response refusing it. */
@@ -19,7 +20,7 @@ async function owner(req: Request, db: D1Database) {
   const refused = sameOrigin(req);
   if (refused) return refused;
   const me = await player(req, db);
-  return me.signedIn ? me.id : fail('请先登录。', 401);
+  return me.signedIn ? me.id : fail('sign-in-required', 401);
 }
 
 // A page ends at `${played_at}:${id}` of its last game; the next page starts after it.
@@ -44,11 +45,11 @@ export async function listGames(req: Request, db: D1Database) {
       .first<{ data: string }>();
     return row
       ? Response.json({ game: JSON.parse(row.data) }, { headers: noStore })
-      : fail('找不到这盘对局。', 404);
+      : fail('game-not-found', 404);
   }
   const before = params.get('before');
   const after = before === null ? null : position(before);
-  if (before !== null && !after) return fail('分页参数无效。', 400);
+  if (before !== null && !after) return fail('bad-page', 400);
   // No game is dated near the largest safe integer, so the first page has no bound.
   const [at, last] = after ?? [Number.MAX_SAFE_INTEGER, ''];
   const { results } = await db
@@ -76,12 +77,12 @@ export async function saveGame(req: Request, db: D1Database, now = Date.now()) {
   const user = await owner(req, db);
   if (user instanceof Response) return user;
   const raw = await req.text();
-  if (raw.length > ARCHIVE_MAX_LENGTH) return fail('请求内容过长。', 413);
+  if (raw.length > ARCHIVE_MAX_LENGTH) return fail('request-too-large', 413);
   let game = null;
   try {
     game = parseArchive(JSON.parse(raw));
   } catch {}
-  if (!game) return fail('对局数据无效。', 400);
+  if (!game) return fail('bad-game', 400);
   await db.batch([
     db
       .prepare(
@@ -104,7 +105,7 @@ export async function deleteGame(req: Request, db: D1Database) {
   const user = await owner(req, db);
   if (user instanceof Response) return user;
   const id = new URL(req.url).searchParams.get('id');
-  if (!id) return fail('缺少对局编号。', 400);
+  if (!id) return fail('missing-game-id', 400);
   await db
     .prepare('DELETE FROM archived_games WHERE user_id = ? AND id = ?')
     .bind(user, id)

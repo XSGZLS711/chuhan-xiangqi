@@ -1,3 +1,4 @@
+import { AppError } from './errors';
 import { engineMove, parseEngineInfo, type EngineInfo } from './ai-game';
 import type { Side } from './xiangqi';
 
@@ -16,9 +17,7 @@ export function aiBase(): URL {
  */
 export async function prepareAiPage(): Promise<void> {
   if (!window.crossOriginIsolated) {
-    throw new Error(
-      '此浏览器无法启动本地棋手，请用新版 Safari、Chrome 或 Edge 打开。',
-    );
+    throw new AppError('engine-unsupported');
   }
 }
 
@@ -47,7 +46,7 @@ export class BrowserEngine {
     this.worker = new Worker(new URL('engine-host.js', aiBase()));
     this.ready = new Promise<void>((resolve, reject) => {
       const timer = setTimeout(
-        () => this.fail(new Error('引擎加载超时，请重试。')),
+        () => this.fail(new AppError('engine-timeout')),
         20000,
       );
       const fail = (error: Error) => {
@@ -83,15 +82,12 @@ export class BrowserEngine {
     ) => {
       if (event.data.type === 'loaded') this.send('uci');
       if (event.data.type === 'error')
-        this.fail(new Error('象棋引擎启动失败，请刷新或更换浏览器。'));
+        this.fail(new AppError('engine-start-failed'));
       if (event.data.type === 'line')
         // Snapshot: listeners may add/remove subscriptions while handling a line.
         for (const f of Array.from(this.listeners)) f(event.data.line ?? '');
     };
-    this.worker.onerror = () =>
-      this.fail(
-        new Error('本地棋手停止了，请重试；手机内存不足时可关闭其他页面。'),
-      );
+    this.worker.onerror = () => this.fail(new AppError('engine-stopped'));
   }
   private send(command: string) {
     if (!this.dead) this.worker.postMessage(command);
@@ -128,7 +124,7 @@ export class BrowserEngine {
     return new Promise((resolve, reject) => {
       let stopTimer: ReturnType<typeof setTimeout> | undefined;
       const timer = setTimeout(
-        () => this.fail(new Error('这次计算超时，请重试。')),
+        () => this.fail(new AppError('search-timeout')),
         o.time + 10000,
       );
       const cleanup = () => {
@@ -162,7 +158,7 @@ export class BrowserEngine {
         this.send('stop');
         // Do not issue a new position until the previous bestmove acknowledges stop.
         stopTimer = setTimeout(
-          () => this.fail(new Error('计算未能停止，请重新加载棋手。')),
+          () => this.fail(new AppError('search-stop-failed')),
           4000,
         );
       };

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { BrowserEngine } from './ai-engine';
+import { errorInfo, type ErrorInfo } from './errors';
 import { analyseGame } from './analyse-game';
 import { analysisCache } from './analysis-cache';
 import type { ArchivedGame } from './archive';
@@ -18,15 +19,16 @@ type State = {
   gameId: string | null;
   analysis: GameAnalysis | null;
   status: Status;
-  error: string;
-  cacheMessage: string;
+  /** What went wrong, as a code to show in the viewer's language. */
+  error: ErrorInfo | null;
+  cacheMessage: 'read-failed' | 'write-failed' | null;
 };
 const initial: State = {
   gameId: null,
   analysis: null,
   status: 'loading',
-  error: '',
-  cacheMessage: '',
+  error: null,
+  cacheMessage: null,
 };
 const complete = (analysis: GameAnalysis) =>
   analysis.moves.every((entry) => entry.status === 'complete');
@@ -63,8 +65,8 @@ export function useGameAnalysis(
           gameId: game.id,
           analysis,
           status: complete(analysis) ? 'complete' : 'idle',
-          error: '',
-          cacheMessage: '',
+          error: null,
+          cacheMessage: null,
         });
       })
       .catch(() => {
@@ -74,8 +76,8 @@ export function useGameAnalysis(
           gameId: game.id,
           analysis,
           status: complete(analysis) ? 'complete' : 'idle',
-          error: '',
-          cacheMessage: '暂时无法读取缓存，可直接分析。',
+          error: null,
+          cacheMessage: 'read-failed',
         });
       });
     return () => {
@@ -110,7 +112,7 @@ export function useGameAnalysis(
     running.current = controller;
     const belongs = () =>
       generation.current === token && running.current === controller;
-    setState((state) => ({ ...state, status: 'running', error: '' }));
+    setState((state) => ({ ...state, status: 'running', error: null }));
     void analyseGame(room, {
       gameId: game.id,
       engine,
@@ -121,12 +123,13 @@ export function useGameAnalysis(
         setState((state) => ({ ...state, analysis }));
         try {
           await analysisCache().save(game, analysis);
-          if (belongs()) setState((state) => ({ ...state, cacheMessage: '' }));
+          if (belongs())
+            setState((state) => ({ ...state, cacheMessage: null }));
         } catch {
           if (belongs())
             setState((state) => ({
               ...state,
-              cacheMessage: '结果已保留在本页，暂时无法写入缓存。',
+              cacheMessage: 'write-failed',
             }));
         }
       },
@@ -149,8 +152,7 @@ export function useGameAnalysis(
           setState((state) => ({
             ...state,
             status: 'error',
-            error:
-              error instanceof Error ? error.message : '整局分析失败，请重试。',
+            error: errorInfo(error, 'analysis-failed'),
           }));
       })
       .finally(() => {

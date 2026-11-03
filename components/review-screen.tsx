@@ -20,13 +20,17 @@ import ChessBoard, {
 } from '@/components/chess-board';
 import { EvalBar, EvalChart } from '@/components/eval-chart';
 import { archiveLabel, type ArchivedGame } from '@/lib/archive';
-import { RATING_LABELS } from '@/lib/game-analysis';
+import { ratingLabel } from '@/lib/game-analysis';
+import { errorText } from '@/lib/errors';
+import { playerName, reasonText, sideName } from '@/lib/i18n';
 import type { useGameAnalysis } from '@/lib/use-game-analysis';
+import { useLocale } from '@/lib/use-locale';
+import LanguageSwitch from '@/components/language-switch';
 import {
-  PHASE_LABELS,
   gamePhases,
   moveComparison,
   moveNumber,
+  phaseLabel,
   playedScore,
   reviewReport,
   reviewSeries,
@@ -36,22 +40,17 @@ import {
   type Phase,
 } from '@/lib/review';
 import { explainMove, type Commentary } from '@/lib/explain';
+import { historyMoveText } from '@/lib/notation';
 import {
   legalMove,
   legalTargets,
-  sideLabel,
   type Board,
   type Move,
   type Side,
 } from '@/lib/xiangqi';
 
 type Tab = 'chart' | 'analysis' | 'report' | 'practice';
-const TABS: [Tab, string][] = [
-  ['chart', '局势图'],
-  ['analysis', '分析'],
-  ['report', '报告'],
-  ['practice', '练习'],
-];
+const TABS: Tab[] = ['chart', 'analysis', 'report', 'practice'];
 type Line = { kind: 'best' | 'actual'; step: number; playing: boolean };
 type Practice = {
   ply: number;
@@ -72,7 +71,7 @@ export default function ReviewScreen({
   analysis,
   onExplore,
   onExit,
-  exitLabel,
+  exitTo,
 }: {
   game: ArchivedGame;
   history: readonly Move[];
@@ -84,8 +83,10 @@ export default function ReviewScreen({
   analysis: ReturnType<typeof useGameAnalysis>;
   onExplore: () => void;
   onExit: () => void;
-  exitLabel: string;
+  /** Where leaving the review goes, for the back button's label. */
+  exitTo: 'club' | 'game';
 }) {
+  const { locale, t, notation } = useLocale();
   const [tab, setTab] = useState<Tab>('chart');
   const [line, setLine] = useState<Line | null>(null);
   const [practice, setPractice] = useState<Practice | null>(null);
@@ -100,29 +101,32 @@ export default function ReviewScreen({
     [history, finalBoard],
   );
   const report = useMemo(
-    () => reviewReport(history, data, phases),
-    [history, data, phases],
+    () => reviewReport(history, data, phases, notation),
+    [history, data, phases, notation],
   );
   const compared = useMemo(
-    () => moveComparison(history, data, ply),
-    [history, data, ply],
+    () => moveComparison(history, data, ply, notation),
+    [history, data, ply, notation],
   );
   // Commentary only for rated moves: a good move needs no excuse.
   const commentary = useMemo(
     () =>
       compared?.result?.rating
-        ? explainMove(compared.played, compared.result)
+        ? explainMove(compared.played, compared.result, locale, notation)
         : null,
-    [compared],
+    [compared, locale, notation],
   );
   const drill = useMemo(
-    () => (practice ? moveComparison(history, data, practice.ply) : null),
-    [history, data, practice],
+    () =>
+      practice ? moveComparison(history, data, practice.ply, notation) : null,
+    [history, data, practice, notation],
   );
   const drillCommentary = useMemo(
     () =>
-      drill?.result?.rating ? explainMove(drill.played, drill.result) : null,
-    [drill],
+      drill?.result?.rating
+        ? explainMove(drill.played, drill.result, locale, notation)
+        : null,
+    [drill, locale, notation],
   );
   const done = data?.moves.filter((m) => m.status === 'complete').length ?? 0;
 
@@ -223,7 +227,7 @@ export default function ReviewScreen({
     if (compared.result.rating)
       marks.push({
         at: move.to,
-        text: RATING_LABELS[compared.result.rating],
+        text: ratingLabel(locale, compared.result.rating),
         tone: `rating-${compared.result.rating}`,
       });
     if (best && (best.from !== move.from || best.to !== move.to))
@@ -270,7 +274,7 @@ export default function ReviewScreen({
     setPractice({ ply: at, selected: null, state: 'trying', hint: false });
   }
 
-  const label = archiveLabel(game);
+  const label = archiveLabel(game, locale);
   const mistakes = report[practiceSide].mistakes;
   const drillIndex = practice
     ? mistakes.findIndex((m) => m.ply === practice.ply)
@@ -282,7 +286,7 @@ export default function ReviewScreen({
     return (
       <div className="line-controls">
         <button
-          aria-label={active?.playing ? '暂停变化' : '播放变化'}
+          aria-label={t(active?.playing ? 'line.pause' : 'line.play')}
           disabled={!moves.length}
           onClick={() =>
             setLine(
@@ -295,14 +299,14 @@ export default function ReviewScreen({
           {active?.playing && step < moves.length ? <Pause /> : <Play />}
         </button>
         <button
-          aria-label="变化上一着"
+          aria-label={t('line.prev')}
           disabled={!active || step === 0}
           onClick={() => setLine({ kind, step: step - 1, playing: false })}
         >
           <ChevronLeft />
         </button>
         <button
-          aria-label="变化下一着"
+          aria-label={t('line.next')}
           disabled={!moves.length || step >= moves.length}
           onClick={() => setLine({ kind, step: step + 1, playing: false })}
         >
@@ -336,7 +340,7 @@ export default function ReviewScreen({
         </ol>
         {exit && (
           <button className="line-exit" onClick={() => setLine(null)}>
-            回到实战局面
+            {t('line.back')}
           </button>
         )}
       </div>
@@ -348,36 +352,29 @@ export default function ReviewScreen({
   function commentaryCard(commentary: Commentary, best: string) {
     return (
       <article className="commentary-card" aria-live="polite">
-        <h4>问题在哪</h4>
+        <h4>{t('review.problem')}</h4>
         <ul>
           {commentary.problem.map((text) => (
             <li key={text}>{text}</li>
           ))}
         </ul>
-        <h4>为什么推荐{best}</h4>
+        <h4>{t('review.why', { move: best })}</h4>
         <ul>
           {commentary.reason.map((text) => (
             <li key={text}>{text}</li>
           ))}
         </ul>
-        {!commentary.certain && (
-          <small>没有找到明确的战术原因，以上是引擎对局面的判断。</small>
-        )}
+        {!commentary.certain && <small>{t('review.uncertain')}</small>}
       </article>
     );
   }
 
   function analysisTab() {
-    if (!ply)
-      return (
-        <p className="review-empty">
-          在局势图上点一步，或按「下一步」开始逐步分析。
-        </p>
-      );
+    if (!ply) return <p className="review-empty">{t('review.empty.start')}</p>;
     if (!compared) return null;
     const { played, result, best, actual } = compared;
     if (!result)
-      return <p className="review-empty">这一步还在分析，稍等片刻。</p>;
+      return <p className="review-empty">{t('review.empty.pending')}</p>;
     const same =
       best[0] && best[0].from === played.from && best[0].to === played.to;
     return (
@@ -385,33 +382,35 @@ export default function ReviewScreen({
         <div
           className={`compare-row played ${line?.kind === 'actual' ? 'active' : ''}`}
         >
-          <span className={`compare-who ${played.side}`}>实战</span>
+          <span className={`compare-who ${played.side}`}>
+            {t('review.played')}
+          </span>
           <div className="compare-move">
             <strong>
-              {moveNumber(ply, played.side)} {played.text}
+              {moveNumber(ply, played.side)} {historyMoveText(played, notation)}
             </strong>
             {result.rating && (
               <span className={`move-rating rating-${result.rating}`}>
-                {RATING_LABELS[result.rating]}
+                {ratingLabel(locale, result.rating)}
               </span>
             )}
-            <small>{scoreText(playedScore(result))}</small>
+            <small>{scoreText(playedScore(result), locale)}</small>
           </div>
           {lineControls('actual', actual)}
         </div>
         <div
           className={`compare-row best ${line?.kind === 'best' ? 'active' : ''}`}
         >
-          <span className="compare-who engine">推荐</span>
+          <span className="compare-who engine">{t('review.best')}</span>
           <div className="compare-move">
             <strong>
               {moveNumber(ply, played.side)} {best[0]?.text ?? '—'}
             </strong>
-            <span className="best-star" aria-label="引擎首选">
+            <span className="best-star" aria-label={t('review.engineChoice')}>
               ★
             </span>
             <small>
-              {same ? '与实战相同' : scoreText(result.before.score)}
+              {same ? t('review.same') : scoreText(result.before.score, locale)}
             </small>
           </div>
           {lineControls('best', best)}
@@ -425,30 +424,34 @@ export default function ReviewScreen({
   function reportTab() {
     // A phase the game never reached is not a missing score.
     const cell = (v: number | null) =>
-      v !== null ? `${v}分` : done < total ? '—' : '未进入';
+      v !== null
+        ? t('report.points', { v })
+        : done < total
+          ? '—'
+          : t('report.notReached');
     const side = (s: Side) => (
       <div className={`report-side ${s}`}>
-        <span>{game.players[s]}</span>
+        <span>{playerName(locale, game.players[s])}</span>
         <strong>{report[s].overall ?? '—'}</strong>
-        <small>综合表现</small>
+        <small>{t('report.overall')}</small>
       </div>
     );
     const rows: [string, (s: Side) => string][] = [
       ...PHASES.map(
         (p) =>
           [
-            `${PHASE_LABELS[p]}评分`,
+            t('report.phaseScore', { phase: phaseLabel(locale, p) }),
             (s: Side) => cell(report[s].phases[p]),
           ] as [string, (s: Side) => string],
       ),
       [
-        '错 / 差 / 中',
+        t('report.counts'),
         (s) => {
           const c = report[s].counts;
           return `${c.blunder + c['allowed-mate']} / ${c.mistake} / ${c.inaccuracy}`;
         },
       ],
-      ['漏杀', (s) => String(report[s].counts['missed-mate'])],
+      [t('report.missedMates'), (s) => String(report[s].counts['missed-mate'])],
     ];
     return (
       <div className="review-report">
@@ -456,7 +459,7 @@ export default function ReviewScreen({
           {side('red')}
           <div className="report-result">
             <b>{label.result}</b>
-            <small>{game.result.reason}</small>
+            <small>{reasonText(locale, game.result.reason)}</small>
           </div>
           {side('black')}
         </div>
@@ -473,8 +476,11 @@ export default function ReviewScreen({
         </table>
         <div className="report-mistakes">
           {(['red', 'black'] as Side[]).map((s) => (
-            <section key={s} aria-label={`${sideLabel(s)}失误`}>
-              <h4>{sideLabel(s)}失误</h4>
+            <section
+              key={s}
+              aria-label={t('report.mistakes', { side: sideName(locale, s) })}
+            >
+              <h4>{t('report.mistakes', { side: sideName(locale, s) })}</h4>
               {report[s].mistakes.length ? (
                 <ul>
                   {report[s].mistakes.map((m) => (
@@ -487,21 +493,21 @@ export default function ReviewScreen({
                       >
                         <span>{moveNumber(m.ply, m.side)}</span> {m.text}
                         <i className={`move-rating rating-${m.rating}`}>
-                          {RATING_LABELS[m.rating]}
+                          {ratingLabel(locale, m.rating)}
                         </i>
                       </button>
                     </li>
                   ))}
                 </ul>
               ) : (
-                <p>{done < total ? '分析完成后显示' : '没有明显失误'}</p>
+                <p>
+                  {t(done < total ? 'report.afterAnalysis' : 'report.none')}
+                </p>
               )}
             </section>
           ))}
         </div>
-        <small className="review-note">
-          分数为引擎估计，不同设备和搜索时间会略有差异。
-        </small>
+        <small className="review-note">{t('report.note')}</small>
       </div>
     );
   }
@@ -511,20 +517,22 @@ export default function ReviewScreen({
     const finished =
       practice?.state === 'solved' || practice?.state === 'revealed';
     const message = !practice
-      ? '选一道题，回到当时的局面重新走。'
+      ? t('practice.pick')
       : practice.state === 'solved'
-        ? `正确！${best?.text ?? ''} 正是引擎首选。`
+        ? t('practice.solved', { move: best?.text ?? '' })
         : practice.state === 'revealed'
-          ? `答案：${best?.text ?? '—'}`
+          ? t('practice.revealed', { move: best?.text ?? '—' })
           : practice.state === 'wrong'
-            ? '这步不是引擎首选，再想想。'
-            : `轮到${drillSide ? sideLabel(drillSide) : ''}走：找出比实战更好的一步。`;
+            ? t('practice.wrong')
+            : t('practice.turn', {
+                side: drillSide ? sideName(locale, drillSide) : '',
+              });
     return (
       <div className="review-practice">
         <div className="practice-picker">
           <select
             id="practice-side"
-            aria-label="练习哪一方的失误"
+            aria-label={t('practice.side')}
             value={practiceSide}
             onChange={(event) => {
               const side = event.target.value as Side,
@@ -539,26 +547,34 @@ export default function ReviewScreen({
           >
             {(['red', 'black'] as Side[]).map((s) => (
               <option key={s} value={s}>
-                {sideLabel(s)}失误 {report[s].mistakes.length}
+                {t('practice.sideOption', {
+                  side: sideName(locale, s),
+                  n: report[s].mistakes.length,
+                })}
               </option>
             ))}
           </select>
           {mistakes.length > 0 && (
             <select
               id="practice-question"
-              aria-label="选择题目"
+              aria-label={t('practice.choose')}
               value={practice?.ply ?? ''}
               onChange={(event) => startDrill(Number(event.target.value))}
             >
               {!practice && (
                 <option value="" disabled>
-                  选择题目
+                  {t('practice.choose')}
                 </option>
               )}
               {mistakes.map((m, i) => (
                 <option key={m.ply} value={m.ply}>
-                  第 {i + 1}/{mistakes.length} 题 · {moveNumber(m.ply, m.side)}{' '}
-                  {m.text}（{RATING_LABELS[m.rating]}）
+                  {t('practice.question', {
+                    i: i + 1,
+                    total: mistakes.length,
+                    num: moveNumber(m.ply, m.side),
+                    move: m.text,
+                    rating: ratingLabel(locale, m.rating, true),
+                  })}
                 </option>
               ))}
             </select>
@@ -574,8 +590,10 @@ export default function ReviewScreen({
         ) : (
           <p className="review-empty">
             {done < total
-              ? '分析完成后出题。'
-              : `${sideLabel(practiceSide)}没有明显失误。`}
+              ? t('practice.afterAnalysis')
+              : t('practice.noMistakes', {
+                  side: sideName(locale, practiceSide),
+                })}
           </p>
         )}
         {/* The explanation waits until the player has tried: no spoilers. */}
@@ -598,7 +616,7 @@ export default function ReviewScreen({
               className="primary"
               onClick={() => startDrill(mistakes[0].ply)}
             >
-              开始练习
+              {t('practice.start')}
             </button>
           </footer>
         ) : null;
@@ -608,7 +626,7 @@ export default function ReviewScreen({
           <footer className="review-nav">
             <button
               className="icon"
-              aria-label="上一着"
+              aria-label={t('practice.prev')}
               disabled={!step}
               onClick={() =>
                 setLine({ ...line, step: step - 1, playing: false })
@@ -629,11 +647,12 @@ export default function ReviewScreen({
                 )
               }
             >
-              {playing ? <Pause /> : <Play />} {playing ? '暂停' : '播放'}
+              {playing ? <Pause /> : <Play />}{' '}
+              {t(playing ? 'practice.pause' : 'practice.play')}
             </button>
             <button
               className="icon"
-              aria-label="下一着"
+              aria-label={t('practice.next')}
               disabled={step >= steps.length}
               onClick={() =>
                 setLine({ ...line, step: step + 1, playing: false })
@@ -641,7 +660,9 @@ export default function ReviewScreen({
             >
               <ChevronRight />
             </button>
-            <button onClick={() => setLine(null)}>结束演示</button>
+            <button onClick={() => setLine(null)}>
+              {t('practice.endDemo')}
+            </button>
           </footer>
         );
       }
@@ -665,7 +686,7 @@ export default function ReviewScreen({
                   })
                 }
               >
-                <RotateCcw /> 再做一次
+                <RotateCcw /> {t('practice.again')}
               </button>
               <button
                 disabled={!drill?.best.length}
@@ -673,7 +694,7 @@ export default function ReviewScreen({
                   setLine({ kind: 'best', step: 0, playing: true })
                 }
               >
-                <Play /> 演示变化
+                <Play /> {t('practice.demo')}
               </button>
             </>
           ) : (
@@ -682,7 +703,7 @@ export default function ReviewScreen({
                 disabled={practice.hint}
                 onClick={() => setPractice({ ...practice, hint: true })}
               >
-                <Lightbulb /> 提示
+                <Lightbulb /> {t('practice.hint')}
               </button>
               <button
                 onClick={() =>
@@ -693,7 +714,7 @@ export default function ReviewScreen({
                   })
                 }
               >
-                <Eye /> 答案
+                <Eye /> {t('practice.answer')}
               </button>
             </>
           )}
@@ -702,7 +723,8 @@ export default function ReviewScreen({
             disabled={!next}
             onClick={() => next && startDrill(next.ply)}
           >
-            <SkipForward /> {next ? '下一题' : '最后一题'}
+            <SkipForward />{' '}
+            {t(next ? 'practice.nextPuzzle' : 'practice.lastPuzzle')}
           </button>
         </footer>
       );
@@ -713,21 +735,21 @@ export default function ReviewScreen({
           className="icon"
           onClick={() => go(0)}
           disabled={!ply}
-          aria-label="回到开局"
+          aria-label={t('review.nav.start')}
         >
           <ChevronFirst />
         </button>
         <button onClick={() => go(ply - 1)} disabled={!ply}>
-          <ChevronLeft /> 上一步
+          <ChevronLeft /> {t('review.nav.prev')}
         </button>
         <button onClick={() => go(ply + 1)} disabled={ply >= total}>
-          下一步 <ChevronRight />
+          {t('review.nav.next')} <ChevronRight />
         </button>
         <button
           className="icon"
           onClick={() => go(total)}
           disabled={ply >= total}
-          aria-label="到终局"
+          aria-label={t('review.nav.end')}
         >
           <ChevronLast />
         </button>
@@ -738,13 +760,20 @@ export default function ReviewScreen({
   return (
     <main className="review-screen">
       <header className="review-header">
-        <button className="review-icon" onClick={onExit} aria-label={exitLabel}>
+        <button
+          className="review-icon"
+          onClick={onExit}
+          aria-label={t(
+            exitTo === 'club' ? 'review.exit.club' : 'play.backToGame',
+          )}
+        >
           <ArrowLeft />
         </button>
         <div>
-          <strong>复盘分析</strong>
+          <strong>{t('review.title')}</strong>
           <span>
-            {game.players.red} · {game.players.black} · {label.result}
+            {playerName(locale, game.players.red)} ·{' '}
+            {playerName(locale, game.players.black)} · {label.result}
           </span>
         </div>
         <span className="review-ply">
@@ -754,12 +783,13 @@ export default function ReviewScreen({
           <button
             className="review-icon"
             onClick={onExplore}
-            aria-label="从这里推演"
-            title="从这里推演"
+            aria-label={t('review.explore')}
+            title={t('review.explore')}
           >
             <GitBranch />
           </button>
         )}
+        <LanguageSwitch />
       </header>
       <div className="review-stage">
         <div className="review-board">
@@ -789,23 +819,31 @@ export default function ReviewScreen({
           <div className="review-progress" aria-live="polite">
             {analysis.status === 'error' ? (
               <>
-                <span>{analysis.error || '分析中断'}</span>
-                <button onClick={analysis.start}>重试</button>
+                <span>
+                  {analysis.error
+                    ? errorText(locale, analysis.error)
+                    : t('review.interrupted')}
+                </span>
+                <button onClick={analysis.start}>{t('review.retry')}</button>
               </>
             ) : (
               <>
                 <span>
                   {!analysis.enabled
-                    ? '正在准备引擎…'
-                    : `引擎分析中 ${done} / ${total}`}
+                    ? t('review.preparing')
+                    : t('review.analyzing', { done, total })}
                 </span>
                 <progress max={Math.max(1, total)} value={done} />
               </>
             )}
           </div>
         )}
-        <div className="review-tabs" role="tablist" aria-label="复盘内容">
-          {TABS.map(([key, name]) => (
+        <div
+          className="review-tabs"
+          role="tablist"
+          aria-label={t('review.tabs')}
+        >
+          {TABS.map((key) => (
             <button
               key={key}
               role="tab"
@@ -817,7 +855,7 @@ export default function ReviewScreen({
                 else if (!practice && mistakes[0]) startDrill(mistakes[0].ply);
               }}
             >
-              {name}
+              {t(`review.tab.${key}`)}
             </button>
           ))}
         </div>
@@ -827,13 +865,15 @@ export default function ReviewScreen({
               <EvalChart series={series} ply={ply} phases={phases} onPly={go} />
               <p className="chart-caption">
                 {ply
-                  ? `${moveNumber(ply, history[ply - 1].side)} ${history[ply - 1].text} · ${scoreText(scoreAt(data, ply))}`
-                  : `开局 · ${scoreText(scoreAt(data, 0))}`}
+                  ? `${moveNumber(ply, history[ply - 1].side)} ${historyMoveText(history[ply - 1], notation)} · ${scoreText(scoreAt(data, ply), locale)}`
+                  : t('review.start', {
+                      score: scoreText(scoreAt(data, 0), locale),
+                    })}
                 {compared?.result?.rating && (
                   <span
                     className={`move-rating rating-${compared.result.rating}`}
                   >
-                    {RATING_LABELS[compared.result.rating]}
+                    {ratingLabel(locale, compared.result.rating)}
                   </span>
                 )}
               </p>

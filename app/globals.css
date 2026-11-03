@@ -4454,3 +4454,154 @@ html {
     margin: 0;
   }
 }
+
+/* Language menu in page headers. */
+.locale-menu {
+  position: relative;
+}
+.locale-menu summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px;
+  border-radius: 10px;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  cursor: pointer;
+  list-style: none;
+}
+.locale-menu summary::-webkit-details-marker {
+  display: none;
+}
+.locale-menu summary:hover,
+.locale-menu[open] summary {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--accent) 70%, transparent);
+}
+.locale-menu summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.locale-panel {
+  position: absolute;
+  right: 0;
+  top: 44px;
+  z-index: 30;
+  display: grid;
+  min-width: 140px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 6px 22px #30251722;
+}
+.locale-panel button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: none;
+  color: var(--foreground);
+  font-size: 14px;
+  text-align: left;
+}
+.locale-panel button:hover,
+.locale-panel button[aria-pressed='true'] {
+  background: var(--accent);
+}
+@media (max-width: 660px) {
+  .header-tools .locale-menu summary {
+    padding: 8px 5px;
+    min-height: 40px;
+    font-size: 12px;
+    gap: 5px;
+  }
+  /* The icon says "language" on its own; the names are in the menu. */
+  .header-tools .locale-menu .tool-label {
+    display: none;
+  }
+  /* Latin letters are wider than the seal-script name this header was drawn for. */
+  html:lang(en) .brand {
+    font-size: 18px;
+    letter-spacing: 1px;
+    gap: 8px;
+    white-space: nowrap;
+  }
+}
+
+/* Words in the stamp are sized for one or two brushed characters. A Latin word is longer, so
+ * it shrinks to keep inside the ring (about 0.55em per letter). */
+html:lang(en) .ink-word {
+  font-size: min(32cqw, calc(84cqw / var(--word-len, 5)));
+}
+html:lang(en) .effect-mate .ink-word {
+  font-size: min(22cqw, calc(84cqw / var(--word-len, 4)));
+}
+html:lang(en) .effect-result .ink-word {
+  font-size: min(18cqw, calc(84cqw / var(--word-len, 8)));
+}
+
+/* "Player You Edit" is longer than 棋友 我方 改名; the name keeps a few letters when the bar is tight. */
+html:lang(en) .table-view .player-name {
+  min-width: 6ch;
+}
+
+/* In the narrow table-view column the English brand and "New game" would otherwise wrap. */
+html:lang(en) .table-view .brand {
+  font-size: 22px;
+  letter-spacing: 1.5px;
+}
+html:lang(en) .header-tools .text-button {
+  white-space: nowrap;
+}
+
+/* Language choice in the board's settings menu. */
+.effect-language {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  margin-top: 4px;
+  padding-top: 6px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+}
+.effect-language > div {
+  display: flex;
+  gap: 4px;
+}
+.effect-language button {
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--foreground);
+  font-size: 12px;
+}
+.effect-language button[aria-pressed='true'] {
+  border-color: var(--primary);
+  background: var(--accent);
+  color: var(--primary);
+}
+
+/* In the narrow side column the English brand and the tool buttons do not fit on one row:
+ * the tools drop to a second row, right-aligned, instead of pushing the account button out
+ * of view. Chinese fits as it always did. */
+@media (min-aspect-ratio: 23/20) and (min-width: 760px) and (min-height: 501px) {
+  html:lang(en) .table-view .site-header {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+  html:lang(en) .table-view .header-tools {
+    margin-left: auto;
+  }
+}
