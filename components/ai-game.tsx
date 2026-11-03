@@ -626,6 +626,13 @@ export default function AiGame() {
         )}
       </main>
     );
+  // A friend game reviewed straight after it ended returns to its room for a rematch;
+  // opened from the lobby's list, the room may be long gone, so it returns there.
+  const backToRoom =
+    archived?.mode.kind === 'friend' &&
+    new URLSearchParams(location.search).get('back') === 'room'
+      ? archived.id.split(':')[1]
+      : null;
   // A finished game opens in the full review screen; unfinished games keep the inline replay.
   if (reviewing && analysisGame && !branch && !setup)
     return (
@@ -638,8 +645,17 @@ export default function AiGame() {
         onPly={navigate}
         analysis={whole}
         onExplore={explore}
-        onExit={archived ? () => window.location.assign('../') : backToLive}
-        exitLabel={archived ? '返回棋社' : '返回对局'}
+        onExit={
+          archived
+            ? () =>
+                window.location.assign(
+                  backToRoom
+                    ? `../?room=${encodeURIComponent(backToRoom)}`
+                    : '../',
+                )
+            : backToLive
+        }
+        exitLabel={archived && !backToRoom ? '返回棋社' : '返回对局'}
       />
     );
   return (
