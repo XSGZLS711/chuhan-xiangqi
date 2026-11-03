@@ -603,7 +603,7 @@ test('棋谱列表：英文显示 WXF，越南语显示越南记谱，没有语�
   assert(!CJK.test(vietnamese));
 });
 
-test('棋盘设置菜单里能选语言，每种语言各用自己的名字，当前的标记出来', () => {
+test('棋盘设置菜单跟着界面语言走，菜单里没有语言选项', () => {
   const settings = {
     sound: true,
     hints: true,
@@ -619,18 +619,16 @@ test('棋盘设置菜单里能选语言，每种语言各用自己的名字，�
       ),
     );
   const english = menu('en');
-  assert(english.includes('>中文<') && english.includes('>English<'));
-  assert(english.includes('lang="vi"') && english.includes('>Tiếng Việt<'));
-  assert(english.includes('Language'));
-  assert.match(english, /aria-pressed="true"[^>]*>English</);
+  assert(english.includes('Sound'));
   const chinese = menu('zh');
-  assert(chinese.includes('语言'));
-  assert.match(chinese, /aria-pressed="true"[^>]*>中文</);
+  assert(chinese.includes('音效'));
   const vietnamese = menu('vi');
-  assert(vietnamese.includes('Ngôn ngữ') && vietnamese.includes('Âm thanh'));
-  assert.match(vietnamese, /aria-pressed="true"[^>]*>Tiếng Việt</);
-  assert.equal(vietnamese.match(/aria-pressed="true"/g)?.length, 1);
-  assert(!CJK.test(vietnamese.replace('>中文<', '')));
+  assert(vietnamese.includes('Âm thanh'));
+  for (const markup of [english, chinese, vietnamese]) {
+    assert(!markup.includes('aria-pressed'));
+    assert(!markup.includes('Tiếng Việt'));
+  }
+  assert(!CJK.test(vietnamese));
   // Without a provider the menu is Chinese, as before.
   assert.equal(
     renderToStaticMarkup(

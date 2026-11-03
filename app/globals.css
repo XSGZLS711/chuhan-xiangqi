@@ -4623,41 +4623,6 @@ html:not(:lang(zh)) .header-tools .text-button {
   white-space: nowrap;
 }
 
-/* Language choice in the board's settings menu. Each name stays on one line; when the names
- * do not fit beside the label, they move to a row of their own, right-aligned. */
-.effect-language {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px 12px;
-  min-height: 40px;
-  margin-top: 4px;
-  padding-top: 6px;
-  border-top: 1px solid var(--border);
-  font-size: 13px;
-}
-.effect-language > div {
-  display: flex;
-  gap: 4px;
-  margin-left: auto;
-}
-.effect-language button {
-  min-height: 30px;
-  padding: 4px 9px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: transparent;
-  color: var(--foreground);
-  font-size: 12px;
-  white-space: nowrap;
-}
-.effect-language button[aria-pressed='true'] {
-  border-color: var(--primary);
-  background: var(--accent);
-  color: var(--primary);
-}
-
 /* In the narrow side column the Latin brand and the tool buttons do not fit on one row:
  * the tools drop to a second row, right-aligned, instead of pushing the account button out
  * of view. Chinese fits as it always did. */

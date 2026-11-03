@@ -1,7 +1,6 @@
 'use client';
 import { useRef, useState, type CSSProperties, type SubmitEvent } from 'react';
 import { flushSync } from 'react-dom';
-import { LocaleMenuItems } from '@/components/language-switch';
 import { useLocale } from '@/lib/use-locale';
 import {
   Menu,
@@ -128,7 +127,6 @@ export default function MobileDock({
               <LogOut />
               <span>{t('dock.leave')}</span>
             </DropdownMenuItem>
-            <LocaleMenuItems />
           </DropdownMenuContent>
         </DropdownMenu>
         <button

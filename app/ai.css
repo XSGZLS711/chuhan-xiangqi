@@ -308,12 +308,6 @@
     transform: scale(1);
   }
 }
-.ai-setup-note {
-  color: var(--muted-foreground);
-  font-size: 13px;
-  line-height: 1.7;
-  margin: 0;
-}
 .ai-cancel {
   display: block;
   text-align: center;
