@@ -84,7 +84,7 @@ test('应邀出战接受现有邀请并交换红黑，不发起第二次邀请',
   assert.equal(control.intent, 'accept');
   applyAction(r, 'black', { action: 'respond', accept: true }, now);
   assert.equal(r.round, 2);
-  assert.equal(r.players.red.id, 'black');
+  assert.equal(r.players.red?.id, 'black');
   assert.equal(r.result, null);
   assert.equal(r.offer, null);
   assert.deepEqual(r.board, initialBoard());
@@ -133,7 +133,7 @@ test('零步认输也可再蒸一下，不需要重开棋局', () => {
   applyAction(r, 'black', { action: 'undo' }, now);
   assert.equal(r.round, 1);
   assert.equal(r.result, null);
-  assert.equal(r.players.red.id, 'red');
+  assert.equal(r.players.red?.id, 'red');
 });
 test('新聊天气泡分别属于发送者头像', () => {
   const r = fresh();

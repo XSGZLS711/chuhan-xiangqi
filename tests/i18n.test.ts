@@ -698,7 +698,7 @@ test('存储用的口令没有改动（旧存档、旧房间靠它们比对）',
   applyAction(room, 'b', { action: 'join', name: NAME.ai }, 1000);
   applyAction(room, 'a', { action: 'resign' }, 1000);
   assert.deepEqual(room.result, { winner: 'black', reason: '红方认输' });
-  assert.equal(room.players.red.name, '我方');
+  assert.equal(room.players.red?.name, '我方');
   assert.equal(room.players.black?.name, '象棋 AI');
 });
 test('旧存档照常读取、重放，并能用英文、越南语标注', () => {

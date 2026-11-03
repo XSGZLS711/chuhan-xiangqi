@@ -12,7 +12,7 @@ import {
   type Room,
 } from '../lib/game';
 import { pack, unpack, type Wire } from '../lib/room-wire';
-import { opposite } from '../lib/xiangqi';
+import { opposite, type Side } from '../lib/xiangqi';
 import { HOLD_MS, ONLINE_MS } from './room-poll';
 import { usage } from './usage';
 
@@ -110,11 +110,12 @@ export class GameRoom extends DurableObject {
     id: string,
     seat: Player,
     clockMinutes: number,
+    side: Side = 'red',
   ): Promise<Outcome> {
     usage.durable++;
     if (this.room) return failed('room-changed-retry', 409);
     const now = Date.now();
-    this.room = newRoom(id, seat, clockMinutes, now);
+    this.room = newRoom(id, seat, clockMinutes, now, side);
     this.packed = pack(this.room);
     const sql = this.ctx.storage.sql;
     for (const cursor of [
@@ -380,17 +381,14 @@ export class GameRoom extends DurableObject {
 
   private players(now: number): PublicRoom['players'] {
     const { red, black } = this.room!.players;
-    return {
-      red: { name: red.name, online: this.online(red.id, now) },
-      black: black
-        ? { name: black.name, online: this.online(black.id, now) }
-        : null,
-    };
+    const seat = (player: Player | null) =>
+      player && { name: player.name, online: this.online(player.id, now) };
+    return { red: seat(red), black: seat(black) };
   }
 
   private presenceKey(now: number) {
     const { red, black } = this.players(now);
-    return `${red.online}:${black?.online ?? ''}`;
+    return `${red?.online ?? ''}:${black?.online ?? ''}`;
   }
 
   private presence(now: number) {

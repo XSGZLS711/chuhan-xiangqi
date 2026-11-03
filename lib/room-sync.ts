@@ -1,6 +1,7 @@
 import { ApiError, apiError, gameFetch } from './client-api';
 import type { ErrorCode } from './errors';
 import type { PublicRoom } from './game';
+import type { Side } from './xiangqi';
 import { unpack, type Wire } from './room-wire';
 
 /** Rooms made since the move to Durable Objects have 24-character ids and a socket; the
@@ -80,12 +81,14 @@ async function post(transport: Transport, body: Record<string, unknown>) {
   return read(data);
 }
 
+/** A new room with its maker on `side`; the friend who opens the link takes the other. */
 export function createRoom(
   name: string,
   clockMinutes: number,
+  side: Side = 'red',
   transport = browser,
 ): Promise<PublicRoom> {
-  return post(transport, { action: 'create', name, clockMinutes });
+  return post(transport, { action: 'create', name, clockMinutes, side });
 }
 
 /** Keeps the page's room current: a socket to the room's Durable Object, held polls when

@@ -32,7 +32,7 @@ export type ArchiveSource = Pick<
   Room,
   'board' | 'turn' | 'round' | 'history' | 'result'
 > & {
-  players: { red: { name: string }; black: { name: string } | null };
+  players: { red: { name: string } | null; black: { name: string } | null };
 };
 export type ArchiveOptions = {
   id: string;
@@ -46,7 +46,7 @@ export function archiveGame(
   room: ArchiveSource,
   options: ArchiveOptions,
 ): ArchivedGame {
-  if (!room.result || !room.players.black)
+  if (!room.result || !room.players.red || !room.players.black)
     throw new Error('只能保存已结束的完整对局');
   return {
     version: 1,

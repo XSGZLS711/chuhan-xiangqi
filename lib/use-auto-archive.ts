@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { archiveGame, type ArchiveMode, type ArchiveSource } from './archive';
 import { gameArchive } from './archive-storage';
 import { uploadGame } from './client-api';
+import { seated } from './game';
 import type { Side } from './xiangqi';
 
 export function useAutoArchive(
@@ -14,7 +15,7 @@ export function useAutoArchive(
   const queued = useRef(new Set<string>());
   const [error, setError] = useState(false);
   useEffect(() => {
-    if (!room?.result || !room.players.black || !id) return;
+    if (!room?.result || !seated(room) || !id) return;
     const key = JSON.stringify([
       id,
       room.history.map((move) => [move.from, move.to]),

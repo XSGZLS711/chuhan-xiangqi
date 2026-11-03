@@ -51,7 +51,7 @@ import {
   Board,
 } from '@/lib/xiangqi';
 import { NAME } from '@/lib/tokens';
-import type { PublicRoom } from '@/lib/game';
+import { seated, type PublicRoom } from '@/lib/game';
 import {
   Users,
   Bot,
@@ -144,6 +144,8 @@ export default function Home() {
     );
   const [name, setName] = useState<string>(NAME.player),
     [minutes, setMinutes] = useState('0'),
+    // The side the maker of a new room sits on; the create dialog is to offer the choice.
+    [createSide] = useState<Side>('red'),
     [modal, setModal] = useState<'create' | 'rules' | 'invite' | 'name' | null>(
       null,
     ),
@@ -275,7 +277,7 @@ export default function Home() {
         update(r);
         if (
           !r.you &&
-          !r.players.black &&
+          !seated(r) &&
           autoJoin.current !== roomId &&
           new URLSearchParams(location.search).get('spectate') !== '1'
         ) {
@@ -323,7 +325,11 @@ export default function Home() {
         throw apiError(null, 0, 'network-unstable');
       const data =
         kind === 'create'
-          ? await createRoom(String(extra.name), Number(extra.clockMinutes))
+          ? await createRoom(
+              String(extra.name),
+              Number(extra.clockMinutes),
+              extra.side === 'black' ? 'black' : 'red',
+            )
           : await sync!.send(kind, extra);
       update(data);
       setSelected(null);
@@ -373,7 +379,7 @@ export default function Home() {
         ? historyMoves[reviewIndex - 1]
         : null;
   const participant = !!room?.you,
-    canAct = participant && !!room?.players.black && !busy;
+    canAct = participant && !!room && seated(room) && !busy;
   function square(n: number) {
     if (!analysis) {
       if (review !== null) return;
@@ -509,7 +515,9 @@ export default function Home() {
     const lines = [
       t('export.title', { round: room.round }),
       t('export.players', {
-        red: playerName(locale, room.players.red.name),
+        red: room.players.red
+          ? playerName(locale, room.players.red.name)
+          : t('export.waiting'),
         black: room.players.black
           ? playerName(locale, room.players.black.name)
           : t('export.waiting'),
@@ -553,7 +561,7 @@ export default function Home() {
   function clockMs(s: Side): number | null {
     if (!room?.clockMinutes) return null;
     let remaining = room.clocks[s];
-    if (room.players.black && !room.result && room.turn === s)
+    if (seated(room) && !room.result && room.turn === s)
       remaining -= Math.max(0, tick + clockOffset.current - room.turnAt);
     return Math.max(0, remaining);
   }
@@ -659,12 +667,13 @@ export default function Home() {
       lowTime =
         remaining !== null &&
         remaining <= LOW_CLOCK_MS &&
-        !!room?.players.black &&
+        !!room &&
+        seated(room) &&
         !room.result;
     return (
       <div className={`player-seat seat-${s}`}>
         <div
-          className={`player-bar ${room?.players.black && !room.result && room.turn === s ? 'active-player' : ''}`}
+          className={`player-bar ${room && seated(room) && !room.result && room.turn === s ? 'active-player' : ''}`}
         >
           <div className="player-avatar">
             <span className={`avatar ${s}`}>{s === 'red' ? '帅' : '将'}</span>
@@ -697,7 +706,7 @@ export default function Home() {
               <span className="player-name">
                 {p
                   ? playerName(locale, p.name)
-                  : t(s === 'black' ? 'room.seatOpen' : 'room.you')}
+                  : t(room || s === 'black' ? 'room.seatOpen' : 'room.you')}
               </span>
               {me && <em className="player-tag">{t('room.you')}</em>}
               {me && (
@@ -729,7 +738,7 @@ export default function Home() {
           ? 'room.pill.over'
           : room && !room.you
             ? 'room.status.watching'
-            : room?.players.black
+            : room && seated(room)
               ? check
                 ? 'room.pill.check'
                 : 'room.pill.toMove'
@@ -829,7 +838,7 @@ export default function Home() {
                   ? 'room.status.replaying'
                   : room.result
                     ? 'room.status.over'
-                    : !room.players.black
+                    : !seated(room)
                       ? 'room.status.waiting'
                       : !room.you
                         ? 'room.status.watching'
@@ -1145,7 +1154,7 @@ export default function Home() {
                   </span>
                   {participant && (
                     <button
-                      disabled={!room.players.black || busy || !!room.offer}
+                      disabled={!seated(room) || busy || !!room.offer}
                       onClick={() => setConfirm('rematch')}
                     >
                       <RefreshCw size={14} /> {t('room.rematch')}
@@ -1154,11 +1163,7 @@ export default function Home() {
                 </div>
                 <button className="primary-button" onClick={copyInvite}>
                   <Copy size={17} />
-                  {t(
-                    room.players.black
-                      ? 'room.copyRoomLink'
-                      : 'room.copyInvite',
-                  )}
+                  {t(seated(room) ? 'room.copyRoomLink' : 'room.copyInvite')}
                 </button>
               </section>
             )}
@@ -1289,7 +1294,11 @@ export default function Home() {
               onSubmit={async (e) => {
                 e.preventDefault();
                 rememberName();
-                await action('create', { name, clockMinutes: Number(minutes) });
+                await action('create', {
+                  name,
+                  clockMinutes: Number(minutes),
+                  side: createSide,
+                });
               }}
             >
               <label className="field-label" htmlFor="player-name">
