@@ -144,8 +144,8 @@ export default function Home() {
     );
   const [name, setName] = useState<string>(NAME.player),
     [minutes, setMinutes] = useState('0'),
-    // The side the maker of a new room sits on; the create dialog is to offer the choice.
-    [createSide] = useState<Side>('red'),
+    // The side the maker of a new room sits on, chosen in the create dialog.
+    [createSide, setCreateSide] = useState<Side>('red'),
     [modal, setModal] = useState<'create' | 'rules' | 'invite' | 'name' | null>(
       null,
     ),
@@ -1311,6 +1311,22 @@ export default function Home() {
                 onChange={(e) => setName(e.target.value)}
                 required
               />
+              <fieldset className="side-choice">
+                <legend className="field-label">{t('ai.setup.side')}</legend>
+                <div>
+                  {(['red', 'black'] as const).map((side) => (
+                    <button
+                      key={side}
+                      type="button"
+                      aria-pressed={createSide === side}
+                      className={createSide === side ? 'selected' : ''}
+                      onClick={() => setCreateSide(side)}
+                    >
+                      {t(side === 'red' ? 'ai.setup.red' : 'ai.setup.black')}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
               <label className="field-label" id="clock-label">
                 {t('dialog.clock')}
               </label>

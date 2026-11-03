@@ -332,7 +332,7 @@ const messages: Record<MessageKey, string> = {
   'dialog.name.title': 'Gọi bạn là gì nhỉ?',
   'dialog.rules.title': 'Luật ván với bạn',
   'dialog.invite.description':
-    'Gửi liên kết dưới đây cho bạn cờ. Người đầu tiên vào sẽ tự động cầm Đen; những người vào sau có thể xem.',
+    'Gửi liên kết dưới đây cho bạn cờ. Người đầu tiên vào sẽ tự động ngồi vào ghế còn lại; những người vào sau có thể xem.',
   'dialog.rules.description': 'Đỏ đi trước, hai bên lần lượt đi.',
   'dialog.yourName': 'Tên của bạn',
   'dialog.clock': 'Thời gian ván cờ',

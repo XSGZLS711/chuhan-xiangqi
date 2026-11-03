@@ -1558,6 +1558,43 @@ p {
 .field-input + .field-label {
   margin-top: 21px;
 }
+/* Which side the maker of a friend room takes; the same two buttons as the AI page's setup. */
+.side-choice {
+  min-width: 0;
+  margin: 21px 0 0;
+  padding: 0;
+  border: 0;
+}
+.side-choice + .field-label {
+  margin-top: 21px;
+}
+.side-choice > div {
+  display: flex;
+  gap: 9px;
+}
+.side-choice button {
+  flex: 1;
+  min-height: 46px;
+  padding: 10px 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--foreground);
+  font-size: 14px;
+}
+.side-choice button:not(.selected):hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, var(--border));
+}
+.side-choice button.selected {
+  border-color: var(--primary);
+  background: var(--accent);
+  color: var(--emphasis);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+.side-choice button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
 .clock-select {
   height: 46px !important;
   width: 100% !important;
