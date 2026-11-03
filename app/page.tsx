@@ -1013,7 +1013,7 @@ export default function Home() {
                     disabled={!canAct}
                     onClick={() => void undoAndContinue()}
                   >
-                    再争一下<small>悔棋继续</small>
+                    再蒸一下<small>悔棋继续</small>
                   </button>
                   <button
                     className="secondary-button"
