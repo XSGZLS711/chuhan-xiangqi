@@ -32,11 +32,18 @@ import {
   saveLocale,
   t,
   tn,
+  type Locale,
   type MessageKey,
 } from '../lib/i18n';
 import { en } from '../lib/locales/en';
+import { vi } from '../lib/locales/vi';
 import { zh } from '../lib/locales/zh';
-import { historyMoveText, moveText, wxfNotation } from '../lib/notation';
+import {
+  historyMoveText,
+  moveText,
+  vietnameseNotation,
+  wxfNotation,
+} from '../lib/notation';
 import { resultEffect, stampWords, updateFeedback } from '../lib/presentation';
 import { noteText } from '../lib/room-note';
 import { scoreText } from '../lib/review';
@@ -67,14 +74,18 @@ const placeholders = (text: string) =>
   [...text.matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort();
 const keys = Object.keys(zh.messages) as MessageKey[];
 
+const BUNDLES = { en, vi };
 test('每种语言的词典与中文有同一组键，占位符一一对应', () => {
-  assert.deepEqual(Object.keys(en.messages).sort(), [...keys].sort());
-  for (const key of keys)
-    assert.deepEqual(
-      placeholders(en.messages[key]),
-      placeholders(zh.messages[key]),
-      `${key} 的 {参数} 在两种语言里不一致`,
-    );
+  assert.deepEqual([...LOCALES].sort(), ['zh', ...Object.keys(BUNDLES)].sort());
+  for (const [code, bundle] of Object.entries(BUNDLES)) {
+    assert.deepEqual(Object.keys(bundle.messages).sort(), [...keys].sort());
+    for (const key of keys)
+      assert.deepEqual(
+        placeholders(bundle.messages[key]),
+        placeholders(zh.messages[key]),
+        `${code} 的 ${key}：{参数} 和中文不一致`,
+      );
+  }
 });
 test('单复数键成对出现，并且各语言齐全', () => {
   const others = keys.filter((key) => key.endsWith('.other'));
@@ -85,12 +96,46 @@ test('单复数键成对出现，并且各语言齐全', () => {
   assert.equal(tn('en', 'recent.moves', 2), '2 moves');
   assert.equal(tn('zh', 'recent.moves', 1), '1 步');
   assert.equal(tn('zh', 'recent.moves', 26), '26 步');
+  // Vietnamese has no plural forms: Intl always picks other, so one is never shown and reads the same.
+  assert.equal(tn('vi', 'recent.moves', 1), '1 nước');
+  assert.equal(tn('vi', 'recent.moves', 26), '26 nước');
+  for (const key of others) {
+    const one = key.replace(/\.other$/, '.one') as MessageKey;
+    assert.equal(vi.messages[one], vi.messages[key as MessageKey], key);
+  }
 });
-test('英文词典里没有中文字符（语言名在 meta 里，不算）', () => {
-  for (const [key, text] of Object.entries(en.messages))
-    assert(!CJK.test(text), `${key}: ${text}`);
+test('英文和越南语词典里没有中文字符（语言名在 meta 里，不算）', () => {
+  for (const bundle of Object.values(BUNDLES))
+    for (const [key, text] of Object.entries(bundle.messages))
+      assert(!CJK.test(text), `${key}: ${text}`);
   assert.equal(en.meta.name, 'English');
   assert.equal(zh.meta.name, '中文');
+  assert.equal(vi.meta.name, 'Tiếng Việt');
+  assert.equal(vi.meta.htmlLang, 'vi');
+  assert.equal(vi.meta.notation, 'vietnamese');
+});
+/** Vietnamese values that may read exactly as the English ones: proper nouns. Values with no
+ * letters outside their placeholders (`{side}`, `?!`, `, `) are the same in every language. */
+const SAME_AS_ENGLISH: Partial<Record<MessageKey, string>> = {
+  'brand.name': 'the brand, a proper noun',
+};
+test('越南语没有漏翻：和英文相同的值只能是白名单里的专有名词，空值只在英文也为空时', () => {
+  const same = keys.filter(
+    (key) =>
+      vi.messages[key] === en.messages[key] &&
+      /\p{L}/u.test(vi.messages[key].replace(/\{\w+\}/g, '')),
+  );
+  assert.deepEqual(same, Object.keys(SAME_AS_ENGLISH));
+  for (const key of keys)
+    assert.equal(vi.messages[key] === '', en.messages[key] === '', key);
+  // Vietnamese letters are there, not ASCII left over from a draft.
+  assert(
+    keys.filter((key) =>
+      /[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i.test(
+        vi.messages[key],
+      ),
+    ).length > 400,
+  );
 });
 test('t：占位符替换，缺参数时原样保留', () => {
   assert.equal(t('en', 'room.round', { n: 3 }), 'Game 3');
@@ -109,15 +154,24 @@ test('棋子名与 xiangqi.label 一致，两种语言都有', () => {
         label(piece),
       );
       assert(t('en', `piece.${side}.${kind}` as MessageKey).length > 2);
+      assert(t('vi', `piece.${side}.${kind}` as MessageKey).length >= 2);
     }
+  assert.equal(
+    t('vi', 'piece.named', { side: 'Đỏ', piece: t('vi', 'piece.red.r') }),
+    'Xe Đỏ',
+  );
 });
 
-test('语言选择：zh 开头读中文，其余读英文，存下来的优先，存储坏了不影响', () => {
+test('语言选择：zh 开头读中文，vi 开头读越南语，其余读英文，存下来的优先，存储坏了不影响', () => {
   assert.equal(detectLocale(['zh-CN', 'en']), 'zh');
   assert.equal(detectLocale(['zh-Hant-TW']), 'zh');
   assert.equal(detectLocale(['zh']), 'zh');
   assert.equal(detectLocale(['en-US', 'zh-CN']), 'en');
-  assert.equal(detectLocale(['vi']), 'en');
+  assert.equal(detectLocale(['vi']), 'vi');
+  assert.equal(detectLocale(['vi-VN', 'en']), 'vi');
+  assert.equal(detectLocale(['VI-vn']), 'vi');
+  assert.equal(detectLocale(['en-US', 'vi-VN']), 'en');
+  assert.equal(detectLocale(['fr-FR']), 'en');
   assert.equal(detectLocale([]), 'en');
   assert.equal(detectLocale(undefined), 'en');
   const store = (value: string | null) => ({ getItem: () => value });
@@ -125,6 +179,11 @@ test('语言选择：zh 开头读中文，其余读英文，存下来的优先�
   assert.equal(loadLocale(store('en'), ['zh-CN']), 'en');
   assert.equal(loadLocale(store('fr'), ['zh-CN']), 'zh');
   assert.equal(loadLocale(store(null), ['en-GB']), 'en');
+  assert.equal(loadLocale(store(null), ['vi-VN']), 'vi');
+  assert.equal(loadLocale(store('vi'), ['zh-CN']), 'vi');
+  // A choice saved before Vietnamese existed still holds for a Vietnamese browser.
+  assert.equal(loadLocale(store('zh'), ['vi-VN']), 'zh');
+  assert.equal(loadLocale(store('en'), ['vi-VN']), 'en');
   assert.equal(
     loadLocale(
       {
@@ -150,7 +209,7 @@ test('语言选择：zh 开头读中文，其余读英文，存下来的优先�
       'zh',
     ),
   );
-  assert.deepEqual([...LOCALES], ['zh', 'en']);
+  assert.deepEqual([...LOCALES], ['zh', 'en', 'vi']);
 });
 
 // ---- WXF notation ----
@@ -288,9 +347,11 @@ test('WXF：吃子不改变记谱；moveText 的中文分支就是原来的 nota
       notation(start, from, to),
     );
 });
-test('WXF：随机对局里每一步都有唯一的记谱，并能还原成那一步', () => {
-  // The only ambiguity is two files that each hold two of the same piece, which the
-  // notation (like the Chinese one) does not tell apart.
+/** Random games: every legal move is written in the expected shape, and the move played has
+ * a text no other legal move shares. The only ambiguity is two files that each hold two of
+ * the same piece, which the notations (like the Chinese one) do not tell apart.
+ */
+function randomGames(write: typeof wxfNotation, shape: RegExp) {
   let seed = 11;
   const random = () =>
     (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
@@ -322,13 +383,13 @@ test('WXF：随机对局里每一步都有唯一的记谱，并能还原成那�
         }
       const byText = new Map<string, number>();
       for (const [from, to] of moves) {
-        const text = wxfNotation(board, from, to);
-        assert.match(text, /^([+\-2-5]?[KAEHRCP]|[KAEHRCP][1-9])[+\-=][1-9]$/);
+        const text = write(board, from, to);
+        assert.match(text, shape);
         byText.set(text, (byText.get(text) ?? 0) + 1);
       }
       const [from, to] = moves[Math.floor(random() * moves.length)];
       if (!ambiguous) {
-        assert.equal(byText.get(wxfNotation(board, from, to)), 1);
+        assert.equal(byText.get(write(board, from, to)), 1);
         compared++;
       }
       board = moveBoard(board, from, to);
@@ -336,7 +397,145 @@ test('WXF：随机对局里每一步都有唯一的记谱，并能还原成那�
     }
   }
   assert(compared > 500);
+}
+test('WXF：随机对局里每一步都有唯一的记谱，并能还原成那一步', () =>
+  randomGames(wxfNotation, /^([+\-2-5]?[KAEHRCP]|[KAEHRCP][1-9])[+\-=][1-9]$/));
+
+// ---- Vietnamese notation ----
+const vn = (board: Board, from: string, to: string) =>
+  vietnameseNotation(board, at(from), at(to));
+
+test('越南记谱：开局的常见着法（P2-5、M2.3、M8.7 …），和 WXF 同一套路数', () => {
+  const start = initialBoard();
+  assert.equal(vn(start, 'h3', 'e3'), 'P2-5');
+  assert.equal(vn(start, 'h1', 'g3'), 'M2.3');
+  assert.equal(vn(start, 'b1', 'c3'), 'M8.7');
+  assert.equal(vn(start, 'h10', 'g8'), 'M8.7');
+  assert.equal(vn(start, 'b3', 'e3'), 'P8-5');
+  assert.equal(vn(start, 'b8', 'e8'), 'P2-5');
+  assert.equal(vn(start, 'i1', 'i2'), 'X1.1');
+  assert.equal(vn(start, 'a1', 'a2'), 'X9.1');
+  assert.equal(vn(start, 'g4', 'g5'), 'B3.1');
+  assert.equal(vn(start, 'c7', 'c6'), 'B3.1');
+  assert.equal(vn(start, 'c1', 'e3'), 'T7.5');
+  assert.equal(vn(start, 'f1', 'e2'), 'S4.5');
 });
+test('越南记谱：一盘棋的前几步按序记谱', () => {
+  const moves = ['h3e3', 'h10g8', 'h1g3', 'i10h10', 'i1h1', 'b8e8'];
+  const expected = ['P2-5', 'M8.7', 'M2.3', 'X9-8', 'X1-2', 'P2-5'];
+  let board = initialBoard();
+  const got = moves.map((token) => {
+    const { from, to } = engineMove(token)!;
+    const text = vietnameseNotation(board, from, to);
+    board = moveBoard(board, from, to);
+    return text;
+  });
+  assert.deepEqual(got, expected);
+});
+test('越南记谱：退用 /，平用 -，象仕将兵的落点用路数，车炮兵用步数，将是 Tg', () => {
+  assert.equal(vn(mk([['red', 'r', 'i2']]), 'i2', 'i1'), 'X1/1');
+  assert.equal(vn(mk([['red', 'r', 'a2']]), 'a2', 'a1'), 'X9/1');
+  assert.equal(vn(mk([['red', 'r', 'a2']]), 'a2', 'i2'), 'X9-1');
+  assert.equal(vn(mk([['red', 'e', 'c1']]), 'c1', 'e3'), 'T7.5');
+  assert.equal(vn(mk([['red', 'e', 'e3']]), 'e3', 'c1'), 'T5/7');
+  assert.equal(vn(mk([['red', 'a', 'd1']]), 'd1', 'e2'), 'S6.5');
+  assert.equal(vn(mk([['red', 'k', 'e1']]), 'e1', 'e2'), 'Tg5.1');
+  assert.equal(vn(mk([['red', 'k', 'e1']]), 'e1', 'd1'), 'Tg5-6');
+  assert.equal(vn(mk([['red', 'p', 'c4']]), 'c4', 'c5'), 'B7.1');
+  assert.equal(vn(mk([['red', 'p', 'e6']]), 'e6', 'd6'), 'B5-6');
+  assert.equal(vn(mk([['red', 'c', 'b3']]), 'b3', 'b10'), 'P8.7');
+  assert.equal(vn(mk([['black', 'p', 'c7']]), 'c7', 'c6'), 'B3.1');
+  assert.equal(vn(mk([['black', 'p', 'i5']]), 'i5', 'h5'), 'B9-8');
+  assert.equal(vn(mk([['black', 'k', 'e10']]), 'e10', 'e9'), 'Tg5.1');
+  assert.equal(vn(mk([['black', 'h', 'h8']]), 'h8', 'g10'), 'M8/7');
+  assert.equal(vn(mk([['black', 'c', 'h8']]), 'h8', 'h3'), 'P8.5');
+});
+test('越南记谱：同一路两个同种棋子，前者记 t，后者记 s，写在字母后面、代替路数', () => {
+  const red = mk([
+    ['red', 'r', 'a3'],
+    ['red', 'r', 'a5'],
+  ]);
+  assert.equal(vn(red, 'a5', 'a7'), 'Xt.2');
+  assert.equal(vn(red, 'a3', 'a4'), 'Xs.1');
+  assert.equal(vn(red, 'a3', 'b3'), 'Xs-8');
+  const black = mk([
+    ['black', 'r', 'a8'],
+    ['black', 'r', 'a6'],
+  ]);
+  // Black's front piece is the one nearer red's side, the larger row.
+  assert.equal(vn(black, 'a6', 'a5'), 'Xt.1');
+  assert.equal(vn(black, 'a8', 'b8'), 'Xs-2');
+  const cannons = mk([
+    ['red', 'c', 'e3'],
+    ['red', 'c', 'e5'],
+  ]);
+  // The Luật Cờ Tướng's own example: Pt/1, the front cannon one step back.
+  assert.equal(vn(cannons, 'e5', 'e4'), 'Pt/1');
+  const horses = mk([
+    ['red', 'h', 'c3'],
+    ['red', 'h', 'c5'],
+  ]);
+  assert.equal(vn(horses, 'c5', 'd7'), 'Mt.6');
+  assert.equal(vn(horses, 'c3', 'e4'), 'Ms.5');
+  const advisors = mk([
+    ['red', 'a', 'd1'],
+    ['red', 'a', 'd3'],
+  ]);
+  assert.equal(vn(advisors, 'd3', 'e2'), 'St/5');
+  assert.equal(vn(advisors, 'd1', 'e2'), 'Ss.5');
+});
+test('越南记谱：一路三个兵记 t、g、s；四五个兵时中间的从前往后编号，写在字母前', () => {
+  const three = mk([
+    ['red', 'p', 'e5'],
+    ['red', 'p', 'e6'],
+    ['red', 'p', 'e7'],
+  ]);
+  assert.equal(vn(three, 'e7', 'e8'), 'Bt.1');
+  assert.equal(vn(three, 'e6', 'd6'), 'Bg-6');
+  assert.equal(vn(three, 'e5', 'f5'), 'Bs-4');
+  const five = mk(
+    (['c4', 'c5', 'c6', 'c7', 'c8'] as const).map(
+      (square): [Side, Kind, string] => ['red', 'p', square],
+    ),
+  );
+  assert.equal(vn(five, 'c8', 'c9'), 'Bt.1');
+  assert.equal(vn(five, 'c7', 'b7'), '2B-8');
+  assert.equal(vn(five, 'c6', 'b6'), '3B-8');
+  assert.equal(vn(five, 'c5', 'b5'), '4B-8');
+  assert.equal(vn(five, 'c4', 'b4'), 'Bs-8');
+  const black = mk([
+    ['black', 'p', 'e6'],
+    ['black', 'p', 'e5'],
+    ['black', 'p', 'e4'],
+  ]);
+  assert.equal(vn(black, 'e4', 'e3'), 'Bt.1');
+  assert.equal(vn(black, 'e5', 'd5'), 'Bg-4');
+  assert.equal(vn(black, 'e6', 'f6'), 'Bs-6');
+  const pair = mk([
+    ['red', 'p', 'e6'],
+    ['red', 'p', 'e7'],
+  ]);
+  assert.equal(vn(pair, 'e7', 'e8'), 'Bt.1');
+  assert.equal(vn(pair, 'e6', 'e7'), 'Bs.1');
+});
+test('越南记谱：吃子不改变记谱；moveText 按风格选用三种记谱', () => {
+  const board = mk([
+    ['red', 'c', 'b3'],
+    ['black', 'p', 'b7'],
+    ['black', 'h', 'b9'],
+  ]);
+  assert.equal(vn(board, 'b3', 'b7'), 'P8.4');
+  const start = initialBoard();
+  const { from, to } = engineMove('h3e3')!;
+  assert.equal(moveText(start, from, to, 'chinese'), '炮二平五');
+  assert.equal(moveText(start, from, to, 'wxf'), 'C2=5');
+  assert.equal(moveText(start, from, to, 'vietnamese'), 'P2-5');
+});
+test('越南记谱：随机对局里每一步都有唯一的记谱，并能还原成那一步', () =>
+  randomGames(
+    vietnameseNotation,
+    /^(Tg[1-9]|[SPXMTB][1-9]|[SXPMT][ts]|B[tgs]|[2-4]B)[./-][1-9]$/,
+  ));
 test('历史着法在英文里按局面重算，不翻译存下来的中文', () => {
   const room = newRoom('r', { id: 'red', name: NAME.player }, 0, 1000);
   applyAction(room, 'black', { action: 'join', name: NAME.player }, 1000);
@@ -353,8 +552,14 @@ test('历史着法在英文里按局面重算，不翻译存下来的中文', ()
     '車一进一',
   );
   assert.equal(historyMoveText({ ...one, text: '车一进一' }, 'wxf'), 'C2=5');
+  assert.equal(historyMoveText(one, 'vietnamese'), 'P2-5');
+  assert.equal(historyMoveText(two, 'vietnamese'), 'M8.7');
+  assert.equal(
+    historyMoveText({ ...one, text: '车一进一' }, 'vietnamese'),
+    'P2-5',
+  );
 });
-test('棋谱列表：英文显示 WXF，没有语言提供者时仍是中文', () => {
+test('棋谱列表：英文显示 WXF，越南语显示越南记谱，没有语言提供者时仍是中文', () => {
   const room = newRoom('r', { id: 'red', name: NAME.player }, 0, 1000);
   applyAction(room, 'black', { action: 'join', name: NAME.player }, 1000);
   applyAction(room, 'red', { action: 'move', from: 70, to: 67 }, 1000);
@@ -386,16 +591,26 @@ test('棋谱列表：英文显示 WXF，没有语言提供者时仍是中文', (
   );
   assert(chinese.includes('炮二平五') && chinese.includes('上一步'));
   assert.equal(renderToStaticMarkup(record()), chinese);
+  const vietnamese = renderToStaticMarkup(
+    createElement(
+      LocaleProvider,
+      { page: 'home', initialLocale: 'vi' },
+      record(),
+    ),
+  );
+  assert(vietnamese.includes('P2-5') && vietnamese.includes('M8.7'));
+  assert(vietnamese.includes('Nước trước'));
+  assert(!CJK.test(vietnamese));
 });
 
-test('棋盘设置菜单里能选语言，两种语言各用自己的名字，当前的标记出来', () => {
+test('棋盘设置菜单里能选语言，每种语言各用自己的名字，当前的标记出来', () => {
   const settings = {
     sound: true,
     hints: true,
     moveEffects: true,
     resultEffects: true,
   };
-  const menu = (locale: 'zh' | 'en') =>
+  const menu = (locale: Locale) =>
     renderToStaticMarkup(
       createElement(
         LocaleProvider,
@@ -405,11 +620,17 @@ test('棋盘设置菜单里能选语言，两种语言各用自己的名字，�
     );
   const english = menu('en');
   assert(english.includes('>中文<') && english.includes('>English<'));
+  assert(english.includes('lang="vi"') && english.includes('>Tiếng Việt<'));
   assert(english.includes('Language'));
   assert.match(english, /aria-pressed="true"[^>]*>English</);
   const chinese = menu('zh');
   assert(chinese.includes('语言'));
   assert.match(chinese, /aria-pressed="true"[^>]*>中文</);
+  const vietnamese = menu('vi');
+  assert(vietnamese.includes('Ngôn ngữ') && vietnamese.includes('Âm thanh'));
+  assert.match(vietnamese, /aria-pressed="true"[^>]*>Tiếng Việt</);
+  assert.equal(vietnamese.match(/aria-pressed="true"/g)?.length, 1);
+  assert(!CJK.test(vietnamese.replace('>中文<', '')));
   // Without a provider the menu is Chinese, as before.
   assert.equal(
     renderToStaticMarkup(
@@ -431,11 +652,15 @@ const REASONS = [
   REASON.resigned.red,
   REASON.resigned.black,
 ];
-test('终局原因：中文原样，英文翻译，不认识的原因照原样显示', () => {
+test('终局原因：中文原样，英文、越南语翻译，不认识的原因照原样显示', () => {
   for (const reason of REASONS) {
     assert.equal(reasonText('zh', reason), reason);
     assert(!CJK.test(reasonText('en', reason)), reason);
+    assert(!CJK.test(reasonText('vi', reason)), reason);
   }
+  assert.equal(reasonText('vi', REASON.mate), 'Chiếu bí');
+  assert.equal(reasonText('vi', REASON.resigned.red), 'Đỏ xin thua');
+  assert.equal(reasonText('vi', '以后新增的原因'), '以后新增的原因');
   assert.equal(reasonText('en', REASON.mate), 'Checkmate');
   assert.equal(reasonText('en', REASON.stalemate), 'No legal moves');
   assert.equal(reasonText('en', REASON.resigned.black), 'Black resigned');
@@ -449,6 +674,9 @@ test('默认名字：中文原样，英文翻译；用户自己起的名字不�
   assert.equal(playerName('en', NAME.ai), 'Xiangqi AI');
   assert.equal(playerName('en', '老张'), '老张');
   assert.equal(playerName('en', 'Alice'), 'Alice');
+  assert.equal(playerName('vi', NAME.player), 'Bạn cờ');
+  assert.equal(playerName('vi', NAME.ai), 'AI cờ tướng');
+  assert.equal(playerName('vi', 'Minh'), 'Minh');
 });
 test('存储用的口令没有改动（旧存档、旧房间靠它们比对）', () => {
   assert.deepEqual(REASONS, [
@@ -473,7 +701,7 @@ test('存储用的口令没有改动（旧存档、旧房间靠它们比对）',
   assert.equal(room.players.red.name, '我方');
   assert.equal(room.players.black?.name, '象棋 AI');
 });
-test('旧存档照常读取、重放，并能用英文标注', () => {
+test('旧存档照常读取、重放，并能用英文、越南语标注', () => {
   const room = newRoom(
     'old',
     { id: 'red', name: NAME.me },
@@ -509,6 +737,15 @@ test('旧存档照常读取、重放，并能用英文标注', () => {
     'You / Xiangqi AI',
   );
   assert.equal(archiveLabel({ ...parsed, viewerSide: null }).result, '黑方胜');
+  assert.deepEqual(archiveLabel(parsed, 'vi'), {
+    opponent: 'AI cờ tướng',
+    result: 'Thua',
+  });
+  assert.equal(
+    archiveLabel({ ...parsed, viewerSide: null }, 'vi').result,
+    'Đen thắng',
+  );
+  assert.match(formatDateTime('vi', parsed.date), /2026/);
   assert.match(formatDateTime('en', parsed.date), /2026/);
   assert.equal(
     formatDateTime('zh', parsed.date),
@@ -517,7 +754,7 @@ test('旧存档照常读取、重放，并能用英文标注', () => {
 });
 
 // ---- Ink stamps ----
-test('印章：中文字样不变，英文显示英文词，换语言即时生效', () => {
+test('印章：中文字样不变，英文、越南语显示各自的词，换语言即时生效', () => {
   const mate = resultEffect({ winner: 'red', reason: REASON.mate }, 'x');
   assert.equal(mate.title, '绝杀');
   assert.equal(stampWords('en', mate).title, 'Mate');
@@ -547,7 +784,17 @@ test('印章：中文字样不变，英文显示英文词，换语言即时生�
     );
     assert(!CJK.test(words.title + words.detail), reason);
     assert(words.detail.startsWith('Exploring · '));
+    const vietnamese = stampWords(
+      'vi',
+      resultEffect({ winner: 'black', reason }, 'z', true),
+    );
+    assert(!CJK.test(vietnamese.title + vietnamese.detail), reason);
+    assert(vietnamese.detail.startsWith('Thử nước · '));
   }
+  assert.equal(stampWords('vi', mate).title, 'Chiếu bí');
+  assert.equal(stampWords('vi', mate).detail, 'Đỏ thắng · Chiếu bí');
+  assert.equal(stampWords('vi', check).word, 'Chiếu');
+  assert.equal(stampWords('vi', check).detail, 'Đen phải đỡ chiếu');
   const draw = resultEffect({ winner: 'draw', reason: REASON.agreed }, 'd');
   assert.equal(draw.title, '和棋');
   assert.equal(stampWords('en', draw).title, 'Draw');
@@ -571,10 +818,11 @@ test('印章：中文字样不变，英文显示英文词，换语言即时生�
   );
   assert.equal(feedback.effect?.title, '吃');
   assert.equal(stampWords('en', feedback.effect!).title, 'Capture');
+  assert.equal(stampWords('vi', feedback.effect!).title, 'Ăn');
 });
 
 // ---- Errors ----
-test('错误码：每个码都有两种语言，AppError 的 message 仍是中文', () => {
+test('错误码：每个码都有每种语言，AppError 的 message 仍是中文', () => {
   const codes = keys.filter((key) => key.startsWith('err.'));
   assert(codes.length >= 50);
   for (const key of codes) {
@@ -583,6 +831,7 @@ test('错误码：每个码都有两种语言，AppError 的 message 仍是中�
     assert.equal(error.message, t('zh', key, { n: 4 }));
     assert.equal(error.code, code);
     assert(en.messages[key].length > 8);
+    assert(vi.messages[key].length > 8);
   }
   const full = new GameError('room-full', 409);
   assert.equal(full.status, 409);
@@ -606,6 +855,20 @@ test('接口错误同时带中文 error 和 code；客户端按当前语言显�
   assert.equal(
     errorText('en', errorInfo(served, 'action-failed')),
     'The table is full, but you can watch.',
+  );
+  assert.equal(
+    errorText('vi', errorInfo(served, 'action-failed')),
+    'Bàn cờ đã đủ người, bạn có thể vào xem.',
+  );
+  assert.equal(
+    errorText(
+      'vi',
+      errorInfo(
+        new AppError('analysis-ply-incomplete', { n: 3 }),
+        'analysis-failed',
+      ),
+    ),
+    'Nước 3 chưa có điểm đánh giá đầy đủ. Hãy thử lại.',
   );
   const newer = apiError(
     { error: '一个新的错误。', code: 'added-later' },
@@ -697,6 +960,29 @@ test('房间提示：旧的纯文字原样显示，新的按语言生成', () =>
     'Sides swapped. A new game begins.',
   );
   assert(!CJK.test(noteText('en', room, 'wxf')));
+  assert.equal(
+    noteText('vi', room, 'vietnamese'),
+    'Đã đổi màu quân. Ván mới bắt đầu.',
+  );
+});
+test('房间提示：越南语用越南记谱', () => {
+  const room = played();
+  applyAction(room, 'b', { action: 'join', name: NAME.player }, 1000);
+  assert.equal(
+    noteText('vi', room, 'vietnamese'),
+    'Bạn cờ đã vào bàn. Đỏ đi trước.',
+  );
+  applyAction(room, 'red', { action: 'move', from: 70, to: 67 }, 1000);
+  assert.equal(noteText('vi', room, 'vietnamese'), 'P2-5');
+  applyAction(room, 'b', { action: 'move', from: 25, to: 70 }, 1000);
+  assert.equal(noteText('vi', room, 'vietnamese'), 'P8.5');
+  applyAction(room, 'red', { action: 'undo' }, 1000);
+  assert.equal(
+    noteText('vi', room, 'vietnamese'),
+    'Đỏ đã đi lại một nước · P8.5',
+  );
+  applyAction(room, 'red', { action: 'resign' }, 1000);
+  assert.equal(noteText('vi', room, 'vietnamese'), 'Đỏ xin thua');
 });
 test('房间的字段保持原样：note 之外没有新增，历史里仍存中文着法', () => {
   const room = played();
@@ -726,7 +1012,7 @@ test('房间的字段保持原样：note 之外没有新增，历史里仍存中
 });
 
 // ---- Commentary ----
-test('讲解：英文是自然的英文句子，着法用 WXF，中文输出不变', () => {
+test('讲解：英文是自然的英文句子，着法用 WXF，越南语用越南记谱，中文输出不变', () => {
   const before = initialBoard();
   const { from, to } = engineMove('i1i2')!;
   const move: Move = {
@@ -783,9 +1069,24 @@ test('讲解：英文是自然的英文句子，着法用 WXF，中文输出不�
   assert.equal(ratingLabel('en', 'blunder'), '??');
   assert.equal(ratingLabel('en', 'blunder', true), 'Blunder');
   assert.equal(ratingLabel('zh', 'blunder'), '错');
+  // Vietnamese reads the same analysis with its own notation.
+  const vietnamese = explainMove(move, result, 'vi');
+  assert.deepEqual(vietnamese.problem, [
+    'Khi Xe Đỏ rời đi, Mã Đỏ không còn được bảo vệ. Đen có thể ăn nó bằng P8.7.',
+  ]);
+  assert.equal(
+    vietnamese.reason[0],
+    'Máy thích M2.3 hơn. Đánh giá sau đó: Cân bằng; biến chính: M2.3, M8.7.',
+  );
+  assert.equal(scoreText({ kind: 'cp', value: 133 }, 'vi'), 'Đỏ +133');
+  assert.equal(
+    scoreText({ kind: 'mate', winner: 'black', plies: 5 }, 'vi'),
+    'Đen chiếu bí sau 3 nước',
+  );
+  assert.equal(ratingLabel('vi', 'blunder', true), 'Sai lầm nghiêm trọng');
 });
 
-test('讲解：同样的局面在两种语言里各个模板都填满了参数', () => {
+test('讲解：同样的局面在每种语言里各个模板都填满了参数', () => {
   const cp = (value: number): AnalysisScore => ({ kind: 'cp', value });
   const line = (score: AnalysisScore, pv: string[]) => ({
     score,
@@ -807,7 +1108,7 @@ test('讲解：同样的局面在两种语言里各个模板都填满了参数',
       bestScore?: AnalysisScore;
       playedScore?: AnalysisScore;
     },
-    locale: 'zh' | 'en',
+    locale: Locale,
   ) => {
     const { from, to } = engineMove(token)!;
     const move: Move = {
@@ -842,136 +1143,152 @@ test('讲解：同样的局面在两种语言里各个模板都填满了参数',
     ['black', 'h', 'f6'],
     ['black', 'p', 'd6'],
   ]);
-  const cases: [string, () => ReturnType<typeof explainMove>[]][] = [
+  const cases: [
+    string,
+    (locale: Locale) => ReturnType<typeof explainMove>[],
+  ][] = [
     [
       'hung',
-      () =>
-        (['zh', 'en'] as const).map((locale) =>
-          explain(
-            hung,
-            'red',
-            'i2h2',
-            { best: ['h1g3'], actual: ['i2h2', 'h8h2'] },
-            locale,
-          ),
+      (locale) => [
+        explain(
+          hung,
+          'red',
+          'i2h2',
+          { best: ['h1g3'], actual: ['i2h2', 'h8h2'] },
+          locale,
         ),
+      ],
     ],
     [
       'ignored',
-      () =>
-        (['zh', 'en'] as const).map((locale) =>
-          explain(
-            attacked,
-            'red',
-            'g4g5',
-            { best: ['h1g3', 'a9d9'], actual: ['g4g5', 'h8h1'] },
-            locale,
-          ),
+      (locale) => [
+        explain(
+          attacked,
+          'red',
+          'g4g5',
+          { best: ['h1g3', 'a9d9'], actual: ['g4g5', 'h8h1'] },
+          locale,
         ),
+      ],
     ],
     [
       'fork',
-      () =>
-        (['zh', 'en'] as const).map((locale) =>
-          explain(
-            fork,
-            'red',
-            'e1e2',
-            {
-              best: ['c3d5'],
-              actual: ['e1e2', 'b6b5'],
-              bestScore: cp(300),
-              playedScore: cp(0),
-            },
-            locale,
-          ),
+      (locale) => [
+        explain(
+          fork,
+          'red',
+          'e1e2',
+          {
+            best: ['c3d5'],
+            actual: ['e1e2', 'b6b5'],
+            bestScore: cp(300),
+            playedScore: cp(0),
+          },
+          locale,
         ),
+      ],
     ],
     [
       'missed capture',
-      () =>
-        (['zh', 'en'] as const).map((locale) =>
-          explain(
-            apply(['i1i2', 'b8e8', 'i2h2']),
-            'black',
-            'e8e4',
-            {
-              best: ['h8h2', 'h1g3'],
-              actual: ['e8e4', 'h2h8'],
-              bestScore: cp(-650),
-              playedScore: cp(-100),
-            },
-            locale,
-          ),
+      (locale) => [
+        explain(
+          apply(['i1i2', 'b8e8', 'i2h2']),
+          'black',
+          'e8e4',
+          {
+            best: ['h8h2', 'h1g3'],
+            actual: ['e8e4', 'h2h8'],
+            bestScore: cp(-650),
+            playedScore: cp(-100),
+          },
+          locale,
         ),
+      ],
     ],
     [
       'mates',
-      () =>
-        (['zh', 'en'] as const).flatMap((locale) => [
-          explain(
-            initialBoard(),
-            'red',
-            'h3e3',
-            {
-              best: ['b3e3'],
-              actual: ['h3e3', 'h10g8', 'h1g3', 'i10h10'],
-              playedScore: { kind: 'mate', winner: 'black', plies: 3 },
-            },
-            locale,
-          ),
-          explain(
-            initialBoard(),
-            'red',
-            'i1i2',
-            {
-              best: ['h3e3'],
-              actual: ['i1i2', 'h10g8'],
-              bestScore: { kind: 'mate', winner: 'red', plies: 1 },
-              playedScore: cp(0),
-            },
-            locale,
-          ),
-        ]),
+      (locale) => [
+        explain(
+          initialBoard(),
+          'red',
+          'h3e3',
+          {
+            best: ['b3e3'],
+            actual: ['h3e3', 'h10g8', 'h1g3', 'i10h10'],
+            playedScore: { kind: 'mate', winner: 'black', plies: 3 },
+          },
+          locale,
+        ),
+        explain(
+          initialBoard(),
+          'red',
+          'i1i2',
+          {
+            best: ['h3e3'],
+            actual: ['i1i2', 'h10g8'],
+            bestScore: { kind: 'mate', winner: 'red', plies: 1 },
+            playedScore: cp(0),
+          },
+          locale,
+        ),
+      ],
     ],
   ];
-  const sentences: Record<string, string[]> = {};
-  for (const [name, run] of cases) {
-    const outputs = run();
-    for (const c of outputs) {
-      for (const text of [...c.problem, ...c.reason])
-        assert(!/[{}]/.test(text), `${name}: ${text}`);
+  const sentences: Record<string, Record<string, string[]>> = {};
+  for (const locale of LOCALES) {
+    sentences[locale] = {};
+    for (const [name, run] of cases) {
+      const texts = run(locale).flatMap((c) => [...c.problem, ...c.reason]);
+      for (const text of texts) {
+        assert(!/[{}]/.test(text), `${locale} ${name}: ${text}`);
+        if (locale !== 'zh')
+          assert(!CJK.test(text), `${locale} ${name}: ${text}`);
+      }
+      sentences[locale][name] = texts;
     }
-    // zh outputs come first; the English ones follow with no Chinese in them.
-    const english = name === 'mates' ? outputs.slice(2) : outputs.slice(1);
-    for (const c of english)
-      for (const text of [...c.problem, ...c.reason])
-        assert(!CJK.test(text), `${name}: ${text}`);
-    sentences[name] = english.flatMap((c) => [...c.problem, ...c.reason]);
   }
-  assert.deepEqual(sentences.hung, [
+  const { en: english, vi: vietnamese } = sentences;
+  assert.deepEqual(english.hung, [
     'R1=2 puts the Red Chariot where the Black Cannon can capture it for free.',
     'The engine prefers H2+3. Evaluation afterwards: Even; main line: H2+3.',
   ]);
-  assert.deepEqual(sentences.ignored, [
+  assert.deepEqual(english.ignored, [
     'Black was already attacking the Red Horse, and this move does not deal with it.',
     'H2+3 moves the attacked Red Horse to safety.',
   ]);
   assert.equal(
-    sentences.fork[1],
+    english.fork[1],
     'H7+6 attacks the Black Chariot and the Black Horse at once, and Black cannot save both.',
   );
-  assert.deepEqual(sentences['missed capture'], [
+  assert.deepEqual(english['missed capture'], [
     'This misses a chance to win material: C8+6 captures the Red Chariot.',
     'In the recommended line (C8+6), Black nets about 9 points of material.',
   ]);
-  assert.deepEqual(sentences.mates.slice(0, 1), [
+  assert.deepEqual(english.mates.slice(0, 1), [
     'This allows Black to mate in 2: H8+7, H2+3, R9=8.',
   ]);
-  assert(sentences.mates.includes('This misses a forced mate.'));
+  assert(english.mates.includes('This misses a forced mate.'));
   assert(
-    sentences.mates.includes(
+    english.mates.includes(
       'A mate in 1 was available, starting with C2=5: C2=5.',
+    ),
+  );
+  // The same sentences in Vietnamese, with the moves in Vietnamese notation.
+  assert.deepEqual(vietnamese.hung, [
+    'X1-2 đưa Xe Đỏ tới chỗ Pháo Đen có thể ăn không mất gì.',
+    'Máy thích M2.3 hơn. Đánh giá sau đó: Cân bằng; biến chính: M2.3.',
+  ]);
+  assert.equal(
+    vietnamese.fork[1],
+    'M7.6 bắt đôi Xe Đen và Mã Đen cùng lúc, Đen không giữ được cả hai.',
+  );
+  assert.deepEqual(vietnamese['missed capture'], [
+    'Nước này bỏ lỡ cơ hội được quân: P8.6 ăn được Xe Đỏ.',
+    'Theo biến gợi ý (P8.6), Đen được khoảng 9 điểm quân.',
+  ]);
+  assert(
+    vietnamese.mates.includes(
+      'Nước này để Đen chiếu bí sau 2 nước: M8.7, M2.3, X9-8.',
     ),
   );
 });
