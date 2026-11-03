@@ -262,8 +262,9 @@ const messages: Record<MessageKey, string> = {
   'play.rematchShort': 'Rematch',
   'play.rematchInvite': 'Invite to a rematch',
   'play.draw.result': 'Draw',
-  'play.steam': 'Reheat it',
+  'play.steam': 'Undo and play on',
   'play.steam.small': 'Undo and play on',
+  'play.steam.hint': '',
   'play.review': 'Review',
   'play.illegal': 'That move is not allowed. Pick one of the marked squares.',
   'play.noRoom':

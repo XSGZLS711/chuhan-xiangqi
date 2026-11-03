@@ -1144,7 +1144,9 @@ export default function Home() {
                     onClick={() => void undoAndContinue()}
                   >
                     {t('play.steam')}
-                    <small>{t('play.steam.small')}</small>
+                    {t('play.steam.hint') && (
+                      <small>{t('play.steam.hint')}</small>
+                    )}
                   </button>
                   <button
                     className="secondary-button"

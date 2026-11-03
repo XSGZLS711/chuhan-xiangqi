@@ -252,6 +252,7 @@ export const zhMessages = {
   'play.draw.result': '和棋',
   'play.steam': '再蒸一下',
   'play.steam.small': '悔棋继续',
+  'play.steam.hint': '悔棋继续',
   'play.review': '复盘',
   'play.illegal': '这一步不可走，请选择标记位置。',
   'play.noRoom': '创建好友对局开始对弈，或点击“推演”先试试棋。',
