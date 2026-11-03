@@ -106,8 +106,6 @@ export type BoardEffect = {
   detail: string;
   side?: Side;
   analysis?: boolean;
-  /** Where a capture happened: its stamp lands on that point, not mid-board. */
-  at?: number;
 };
 export const STAMP_TIMING = { delayMs: 250, enterMs: 150, fadeMs: 400 };
 /** Visible lifetime, after the stamp's delayed entrance. */
@@ -120,12 +118,10 @@ export function captureEffect(
   id: string,
   side: Side,
   analysis = false,
-  at?: number,
 ): BoardEffect {
   return {
     id,
     kind: 'capture',
-    at,
     title: '吃',
     detail: (analysis ? '推演 · ' : '') + sideLabel(side) + '吃子',
     side,
@@ -184,8 +180,6 @@ export function updateFeedback<T extends FeedbackRoom>(
       effect = captureEffect(
         `${next.id}:${next.round}:${next.version}`,
         move.side,
-        false,
-        move.to,
       );
     if (move.check && !next.result) {
       sounds.push('check');
@@ -242,8 +236,5 @@ export function branchFeedback(
       },
     };
   }
-  return {
-    sounds,
-    effect: board[to] ? captureEffect(id, turn, true, to) : null,
-  };
+  return { sounds, effect: board[to] ? captureEffect(id, turn, true) : null };
 }

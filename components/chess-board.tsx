@@ -19,6 +19,8 @@ type Frame = {
     id: string;
     key: string;
     timing: ReturnType<typeof pieceMotion>;
+    /** Axis the piece tips about as it is set down, leading edge first. */
+    lean: { x: number; y: number };
   } | null;
   /** Restored by an undo; fades back in once the mover has left its square. */
   revived: string | null;
@@ -31,14 +33,15 @@ type Frame = {
   } | null;
 };
 const SHARDS = [0, 1, 2, 3, 4, 5, 6, 7];
-/** A capture stamp centred on its point, pulled inward so it never leaves the board. */
-function stampPoint(shown: number) {
-  const clamp = (v: number, edge: number) =>
-    Math.min(100 - edge, Math.max(edge, v));
-  return {
-    x: `${clamp((((shown % 9) + 0.5) / 9) * 100, 17)}%`,
-    y: `${clamp(((Math.floor(shown / 9) + 0.5) / 10) * 100, 16)}%`,
-  };
+/** A piece set down after travelling tips its leading edge into the board first:
+ * rotating about (−dy, dx) on screen sends that edge away from the viewer.
+ */
+function leanAxis(from: number, to: number, flipped: boolean) {
+  const at = (n: number) => (flipped ? 89 - n : n);
+  const dx = (at(to) % 9) - (at(from) % 9),
+    dy = Math.floor(at(to) / 9) - Math.floor(at(from) / 9),
+    length = Math.hypot(dx, dy) || 1;
+  return { x: +(-dy / length).toFixed(3), y: +(dx / length).toFixed(3) };
 }
 /** A move drawn on the board: the engine's choice or the move actually played. */
 export type BoardArrow = { from: number; to: number; tone: 'best' | 'played' };
@@ -109,6 +112,7 @@ export default function ChessBoard({
             id: transition.piece.id,
             key: `${transition.piece.id}:${transition.from}:${transition.to}`,
             timing,
+            lean: leanAxis(transition.from, transition.to, flipped),
           }
         : null,
       revived: transition?.revived?.id ?? null,
@@ -256,6 +260,9 @@ export default function ChessBoard({
                     ? css({
                         '--hover': `${frame.move?.timing.hoverMs}ms`,
                         '--drop': `${frame.move?.timing.dropMs}ms`,
+                        '--settle': `${frame.move?.timing.settleMs}ms`,
+                        '--lean-x': frame.move?.lean.x ?? 0,
+                        '--lean-y': frame.move?.lean.y ?? 1,
                       })
                     : {}),
                 }}
@@ -265,7 +272,7 @@ export default function ChessBoard({
                   key={moved ? frame.move?.key : 'idle'}
                   className={`piece ${p.side} ${p.kind === 'k' && checkSide === p.side ? 'checked' : ''}`}
                   onAnimationEnd={(event) => {
-                    if (event.animationName === 'piece-hop')
+                    if (event.animationName === 'piece-settle')
                       setFrame((current) =>
                         current.move === move
                           ? { ...current, move: null }
@@ -355,14 +362,7 @@ export default function ChessBoard({
             {mark.text && <b>{mark.text}</b>}
           </span>
         ))}
-        <BoardEffect
-          effect={effect}
-          at={
-            effect?.kind === 'capture' && effect.at !== undefined
-              ? stampPoint(view(effect.at))
-              : null
-          }
-        />
+        <BoardEffect effect={effect} />
       </fieldset>
     </div>
   );
