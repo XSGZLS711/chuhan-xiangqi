@@ -595,6 +595,18 @@ export default function AiGame() {
       </div>
     );
   }
+  const statusLine = (
+    <>
+      {engineState === 'loading' ? t('ai.engineLoading') : status}
+      {engineState !== 'loading' && aiTurn && visible && (
+        <span className="thinking-dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+      )}
+    </>
+  );
   function player(side: Side) {
     const me = side === match.human;
     return (
@@ -625,6 +637,11 @@ export default function AiGame() {
             </strong>
           </div>
           <CapturedTray board={board} side={side} />
+          {!me && !archived && (
+            <span className="bar-status" aria-hidden="true">
+              {statusLine}
+            </span>
+          )}
           {!me && (!archived || archived.mode.kind === 'ai') && (
             <Bot size={20} aria-label={t('ai.player.computer')} />
           )}
@@ -729,16 +746,7 @@ export default function AiGame() {
         </button>
       </div>
       <output className="ai-status-line">
-        <span>
-          {engineState === 'loading' ? t('ai.engineLoading') : status}
-          {engineState !== 'loading' && aiTurn && visible && (
-            <span className="thinking-dots" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-            </span>
-          )}
-        </span>
+        <span>{statusLine}</span>
       </output>
       {(archived || (ratedSelection && !branch)) && (
         <div className="ai-review-details">
