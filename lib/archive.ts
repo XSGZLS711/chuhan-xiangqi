@@ -9,6 +9,9 @@ import {
 import { opposite, sideLabel, type Result, type Side } from './xiangqi';
 
 export const ARCHIVE_LIMIT = 200;
+// Characters of serialized JSON. The 60-move rule caps a game near 3,700 plies,
+// about 27,000 characters, so every legal game fits.
+export const ARCHIVE_MAX_LENGTH = 32768;
 export type ArchiveMode = { kind: 'friend' } | { kind: 'ai'; level: AiLevel };
 export type ArchivedGame = {
   version: 1;
@@ -168,6 +171,23 @@ export function mergeGame(
     { ...game, date: existing?.date ?? game.date },
     ...games.filter((entry) => entry.id !== game.id),
   ]);
+}
+/** Signed in, 最近对局 lists both copies. Only local games inside the newest 200 are
+ * sent up: the server keeps 200 per account and would drop older ones again. */
+export function syncArchives(
+  local: ArchivedGame[],
+  server: ArchivedGame[],
+): { games: ArchivedGame[]; upload: ArchivedGame[] } {
+  const games = newestGames([...server, ...local]);
+  const stored = new Set(server.map((game) => game.id));
+  return {
+    games,
+    upload: games.filter(
+      (game) =>
+        !stored.has(game.id) &&
+        serializeArchive(game).length <= ARCHIVE_MAX_LENGTH,
+    ),
+  };
 }
 export function archiveLabel(game: ArchivedGame): {
   opponent: string;

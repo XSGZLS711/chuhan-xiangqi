@@ -137,6 +137,7 @@ export default function Home() {
     room ? `friend:${room.id}:${room.round}` : null,
     { kind: 'friend' },
     room?.you ?? null,
+    !!account.user,
   );
   const viewportStyle = useGameViewport(!!room);
   const roomRef = useRef<PublicRoom | null>(null),
@@ -885,6 +886,7 @@ export default function Home() {
       )}
       {lobby ? (
         <GameLobby
+          signedIn={!!account.user}
           friendDisabled={busy}
           onCreate={() => setModal('create')}
           onExplore={startAnalysis}

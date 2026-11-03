@@ -3,7 +3,8 @@ import { mkdtempSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { getPlatformProxy } from 'wrangler';
-import { newRoom, type Room } from '../lib/game';
+import { archiveGame, type ArchivedGame } from '../lib/archive';
+import { applyAction, newRoom, type Room } from '../lib/game';
 import {
   account,
   deleteAccount,
@@ -11,6 +12,7 @@ import {
   signIn,
   signOut,
 } from '../worker/accounts';
+import { deleteGame, listGames, saveGame } from '../worker/archive-api';
 import { hashToken } from '../worker/identity';
 
 // A throwaway local D1 with every migration applied, as production has.
@@ -59,6 +61,53 @@ async function addRoom(
     )
     .bind(id, JSON.stringify(room), updatedAt)
     .run();
+}
+/** A finished game (red resigns at once), dated `minutes` after now. */
+function finished(id: string, minutes = 0): ArchivedGame {
+  const room = newRoom(id, { id: 'red', name: '红' }, 0, now);
+  applyAction(room, 'black', { action: 'join', name: '黑' }, now);
+  applyAction(room, 'red', { action: 'resign' }, now);
+  return archiveGame(room, {
+    id,
+    mode: { kind: 'friend' },
+    viewerSide: 'red',
+    date: new Date(now + minutes * 60000).toISOString(),
+  });
+}
+const games = (
+  token: string,
+  { method = 'GET', query = '', body = '' } = {},
+  headers: Record<string, string> = {},
+) =>
+  new Request('https://chess.example/api/games' + query, {
+    method,
+    headers: { cookie: `chuhan_session=${token}`, ...headers },
+    ...(body ? { body } : {}),
+  });
+const upload = (token: string, game: unknown) =>
+  saveGame(games(token, { method: 'POST', body: JSON.stringify(game) }), db);
+async function listAll(token: string) {
+  const pages: string[][] = [];
+  let before: string | null = null;
+  do {
+    const query: string = before ? '?before=' + encodeURIComponent(before) : '';
+    const response = await listGames(games(token, { query }), db);
+    assert.equal(response.status, 200);
+    const page = (await response.json()) as {
+      games: ArchivedGame[];
+      next: string | null;
+    };
+    pages.push(page.games.map((game) => game.id));
+    before = page.next;
+  } while (before);
+  return pages;
+}
+async function storedGames(userId: string) {
+  const row = await db
+    .prepare('SELECT COUNT(*) AS n FROM archived_games WHERE user_id = ?')
+    .bind(userId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
 }
 async function readRoom(id: string) {
   const row = await db
@@ -201,7 +250,7 @@ await test('退出登录删除会话', async () => {
   await signOut(db, me.device);
   assert.equal((await player(request(token), db)).signedIn, false);
 });
-await test('删除账号后登录方式和所有会话一并删除，同一 Google 账号再登录是新账号', async () => {
+await test('删除账号后登录方式、对局和所有会话一并删除，同一 Google 账号再登录是新账号', async () => {
   const first = await signIn(
     db,
     google('g-5'),
@@ -215,6 +264,7 @@ await test('删除账号后登录方式和所有会话一并删除，同一 Goog
     now,
   );
   const me = await player(request(first), db);
+  assert.equal((await upload(first, finished('friend:gone:1'))).status, 204);
   await deleteAccount(db, me.id);
   assert.equal((await player(request(first), db)).signedIn, false);
   assert.equal(
@@ -222,7 +272,7 @@ await test('删除账号后登录方式和所有会话一并删除，同一 Goog
     false,
     '其他设备也一并退出',
   );
-  for (const table of ['users', 'identities', 'sessions']) {
+  for (const table of ['users', 'identities', 'sessions', 'archived_games']) {
     const row = await db
       .prepare(
         `SELECT COUNT(*) AS n FROM ${table} WHERE ${table === 'users' ? 'id' : 'user_id'} = ?`,
@@ -238,6 +288,133 @@ await test('删除账号后登录方式和所有会话一并删除，同一 Goog
     now,
   );
   assert.notEqual((await player(request(again), db)).id, me.id);
+});
+const gamesA = await signIn(
+  db,
+  google('g-6'),
+  await player(request('1'.repeat(64)), db),
+  now,
+);
+const gamesB = await signIn(
+  db,
+  google('g-6'),
+  await player(request('2'.repeat(64)), db),
+  now,
+);
+const gamesOther = await signIn(
+  db,
+  google('g-7'),
+  await player(request('3'.repeat(64)), db),
+  now,
+);
+await test('对局同步只给登录的玩家，且只接受本站页面的请求', async () => {
+  const anonymous = '4'.repeat(64);
+  assert.equal((await listGames(games(anonymous), db)).status, 401);
+  assert.equal((await upload(anonymous, finished('ai:x:1'))).status, 401);
+  assert.equal(
+    (
+      await deleteGame(
+        games(anonymous, { method: 'DELETE', query: '?id=a' }),
+        db,
+      )
+    ).status,
+    401,
+  );
+  const foreign = { origin: 'https://evil.example' };
+  assert.equal((await listGames(games(gamesA, {}, foreign), db)).status, 403);
+  assert.equal(
+    (
+      await saveGame(
+        games(
+          gamesA,
+          { method: 'POST', body: JSON.stringify(finished('ai:x:1')) },
+          { 'sec-fetch-site': 'cross-site' },
+        ),
+        db,
+      )
+    ).status,
+    403,
+  );
+  const me = await player(request(gamesA), db);
+  assert.equal(await storedGames(me.id), 0, '被拒的请求什么都没存');
+});
+await test('上传按对局编号只存一次，另一台设备看到同样的列表', async () => {
+  const first = finished('friend:room:1', 1);
+  assert.equal((await upload(gamesA, first)).status, 204);
+  const again = { ...first, players: { red: '改过', black: '改过' } };
+  assert.equal((await upload(gamesA, again)).status, 204, '重复上传也算成功');
+  const me = await player(request(gamesA), db);
+  assert.equal(await storedGames(me.id), 1);
+  const read = await listGames(
+    games(gamesB, { query: '?id=' + encodeURIComponent(first.id) }),
+    db,
+  );
+  assert.deepEqual(
+    ((await read.json()) as { game: ArchivedGame }).game,
+    first,
+    '第二台设备读到第一次上传的原样',
+  );
+  assert.deepEqual(await listAll(gamesB), [['friend:room:1']]);
+  assert.deepEqual(await listAll(gamesOther), [[]], '别的账号看不到');
+});
+await test('列表新的在前，每页 50 局；超过 200 局时删掉最旧的', async () => {
+  const me = await player(request(gamesA), db);
+  // Dated before the first game, so they line up behind it.
+  for (let i = 0; i < 204; i++)
+    assert.equal(
+      (await upload(gamesA, finished(`ai:many:${i}`, i - 300))).status,
+      204,
+    );
+  assert.equal(await storedGames(me.id), 200);
+  const pages = await listAll(gamesB);
+  assert.deepEqual(
+    pages.map((page) => page.length),
+    [50, 50, 50, 50],
+  );
+  const ids = pages.flat();
+  assert.equal(ids[0], 'friend:room:1');
+  assert.equal(ids[1], 'ai:many:203');
+  assert.equal(ids.at(-1), 'ai:many:5', '最旧的 5 局被删掉');
+  assert.equal(new Set(ids).size, 200);
+  // Older than all 200: stored and dropped at once, so the list stays the same.
+  assert.equal((await upload(gamesA, finished('ai:old:1', -999))).status, 204);
+  assert.deepEqual(await listAll(gamesB), pages);
+  assert.equal(
+    (await listGames(games(gamesA, { query: '?before=nonsense' }), db)).status,
+    400,
+  );
+});
+await test('拒绝无效、过大的对局', async () => {
+  const me = await player(request(gamesOther), db);
+  const post = (body: string) =>
+    saveGame(games(gamesOther, { method: 'POST', body }), db);
+  assert.equal((await post('{bad json')).status, 400);
+  assert.equal(
+    (await upload(gamesOther, { ...finished('ai:bad:1'), moves: ['a0a1'] }))
+      .status,
+    400,
+  );
+  assert.equal(
+    (await upload(gamesOther, { ...finished('ai:bad:2'), version: 2 })).status,
+    400,
+  );
+  const huge = finished('ai:bad:3');
+  huge.players.red = '长'.repeat(40000);
+  assert.equal((await upload(gamesOther, huge)).status, 413);
+  assert.equal(await storedGames(me.id), 0);
+});
+await test('删除单局只删自己的', async () => {
+  const id = encodeURIComponent('friend:room:1');
+  const remove = (token: string, query = '?id=' + id) =>
+    deleteGame(games(token, { method: 'DELETE', query }), db);
+  const exists = async (token: string) =>
+    (await listGames(games(token, { query: '?id=' + id }), db)).status;
+  assert.equal((await remove(gamesOther)).status, 204);
+  assert.equal(await exists(gamesA), 200, '别的账号删不掉');
+  assert.equal(await exists(gamesOther), 404);
+  assert.equal((await remove(gamesB, '')).status, 400);
+  assert.equal((await remove(gamesB)).status, 204);
+  assert.equal(await exists(gamesA), 404, '两台设备都看不到了');
 });
 await test('账号表不可用时照常按匿名下棋', async () => {
   const broken = {

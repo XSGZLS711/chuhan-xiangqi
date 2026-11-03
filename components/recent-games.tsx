@@ -3,17 +3,22 @@ import { useEffect, useState } from 'react';
 import { History, ChevronRight } from 'lucide-react';
 import { archiveLabel, type ArchivedGame } from '@/lib/archive';
 import { gameArchive } from '@/lib/archive-storage';
+import { syncAccountArchive } from '@/lib/archive-sync';
 
-export default function RecentGames() {
-  const [games, setGames] = useState<ArchivedGame[]>([]);
+export default function RecentGames({ signedIn }: { signedIn: boolean }) {
+  const [local, setLocal] = useState<ArchivedGame[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  // Signed in: this browser's games merged with the account's.
+  const [synced, setSynced] = useState<ArchivedGame[] | null>(null);
+  const [syncError, setSyncError] = useState('');
+  const games = (signedIn && synced) || local;
   useEffect(() => {
     let active = true;
     void gameArchive()
       .list()
       .then((games) => {
-        if (active) setGames(games);
+        if (active) setLocal(games);
       })
       .catch(() => {
         if (active) setError('当前浏览器无法读取本地对局。');
@@ -25,16 +30,37 @@ export default function RecentGames() {
       active = false;
     };
   }, []);
+  useEffect(() => {
+    if (!signedIn || loading) return;
+    let active = true;
+    void syncAccountArchive(local)
+      .then((games) => {
+        if (!active) return;
+        setSynced(games);
+        setSyncError('');
+      })
+      .catch(() => {
+        if (active) setSyncError('暂时读不到账号里的对局，先显示本机保存的。');
+      });
+    return () => {
+      active = false;
+    };
+  }, [signedIn, loading, local]);
   return (
     <details className="recent-games">
       <summary>
         <History size={18} /> 最近对局 <span>{games.length || ''}</span>
       </summary>
-      <p>仅保存在当前浏览器，最多保留最近 200 局。</p>
+      <p>
+        {signedIn
+          ? '同步到你的账号，换台设备登录也能看到，最多保留最近 200 局。'
+          : '仅保存在当前浏览器，最多保留最近 200 局。'}
+      </p>
+      {!loading && (error || syncError) && (
+        <p role="alert">{error || syncError}</p>
+      )}
       {loading ? (
         <p>正在读取…</p>
-      ) : error ? (
-        <p role="alert">{error}</p>
       ) : games.length ? (
         <ul>
           {games.map((game) => {
@@ -59,7 +85,7 @@ export default function RecentGames() {
             );
           })}
         </ul>
-      ) : (
+      ) : error ? null : (
         <p>还没有已结束的对局，下完一盘后会自动保存在这里。</p>
       )}
     </details>

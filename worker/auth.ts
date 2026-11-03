@@ -1,5 +1,4 @@
 import { env } from 'cloudflare:workers';
-import { GameError } from '../lib/game';
 import {
   account,
   deleteAccount,
@@ -26,8 +25,8 @@ import {
 import {
   expiredSessionCookie,
   identity,
+  sameOrigin,
   sessionCookie,
-  validateRequestOrigin,
 } from './identity';
 
 /** Sign-in is offered only once both values are set (wrangler secret / .dev.vars). */
@@ -43,16 +42,6 @@ function redirect(location: string, cookies: string[]) {
   const headers = new Headers({ ...noStore, Location: location });
   for (const cookie of cookies) headers.append('Set-Cookie', cookie);
   return new Response(null, { status: 302, headers });
-}
-
-function sameOrigin(req: Request) {
-  try {
-    validateRequestOrigin(req);
-    return null;
-  } catch (error) {
-    const status = error instanceof GameError ? error.status : 403;
-    return Response.json({ error: '请求来源不匹配。' }, { status });
-  }
 }
 
 export async function me(req: Request) {

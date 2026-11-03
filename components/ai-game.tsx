@@ -53,7 +53,7 @@ import {
 } from '@/lib/ai-game';
 import { BrowserEngine, aiBase, prepareAiPage } from '@/lib/ai-engine';
 import { useAutoArchive } from '@/lib/use-auto-archive';
-import { getArchivedGame } from '@/lib/archive-storage';
+import { findArchivedGame } from '@/lib/archive-sync';
 import ReviewScreen from '@/components/review-screen';
 import {
   replayArchive,
@@ -163,11 +163,12 @@ export default function AiGame() {
     started && !archived && !archiveId ? `ai:${sessionId}:${room.round}` : null,
     { kind: 'ai', level: match.level },
     match.human,
+    !!account.user,
   );
   useEffect(() => {
     if (!archiveId) return;
     let active = true;
-    void getArchivedGame(archiveId)
+    void findArchivedGame(archiveId)
       .then((game) => {
         const restored = replayArchive(game);
         if (!active) return;

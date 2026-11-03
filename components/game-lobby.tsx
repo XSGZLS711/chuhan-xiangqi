@@ -4,10 +4,12 @@ import RecentGames from './recent-games';
 import { ArrowRight, Bot, GitBranch, Users } from 'lucide-react';
 
 export default function GameLobby({
+  signedIn,
   friendDisabled,
   onCreate,
   onExplore,
 }: {
+  signedIn: boolean;
   friendDisabled: boolean;
   onCreate: () => void;
   onExplore: () => void;
@@ -56,7 +58,7 @@ export default function GameLobby({
           <GitBranch size={16} /> 先随手推演
         </button>
       </div>
-      <RecentGames />
+      <RecentGames signedIn={signedIn} />
     </section>
   );
 }
