@@ -1,19 +1,23 @@
 import { applyAction, newRoom, type Room } from './game';
+import { sideName, t, type Locale, type MessageKey } from './i18n';
+import { moveText, type NotationStyle } from './notation';
+import { NAME } from './tokens';
 import {
   legalMove,
   moveBoard,
-  notation,
   opposite,
   type Board,
   type Side,
 } from './xiangqi';
 
 export const AI_LEVELS = {
-  easy: { label: '入门', skill: -10, depth: 4, time: 250 },
-  medium: { label: '进阶', skill: 0, depth: 9, time: 650 },
-  hard: { label: '挑战', skill: 20, depth: 16, time: 1500 },
+  easy: { skill: -10, depth: 4, time: 250 },
+  medium: { skill: 0, depth: 9, time: 650 },
+  hard: { skill: 20, depth: 16, time: 1500 },
 } as const;
 export type AiLevel = keyof typeof AI_LEVELS;
+export const levelName = (locale: Locale, level: AiLevel) =>
+  t(locale, `ai.level.${level}` as MessageKey);
 export type AiMatch = {
   room: Room;
   human: Side;
@@ -24,14 +28,14 @@ export type AiMatch = {
 export function createAiMatch(human: Side, level: AiLevel, round = 1): AiMatch {
   const room = newRoom(
     'local-ai',
-    { id: 'red', name: human === 'red' ? '我方' : '象棋 AI' },
+    { id: 'red', name: human === 'red' ? NAME.me : NAME.ai },
     0,
     Date.now(),
   );
   applyAction(
     room,
     'black',
-    { action: 'join', name: human === 'black' ? '我方' : '象棋 AI' },
+    { action: 'join', name: human === 'black' ? NAME.me : NAME.ai },
     Date.now(),
   );
   room.round = round;
@@ -129,26 +133,35 @@ export function describeLine(
   turn: Side,
   moves: string[],
   limit = 5,
+  style: NotationStyle = 'chinese',
 ): string[] {
   const result: string[] = [];
   for (const token of moves.slice(0, limit)) {
     const move = engineMove(token);
     if (!move || !legalMove(board, move.from, move.to, turn)) break;
-    result.push(notation(board, move.from, move.to));
+    result.push(moveText(board, move.from, move.to, style));
     board = moveBoard(board, move.from, move.to);
     turn = opposite(turn);
   }
   return result;
 }
-export function evaluationLabel(info: EngineInfo | null): string {
-  if (!info) return '等待分析';
+export function evaluationLabel(
+  info: EngineInfo | null,
+  locale: Locale = 'zh',
+): string {
+  if (!info) return t(locale, 'eval.waiting');
   if (info.mate !== undefined)
-    return info.mate > 0
-      ? '红方有杀棋'
-      : info.mate < 0
-        ? '黑方有杀棋'
-        : '已到终局';
+    return t(
+      locale,
+      info.mate > 0
+        ? 'eval.redMate'
+        : info.mate < 0
+          ? 'eval.blackMate'
+          : 'eval.ended',
+    );
   const cp = info.cp ?? 0;
-  if (Math.abs(cp) < 50) return '局势均衡';
-  return `${cp > 0 ? '红方' : '黑方'}${Math.abs(cp) < 200 ? '略优' : '明显占优'}`;
+  if (Math.abs(cp) < 50) return t(locale, 'eval.even');
+  return t(locale, Math.abs(cp) < 200 ? 'eval.slight' : 'eval.clear', {
+    side: sideName(locale, cp > 0 ? 'red' : 'black'),
+  });
 }
