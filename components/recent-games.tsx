@@ -4,14 +4,17 @@ import { History, ChevronRight } from 'lucide-react';
 import { archiveLabel, type ArchivedGame } from '@/lib/archive';
 import { gameArchive } from '@/lib/archive-storage';
 import { syncAccountArchive } from '@/lib/archive-sync';
+import { formatDateTime, reasonText } from '@/lib/i18n';
+import { useLocale } from '@/lib/use-locale';
 
 export default function RecentGames({ signedIn }: { signedIn: boolean }) {
+  const { locale, t, tn } = useLocale();
   const [local, setLocal] = useState<ArchivedGame[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [error, setError] = useState(false);
   // Signed in: this browser's games merged with the account's.
   const [synced, setSynced] = useState<ArchivedGame[] | null>(null);
-  const [syncError, setSyncError] = useState('');
+  const [syncError, setSyncError] = useState(false);
   const games = (signedIn && synced) || local;
   useEffect(() => {
     let active = true;
@@ -21,7 +24,7 @@ export default function RecentGames({ signedIn }: { signedIn: boolean }) {
         if (active) setLocal(games);
       })
       .catch(() => {
-        if (active) setError('当前浏览器无法读取本地对局。');
+        if (active) setError(true);
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -37,10 +40,10 @@ export default function RecentGames({ signedIn }: { signedIn: boolean }) {
       .then((games) => {
         if (!active) return;
         setSynced(games);
-        setSyncError('');
+        setSyncError(false);
       })
       .catch(() => {
-        if (active) setSyncError('暂时读不到账号里的对局，先显示本机保存的。');
+        if (active) setSyncError(true);
       });
     return () => {
       active = false;
@@ -49,34 +52,38 @@ export default function RecentGames({ signedIn }: { signedIn: boolean }) {
   return (
     <details className="recent-games">
       <summary>
-        <History size={18} /> 最近对局 <span>{games.length || ''}</span>
+        <History size={18} /> {t('recent.title')}{' '}
+        <span>{games.length || ''}</span>
       </summary>
-      <p>
-        {signedIn
-          ? '同步到你的账号，换台设备登录也能看到，最多保留最近 200 局。'
-          : '仅保存在当前浏览器，最多保留最近 200 局。'}
-      </p>
+      <p>{t(signedIn ? 'recent.synced' : 'recent.local')}</p>
       {!loading && (error || syncError) && (
-        <p role="alert">{error || syncError}</p>
+        <p role="alert">{t(error ? 'recent.readError' : 'recent.syncError')}</p>
       )}
       {loading ? (
-        <p>正在读取…</p>
+        <p>{t('recent.loading')}</p>
       ) : games.length ? (
         <ul>
           {games.map((game) => {
-            const label = archiveLabel(game);
+            const label = archiveLabel(game, locale);
             return (
               <li key={game.id}>
                 <a href={`./ai/?game=${encodeURIComponent(game.id)}`}>
                   <span>
                     <strong>{label.opponent}</strong>
                     <small>
-                      {new Date(game.date).toLocaleString('zh-CN')} ·{' '}
-                      {game.mode.kind === 'ai' ? '人机' : '好友'} ·{' '}
-                      {game.moves.length} 步
+                      {formatDateTime(locale, game.date)} ·{' '}
+                      {t(
+                        game.mode.kind === 'ai'
+                          ? 'recent.mode.ai'
+                          : 'recent.mode.friend',
+                      )}{' '}
+                      · {tn('recent.moves', game.moves.length)}
                     </small>
                   </span>
-                  <span className="archive-result" title={game.result.reason}>
+                  <span
+                    className="archive-result"
+                    title={reasonText(locale, game.result.reason)}
+                  >
                     {label.result}
                   </span>
                   <ChevronRight size={17} />
@@ -86,7 +93,7 @@ export default function RecentGames({ signedIn }: { signedIn: boolean }) {
           })}
         </ul>
       ) : error ? null : (
-        <p>还没有已结束的对局，下完一盘后会自动保存在这里。</p>
+        <p>{t('recent.empty')}</p>
       )}
     </details>
   );

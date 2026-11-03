@@ -1,7 +1,12 @@
 'use client';
 import './lobby.css';
 import { useEffect, useRef, useState } from 'react';
-import { gameFetch, invitationUrl } from '@/lib/client-api';
+import { apiError, gameFetch, invitationUrl } from '@/lib/client-api';
+import { errorInfo, errorText, type ErrorInfo } from '@/lib/errors';
+import { playerName, reasonText, sideName, type MessageKey } from '@/lib/i18n';
+import { historyMoveText } from '@/lib/notation';
+import { useLocale } from '@/lib/use-locale';
+import LanguageSwitch from '@/components/language-switch';
 import ChessBoard from '@/components/chess-board';
 import CapturedTray from '@/components/captured-tray';
 import GameActions from '@/components/game-actions';
@@ -10,12 +15,7 @@ import ChatLog from '@/components/chat-log';
 import GameSheet from '@/components/game-sheet';
 import MobileDock from '@/components/mobile-dock';
 import GameLobby from '@/components/game-lobby';
-import {
-  canPlayLive,
-  rematchControl,
-  recentChat,
-  displayNotation,
-} from '@/lib/mobile-game';
+import { canPlayLive, rematchControl, recentChat } from '@/lib/mobile-game';
 import { useGameViewport } from '@/lib/use-game-viewport';
 import { useAutoArchive } from '@/lib/use-auto-archive';
 import { archiveGame } from '@/lib/archive';
@@ -42,10 +42,9 @@ import {
   Side,
   opposite,
   inCheck,
-  notation,
   Board,
-  sideLabel,
 } from '@/lib/xiangqi';
+import { NAME } from '@/lib/tokens';
 import type { PublicRoom } from '@/lib/game';
 import {
   Users,
@@ -96,17 +95,37 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 type Analysis = {
   boards: Board[];
   turns: Side[];
-  texts: string[];
+  /** Squares of each move played on the branch. */
+  moves: [number, number][];
   base: number;
 };
+/** What the banner says: a dictionary key or an error code, never a finished sentence, so
+ * switching language rewrites it in place. `sticky` banners wait to be resolved instead
+ * of fading; `connection` ones go away once the room answers again. */
+type Notice = {
+  text: { key: MessageKey } | { error: ErrorInfo };
+  sticky?: boolean;
+  connection?: boolean;
+};
+const note = (key: MessageKey, flags: Partial<Notice> = {}): Notice => ({
+  text: { key },
+  ...flags,
+});
+const STICKY = ['unavailable', 'join-failed', 'connection-lost'];
+const CONNECTION = ['unavailable', 'connection-lost'];
+/** A failure as a banner; the ones about the connection stay until it is back. */
+function problem(error: unknown, fallback: Parameters<typeof errorInfo>[1]) {
+  const info = errorInfo(error, fallback);
+  return {
+    text: { error: info },
+    sticky: !!info.code && STICKY.includes(info.code),
+    connection: !!info.code && CONNECTION.includes(info.code),
+  } satisfies Notice;
+}
 const emptyBoard = initialBoard();
-const timeOptions = [
-  { value: '0', label: '不限时 · 从容对弈' },
-  { value: '10', label: '每方 10 分钟' },
-  { value: '20', label: '每方 20 分钟' },
-  { value: '30', label: '每方 30 分钟' },
-];
+const timeValues = ['0', '10', '20', '30'];
 export default function Home() {
+  const { locale, t, tn, notation } = useLocale();
   const { settings, setSetting } = useEffectSettings();
   const account = useAccount();
   const sound = settings.sound;
@@ -117,13 +136,13 @@ export default function Home() {
     [connection, setConnection] = useState<'online' | 'offline' | 'loading'>(
       'loading',
     );
-  const [name, setName] = useState('棋友'),
+  const [name, setName] = useState<string>(NAME.player),
     [minutes, setMinutes] = useState('0'),
     [modal, setModal] = useState<'create' | 'rules' | 'invite' | 'name' | null>(
       null,
     ),
     [confirm, setConfirm] = useState<'resign' | 'rematch' | null>(null);
-  const [message, setMessage] = useState(''),
+  const [message, setMessage] = useState<Notice | null>(null),
     [selected, setSelected] = useState<number | null>(null),
     [flipped, setFlipped] = useState(false),
     [tick, setTick] = useState(Date.now()),
@@ -132,7 +151,7 @@ export default function Home() {
     [chat, setChat] = useState(''),
     [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null),
     [sheet, setSheet] = useState<'record' | null>(null);
-  const archiveError = useAutoArchive(
+  const archiveFailed = useAutoArchive(
     room,
     room ? `friend:${room.id}:${room.round}` : null,
     { kind: 'friend' },
@@ -174,8 +193,8 @@ export default function Home() {
   }, [boardEffect]);
   // Hints fade on their own; connection trouble stays until it is resolved.
   useEffect(() => {
-    if (!message || /连接|重连/.test(message)) return;
-    const timer = setTimeout(() => setMessage(''), 5200);
+    if (!message || message.sticky) return;
+    const timer = setTimeout(() => setMessage(null), 5200);
     return () => clearTimeout(timer);
   }, [message]);
   useEffect(() => () => audioRef.current?.close(), []);
@@ -210,11 +229,7 @@ export default function Home() {
     roomRef.current = r;
     setRoom(r);
     setConnection('online');
-    setMessage((m) =>
-      m.includes('连接不上') || m.includes('连接中断') || m.includes('无法连接')
-        ? ''
-        : m,
-    );
+    setMessage((m) => (m?.connection ? null : m));
     if (r.you && orientationRoom.current !== r.id) {
       setFlipped(r.you === 'black');
       orientationRoom.current = r.id;
@@ -227,15 +242,18 @@ export default function Home() {
       '/api/game?room=' + encodeURIComponent(id) + query,
       { cache: 'no-store', signal: AbortSignal.timeout(12000) },
     );
-    const data = (await res.json()) as PublicRoom & { error?: string };
-    if (!res.ok) throw new Error(data.error);
+    const data = (await res.json()) as PublicRoom & {
+      error?: string;
+      code?: string;
+    };
+    if (!res.ok) throw apiError(data, res.status, 'unavailable');
     return data as PublicRoom;
   }
   useEffect(() => {
     alive.current = true;
     setRoomId(new URLSearchParams(location.search).get('room') || '');
     try {
-      setName(localStorage.getItem('chuhan-name') || '棋友');
+      setName(localStorage.getItem('chuhan-name') || NAME.player);
     } catch {}
     const initialize = async () => {
       try {
@@ -248,7 +266,9 @@ export default function Home() {
         setConnection('online');
       } catch {
         setConnection('offline');
-        setMessage('暂时连接不上棋室，点击右上角重新连接。');
+        setMessage(
+          note('msg.reconnectHint', { sticky: true, connection: true }),
+        );
       }
     };
     void initialize();
@@ -289,21 +309,27 @@ export default function Home() {
               name: nameRef.current,
             }),
           });
-          const joined = (await res.json()) as PublicRoom & { error?: string };
+          const joined = (await res.json()) as PublicRoom & {
+            error?: string;
+            code?: string;
+          };
           if (disposed) return;
           if (res.ok) update(joined);
           else {
             autoJoin.current = '';
             if (res.status !== 409)
-              setMessage(joined.error || '入座未成功，请重新连接。');
+              setMessage(
+                problem(
+                  apiError(joined, res.status, 'join-failed'),
+                  'join-failed',
+                ),
+              );
           }
         }
       } catch (e) {
         if (!disposed) {
           setConnection('offline');
-          setMessage(
-            e instanceof Error ? e.message : '棋室连接中断，正在重连。',
-          );
+          setMessage(problem(e, 'connection-lost'));
         }
       } finally {
         // Spaced from the start of the last request, so an answer that comes back at
@@ -332,10 +358,10 @@ export default function Home() {
       setReady(true);
       if (roomId) update(await fetchRoom(roomId));
       setConnection('online');
-      setMessage('连接已恢复。');
+      setMessage(note('msg.restored', { sticky: true }));
     } catch {
       setConnection('offline');
-      setMessage('仍然无法连接，请检查网络后再试。');
+      setMessage(note('msg.stillOffline', { sticky: true, connection: true }));
     }
   }
   async function action(
@@ -358,14 +384,17 @@ export default function Home() {
           ...extra,
         }),
       });
-      const data = (await res.json()) as PublicRoom & { error?: string };
+      const data = (await res.json()) as PublicRoom & {
+        error?: string;
+        code?: string;
+      };
       if (!res.ok) {
         if (res.status === 409 && current) update(await fetchRoom(current.id));
-        throw new Error(data.error || '操作未成功。');
+        throw apiError(data, res.status, 'action-failed');
       }
       update(data);
       setSelected(null);
-      setMessage('');
+      setMessage(null);
       if (kind === 'create') {
         setReady(true);
         setRoomId(data.id);
@@ -374,7 +403,7 @@ export default function Home() {
       }
       return true;
     } catch (e) {
-      setMessage(e instanceof Error ? e.message : '网络不稳定，请稍后重试。');
+      setMessage(problem(e, 'network-unstable'));
       return false;
     } finally {
       locked.current = false;
@@ -383,7 +412,7 @@ export default function Home() {
   }
   function rememberName() {
     try {
-      localStorage.setItem('chuhan-name', name.trim() || '棋友');
+      localStorage.setItem('chuhan-name', name.trim() || NAME.player);
     } catch {}
   }
   const historyMoves = room?.history ?? [],
@@ -416,7 +445,7 @@ export default function Home() {
     if (!analysis) {
       if (review !== null) return;
       if (!room) {
-        setMessage('创建好友对局开始对弈，或点击“推演”先试试棋。');
+        setMessage(note('play.noRoom'));
         return;
       }
       // Off-turn touches are deliberately silent and never select a piece.
@@ -429,7 +458,7 @@ export default function Home() {
           ...analysis,
           boards: [...analysis.boards, next],
           turns: [...analysis.turns, opposite(turn)],
-          texts: [...analysis.texts, notation(board, selected, n)],
+          moves: [...analysis.moves, [selected, n]],
         });
         const feedback = branchFeedback(
           board,
@@ -446,8 +475,8 @@ export default function Home() {
       setSelected(null);
     } else if (board[n]?.side === turn) {
       setSelected(n === selected ? null : n);
-      setMessage('');
-    } else if (selected !== null) setMessage('这一步不可走，请选择标记位置。');
+      setMessage(null);
+    } else if (selected !== null) setMessage(note('play.illegal'));
   }
   function returnToLive() {
     setBoardEffect(null);
@@ -460,7 +489,7 @@ export default function Home() {
   }
   function rematch() {
     if (!room) return;
-    const control = rematchControl(room, busy);
+    const control = rematchControl(room, busy, locale);
     if (control.disabled) return;
     if (control.intent === 'accept') void action('respond', { accept: true });
     else if (room.result) void action('offer-rematch');
@@ -489,18 +518,18 @@ export default function Home() {
     setAnalysis({
       boards: [board],
       turns: [turn],
-      texts: [],
+      moves: [],
       base: reviewIndex,
     });
     setSelected(null);
-    setMessage('');
+    setMessage(null);
   }
   function exitAnalysis() {
     setBoardEffect(null);
     setAnalysis(null);
     setReview(null);
     setSelected(null);
-    setMessage('');
+    setMessage(null);
   }
   function navigate(n: number) {
     setBoardEffect(null);
@@ -536,27 +565,44 @@ export default function Home() {
   async function copyInvite() {
     try {
       await navigator.clipboard.writeText(inviteUrl);
-      setMessage('邀请链接已复制，发给好友即可入座。');
+      setMessage(note('msg.inviteCopied'));
     } catch {
       setModal('invite');
-      setMessage('请长按或选中链接复制。');
+      setMessage(note('msg.copyManually'));
     }
   }
   function download() {
     if (!room) return;
     const lines = [
-      `楚汉棋社 · 第 ${room.round} 局`,
-      `${room.players.red.name}（红） 对 ${room.players.black?.name ?? '待入座'}（黑）`,
+      t('export.title', { round: room.round }),
+      t('export.players', {
+        red: playerName(locale, room.players.red.name),
+        black: room.players.black
+          ? playerName(locale, room.players.black.name)
+          : t('export.waiting'),
+      }),
       room.result
-        ? `${room.result.winner === 'draw' ? '和棋' : sideLabel(room.result.winner) + '胜'} · ${room.result.reason}`
-        : '对弈中',
+        ? t('export.result', {
+            outcome:
+              room.result.winner === 'draw'
+                ? t('result.draw')
+                : t('result.sideWon', {
+                    side: sideName(locale, room.result.winner),
+                  }),
+            reason: reasonText(locale, room.result.reason),
+          })
+        : t('export.inProgress'),
       '',
-      ...historyMoves.map(
-        (m, i) =>
-          `${i + 1}. ${sideLabel(m.side)} ${displayNotation(m.text)}${m.check ? ' 将军' : ''}`,
+      ...historyMoves.map((m, i) =>
+        t('export.move', {
+          n: i + 1,
+          side: sideName(locale, m.side),
+          text: historyMoveText(m, notation),
+          check: m.check ? t('export.check') : '',
+        }),
       ),
       '',
-      '坐标记录：',
+      t('export.coordinates'),
       ...historyMoves.map(
         (m) =>
           `${m.from % 9},${Math.floor(m.from / 9)} → ${m.to % 9},${Math.floor(m.to / 9)}`,
@@ -567,7 +613,7 @@ export default function Home() {
     );
     const a = document.createElement('a');
     a.href = url;
-    a.download = `楚汉棋谱-第${room.round}局.txt`;
+    a.download = t('export.filename', { round: room.round });
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
@@ -580,7 +626,7 @@ export default function Home() {
   }
   function clockText(s: Side) {
     const remaining = clockMs(s);
-    if (remaining === null) return '不限时';
+    if (remaining === null) return t('room.clock.unlimited');
     const secs = Math.ceil(remaining / 1000);
     return `${String(Math.floor(secs / 60)).padStart(2, '0')}:${String(secs % 60).padStart(2, '0')}`;
   }
@@ -590,15 +636,17 @@ export default function Home() {
         <Tabs defaultValue="record">
           <div className="panel-heading">
             <TabsList variant="line">
-              <TabsTrigger value="record">对局棋谱</TabsTrigger>
+              <TabsTrigger value="record">{t('record.tab')}</TabsTrigger>
               <TabsTrigger value="chat">
-                棋友聊天 {room?.chat.length ? `· ${room.chat.length}` : ''}
+                {t('chat.tab', {
+                  count: room?.chat.length ? `· ${room.chat.length}` : '',
+                })}
               </TabsTrigger>
             </TabsList>
             <button
               className="icon-button"
-              aria-label="导出棋谱"
-              title="导出棋谱"
+              aria-label={t('record.export')}
+              title={t('record.export')}
               disabled={!room}
               onClick={download}
             >
@@ -623,13 +671,13 @@ export default function Home() {
                   setSheet(null);
                 }}
               >
-                返回对局
+                {t('play.backToGame')}
               </button>
               <button
                 className="primary-button compact"
                 onClick={startAnalysis}
               >
-                从此处推演
+                {t('play.exploreFromHere')}
               </button>
             </div>
           </TabsContent>
@@ -647,15 +695,19 @@ export default function Home() {
               }}
             >
               <input
-                aria-label="聊天消息"
-                placeholder={participant ? '和棋友说句话…' : '观战中'}
+                aria-label={t('chat.message')}
+                placeholder={t(
+                  participant
+                    ? 'chat.placeholder'
+                    : 'chat.placeholder.watching',
+                )}
                 value={chat}
                 maxLength={120}
                 disabled={!participant}
                 onChange={(e) => setChat(e.target.value)}
               />
               <button
-                aria-label="发送消息"
+                aria-label={t('chat.send')}
                 disabled={!participant || !chat.trim() || busy}
               >
                 <Send size={18} />
@@ -699,19 +751,28 @@ export default function Home() {
               {p && (
                 <i
                   className={`presence-dot ${p.online ? 'present' : ''}`}
-                  title={`${p.online ? '在线' : '暂时离线'} · ${sideLabel(s)}`}
+                  title={t('room.presence.title', {
+                    state: t(
+                      p.online
+                        ? 'room.presence.online'
+                        : 'room.presence.offline',
+                    ),
+                    side: sideName(locale, s),
+                  })}
                 />
               )}
               <span className="player-name">
-                {p ? p.name : s === 'black' ? '虚位以待' : '我方'}
+                {p
+                  ? playerName(locale, p.name)
+                  : t(s === 'black' ? 'room.seatOpen' : 'room.you')}
               </span>
-              {me && <em className="player-tag">我方</em>}
+              {me && <em className="player-tag">{t('room.you')}</em>}
               {me && (
                 <button
                   className="inline-link"
                   onClick={() => setModal('name')}
                 >
-                  改名
+                  {t('room.rename')}
                 </button>
               )}
             </strong>
@@ -726,22 +787,31 @@ export default function Home() {
       </div>
     );
   }
-  const pillText = analysis
-    ? '独立推演'
-    : review !== null
-      ? '棋谱复盘'
-      : room?.result
-        ? '对局结束'
-        : room && !room.you
-          ? '观战中'
-          : room?.players.black
-            ? check
-              ? '将军！'
-              : sideLabel(room.turn) + '走棋'
-            : room
-              ? '等待好友'
-              : '正在连接';
-  const rematchButton = room ? rematchControl(room, busy) : null;
+  const pillText = t(
+    analysis
+      ? 'room.status.exploring'
+      : review !== null
+        ? 'room.pill.replay'
+        : room?.result
+          ? 'room.pill.over'
+          : room && !room.you
+            ? 'room.status.watching'
+            : room?.players.black
+              ? check
+                ? 'room.pill.check'
+                : 'room.pill.toMove'
+              : room
+                ? 'room.status.waiting'
+                : 'room.pill.connecting',
+    { side: room ? sideName(locale, room.turn) : '' },
+  );
+  const timeOptions = timeValues.map((value) => ({
+    value,
+    label: t(value === '0' ? 'play.clock.unlimited' : 'play.clock.limit', {
+      n: value,
+    }),
+  }));
+  const rematchButton = room ? rematchControl(room, busy, locale) : null;
   const ended = !!room?.result && !analysis && review === null;
   const lobby = !room && !roomId && !analysis;
   return (
@@ -754,15 +824,15 @@ export default function Home() {
       <header className="site-header">
         <a href="./" className="brand">
           <span className="brand-seal">楚</span>
-          <span>楚汉棋社</span>
+          <span>{t('brand.name')}</span>
         </a>
         <div className="header-tools">
           {!lobby && (
             <>
               <button
                 className="text-button icon-tool"
-                aria-label="翻转棋盘"
-                title="翻转棋盘"
+                aria-label={t('room.flip')}
+                title={t('room.flip')}
                 onClick={() => {
                   setFlipped(!flipped);
                   setSelected(null);
@@ -772,8 +842,10 @@ export default function Home() {
               </button>
               <button
                 className="text-button icon-tool"
-                aria-label={sound ? '关闭对局音效' : '开启对局音效'}
-                title={sound ? '关闭音效' : '开启音效'}
+                aria-label={t(
+                  sound ? 'room.sound.off.label' : 'room.sound.on.label',
+                )}
+                title={t(sound ? 'room.sound.off' : 'room.sound.on')}
                 onClick={toggleSound}
               >
                 {sound ? <Volume2 size={17} /> : <VolumeX size={17} />}
@@ -781,8 +853,12 @@ export default function Home() {
             </>
           )}
           <button
-            title={connection === 'online' ? '棋室已连接' : '点击重新连接'}
-            aria-label="重新连接棋室"
+            title={t(
+              connection === 'online'
+                ? 'room.connected'
+                : 'room.reconnect.hint',
+            )}
+            aria-label={t('room.reconnect.label')}
             className={`text-button connection-${connection}`}
             onClick={reconnect}
           >
@@ -794,42 +870,47 @@ export default function Home() {
           </button>
           <button
             className="text-button"
-            aria-label="对局规则"
-            title="对局规则"
+            aria-label={t('room.rules')}
+            title={t('room.rules')}
             onClick={() => setModal('rules')}
           >
-            <BookOpen size={17} /> <span className="tool-label">对局规则</span>
+            <BookOpen size={17} />{' '}
+            <span className="tool-label">{t('room.rules')}</span>
           </button>
+          <LanguageSwitch />
           <AccountMenu account={account} />
         </div>
       </header>
       {room && (
         <div className="mobile-room-nav">
           <span className="mobile-room-title">
-            <strong>好友对弈</strong> <small>第 {room.round} 局</small>
+            <strong>{t('room.friendGame')}</strong>{' '}
+            <small>{t('room.round', { n: room.round })}</small>
           </span>
           <span className={`mobile-room-status ${check ? 'check-status' : ''}`}>
-            {analysis
-              ? '独立推演'
-              : review !== null
-                ? '复盘中'
-                : room.result
-                  ? '本局结束'
-                  : !room.players.black
-                    ? '等待好友'
-                    : !room.you
-                      ? '观战中'
-                      : check
-                        ? room.you === room.turn
-                          ? '将军 · 请应将'
-                          : '对方应将'
-                        : room.you === room.turn
-                          ? '轮到你走'
-                          : '对方思考中'}
+            {t(
+              analysis
+                ? 'room.status.exploring'
+                : review !== null
+                  ? 'room.status.replaying'
+                  : room.result
+                    ? 'room.status.over'
+                    : !room.players.black
+                      ? 'room.status.waiting'
+                      : !room.you
+                        ? 'room.status.watching'
+                        : check
+                          ? room.you === room.turn
+                            ? 'room.status.checkYou'
+                            : 'room.status.checkThem'
+                          : room.you === room.turn
+                            ? 'room.status.yourTurn'
+                            : 'room.status.theirTurn',
+            )}
           </span>
           <button
             className={`mobile-connect connection-${connection}`}
-            aria-label="重新连接棋室"
+            aria-label={t('room.reconnect.label')}
             onClick={reconnect}
           >
             {connection === 'online' ? (
@@ -840,22 +921,24 @@ export default function Home() {
           </button>
           <button className="mobile-invite" onClick={copyInvite}>
             <Users size={16} />
-            <span>邀请</span>
+            <span>{t('room.invite')}</span>
           </button>
         </div>
       )}
       {room?.offer && (
         <div className="mobile-offer-bar" role="status">
           <span>
-            {room.offer.side === room.you
-              ? '等待好友回应'
-              : room.offer.kind === 'draw'
-                ? '好友提议和棋'
-                : '好友邀你再战'}
+            {t(
+              room.offer.side === room.you
+                ? 'room.waitingReply'
+                : room.offer.kind === 'draw'
+                  ? 'room.offer.draw'
+                  : 'room.offer.rematch',
+            )}
           </span>
           {room.offer.side === room.you ? (
             <button disabled={busy} onClick={() => void action('cancel-offer')}>
-              撤回
+              {t('room.offer.withdraw')}
             </button>
           ) : participant ? (
             <>
@@ -863,36 +946,50 @@ export default function Home() {
                 disabled={busy}
                 onClick={() => void action('respond', { accept: false })}
               >
-                婉拒
+                {t('room.offer.decline')}
               </button>
               <button
                 className="accept-offer"
                 disabled={busy}
                 onClick={() => void action('respond', { accept: true })}
               >
-                {room.offer.kind === 'rematch' ? '应邀出战' : '同意'}
+                {t(
+                  room.offer.kind === 'rematch'
+                    ? 'room.offer.acceptRematch'
+                    : 'room.offer.accept',
+                )}
               </button>
             </>
           ) : null}
         </div>
       )}
-      {archiveError && (
+      {archiveFailed && (
         <p className="notice" role="alert">
-          {archiveError}
+          {t('archive.saveFailed')}
         </p>
       )}
       {account.notice && (
         <output className="notice">
           <span>{account.notice}</span>
-          <button aria-label="关闭提示" onClick={account.clearNotice}>
+          <button
+            aria-label={t('notice.dismiss')}
+            onClick={account.clearNotice}
+          >
             <X size={15} />
           </button>
         </output>
       )}
       {message && (
         <div className="notice" role="status">
-          <span>{message}</span>
-          <button aria-label="关闭提示" onClick={() => setMessage('')}>
+          <span>
+            {'key' in message.text
+              ? t(message.text.key)
+              : errorText(locale, message.text.error)}
+          </span>
+          <button
+            aria-label={t('notice.dismiss')}
+            onClick={() => setMessage(null)}
+          >
             <X size={15} />
           </button>
         </div>
@@ -909,9 +1006,11 @@ export default function Home() {
           <section className="play-column">
             {roomId && !room && (
               <div className="room-loading" role="status">
-                {connection === 'offline'
-                  ? '暂时无法打开棋室，请重新连接。'
-                  : '正在打开好友棋室…'}
+                {t(
+                  connection === 'offline'
+                    ? 'room.loading.offline'
+                    : 'room.loading',
+                )}
               </div>
             )}
             {player(flipped ? 'red' : 'black')}
@@ -935,7 +1034,8 @@ export default function Home() {
             {analysis ? (
               <div className="analysis-controls">
                 <span>
-                  <GitBranch size={17} /> 推演 {analysis.texts.length} 步
+                  <GitBranch size={17} />{' '}
+                  {tn('play.exploring', analysis.moves.length)}
                 </span>
                 <button
                   disabled={analysis.boards.length < 2}
@@ -945,13 +1045,13 @@ export default function Home() {
                       ...analysis,
                       boards: analysis.boards.slice(0, -1),
                       turns: analysis.turns.slice(0, -1),
-                      texts: analysis.texts.slice(0, -1),
+                      moves: analysis.moves.slice(0, -1),
                     });
                     setSelected(null);
                   }}
                 >
                   <Undo2 size={17} />
-                  退一步
+                  {t('play.backOne')}
                 </button>
                 <button
                   onClick={() => {
@@ -960,24 +1060,24 @@ export default function Home() {
                       ...analysis,
                       boards: [analysis.boards[0]],
                       turns: [analysis.turns[0]],
-                      texts: [],
+                      moves: [],
                     });
                     setSelected(null);
                   }}
                 >
-                  重置
+                  {t('play.reset')}
                 </button>
                 <button onClick={exitAnalysis}>
                   <ArrowLeft size={17} />
-                  返回对局
+                  {t('play.backToGame')}
                 </button>
               </div>
             ) : review !== null ? (
               <div className="analysis-controls">
-                <span>复盘 · 第 {reviewIndex} 步</span>
+                <span>{t('play.replay', { n: reviewIndex })}</span>
                 <button
                   className="review-step"
-                  aria-label="复盘上一步"
+                  aria-label={t('play.replay.prev')}
                   disabled={!reviewIndex}
                   onClick={() => navigate(reviewIndex - 1)}
                 >
@@ -985,7 +1085,7 @@ export default function Home() {
                 </button>
                 <button
                   className="review-step"
-                  aria-label="复盘下一步"
+                  aria-label={t('play.replay.next')}
                   disabled={reviewIndex >= historyMoves.length}
                   onClick={() => navigate(reviewIndex + 1)}
                 >
@@ -993,7 +1093,7 @@ export default function Home() {
                 </button>
                 <button onClick={startAnalysis}>
                   <GitBranch size={17} />
-                  从此处推演
+                  {t('play.exploreFromHere')}
                 </button>
                 <button
                   onClick={() => {
@@ -1001,7 +1101,7 @@ export default function Home() {
                     setSelected(null);
                   }}
                 >
-                  返回对局
+                  {t('play.backToGame')}
                 </button>
               </div>
             ) : (
@@ -1022,10 +1122,12 @@ export default function Home() {
                 <div className="endgame-caption">
                   <strong>
                     {room.result.winner === 'draw'
-                      ? '和棋'
-                      : sideLabel(room.result.winner) + '获胜'}
+                      ? t('result.draw')
+                      : t('result.sideWins', {
+                          side: sideName(locale, room.result.winner),
+                        })}
                   </strong>
-                  <span>{room.result.reason}</span>
+                  <span>{reasonText(locale, room.result.reason)}</span>
                 </div>
                 <div className="endgame-buttons">
                   <button
@@ -1033,21 +1135,22 @@ export default function Home() {
                     disabled={rematchButton?.disabled}
                     onClick={rematch}
                   >
-                    {rematchButton?.label ?? '再来一局'}
+                    {rematchButton?.label ?? t('room.rematch.again')}
                   </button>
                   <button
                     className="secondary-button steam-button"
                     disabled={!canAct}
                     onClick={() => void undoAndContinue()}
                   >
-                    再蒸一下<small>悔棋继续</small>
+                    {t('play.steam')}
+                    <small>{t('play.steam.small')}</small>
                   </button>
                   <button
                     className="secondary-button"
                     disabled={!historyMoves.length}
                     onClick={() => void openReview()}
                   >
-                    复盘
+                    {t('play.review')}
                   </button>
                 </div>
               </div>
@@ -1069,10 +1172,11 @@ export default function Home() {
                   disabled={!ready || busy || !!roomId}
                   onClick={() => setModal('create')}
                 >
-                  <Users size={18} /> 创建好友对局 <ArrowRight size={18} />
+                  <Users size={18} /> {t('room.createGame')}{' '}
+                  <ArrowRight size={18} />
                 </button>
                 <a className="secondary-button ai-entry" href="./ai/">
-                  <Bot size={18} /> 人机对战与局势分析
+                  <Bot size={18} /> {t('room.aiEntry')}
                 </a>
               </section>
             ) : (
@@ -1091,21 +1195,34 @@ export default function Home() {
                 <div className="room-meta">
                   <span>
                     {room.you
-                      ? `执${room.you === 'red' ? '红' : '黑'} · ${room.clockMinutes ? '每方 ' + room.clockMinutes + ' 分钟' : '不限时'}`
-                      : '观战中'}
+                      ? t('room.youPlay.meta', {
+                          side: t(
+                            room.you === 'red'
+                              ? 'side.red.short'
+                              : 'side.black.short',
+                          ),
+                          time: room.clockMinutes
+                            ? t('play.clock.limit', { n: room.clockMinutes })
+                            : t('room.clock.unlimited'),
+                        })
+                      : t('room.status.watching')}
                   </span>
                   {participant && (
                     <button
                       disabled={!room.players.black || busy || !!room.offer}
                       onClick={() => setConfirm('rematch')}
                     >
-                      <RefreshCw size={14} /> 重新开局
+                      <RefreshCw size={14} /> {t('room.rematch')}
                     </button>
                   )}
                 </div>
                 <button className="primary-button" onClick={copyInvite}>
                   <Copy size={17} />
-                  {room.players.black ? '复制棋室链接' : '复制邀请链接'}
+                  {t(
+                    room.players.black
+                      ? 'room.copyRoomLink'
+                      : 'room.copyInvite',
+                  )}
                 </button>
               </section>
             )}
@@ -1114,11 +1231,16 @@ export default function Home() {
                 <Handshake size={24} />
                 <h3>
                   {room.offer.side === room.you
-                    ? '等待好友回应'
-                    : `${sideLabel(room.offer.side)}${room.offer.kind === 'draw' ? '提议和棋' : '邀请重新开局'}`}
+                    ? t('room.waitingReply')
+                    : t(
+                        room.offer.kind === 'draw'
+                          ? 'room.offer.panel.draw'
+                          : 'room.offer.panel.rematch',
+                        { side: sideName(locale, room.offer.side) },
+                      )}
                 </h3>
                 {room.offer.kind === 'rematch' && (
-                  <p>同意后交换先后手，开始新的一局。请先导出要保留的棋谱。</p>
+                  <p>{t('room.offer.rematchNote')}</p>
                 )}
                 {room.you === room.offer.side ? (
                   <button
@@ -1126,7 +1248,7 @@ export default function Home() {
                     disabled={busy}
                     onClick={() => void action('cancel-offer')}
                   >
-                    撤回邀请
+                    {t('room.offer.withdrawInvite')}
                   </button>
                 ) : participant ? (
                   <div className="button-pair">
@@ -1135,14 +1257,14 @@ export default function Home() {
                       disabled={busy}
                       onClick={() => void action('respond', { accept: false })}
                     >
-                      婉拒
+                      {t('room.offer.decline')}
                     </button>
                     <button
                       className="primary-button compact"
                       disabled={busy}
                       onClick={() => void action('respond', { accept: true })}
                     >
-                      同意
+                      {t('room.offer.accept')}
                     </button>
                   </div>
                 ) : null}
@@ -1180,8 +1302,10 @@ export default function Home() {
           <GameSheet
             open={sheet === 'record'}
             onOpenChange={(open) => setSheet(open ? 'record' : null)}
-            title="对局棋谱"
-            description={`第 ${room.round} 局 · ${historyMoves.length} 步，点击棋谱可回看局面`}
+            title={t('record.title')}
+            description={tn('record.description', historyMoves.length, {
+              round: room.round,
+            })}
           >
             {scorePanel()}
           </GameSheet>
@@ -1199,25 +1323,29 @@ export default function Home() {
         >
           <button
             className="dialog-x"
-            aria-label="关闭"
+            aria-label={t('dialog.close')}
             onClick={() => setModal(null)}
           >
             <X size={19} />
           </button>
           <DialogTitle>
-            {modal === 'create'
-              ? '摆一桌，邀好友。'
-              : modal === 'invite'
-                ? '棋桌已备好，邀友入座。'
-                : modal === 'name'
-                  ? '如何称呼你？'
-                  : '好友对局规则'}
+            {t(
+              modal === 'create'
+                ? 'dialog.create.title'
+                : modal === 'invite'
+                  ? 'dialog.invite.title'
+                  : modal === 'name'
+                    ? 'dialog.name.title'
+                    : 'dialog.rules.title',
+            )}
           </DialogTitle>
           {(modal === 'invite' || modal === 'rules') && (
             <DialogDescription>
-              {modal === 'invite'
-                ? '把下面的链接发给好友。第一位访客自动执黑，之后的访客可以观战。'
-                : '红方先行，双方轮流落子。'}
+              {t(
+                modal === 'invite'
+                  ? 'dialog.invite.description'
+                  : 'dialog.rules.description',
+              )}
             </DialogDescription>
           )}
           {modal === 'create' && (
@@ -1229,18 +1357,18 @@ export default function Home() {
               }}
             >
               <label className="field-label" htmlFor="player-name">
-                你的称呼
+                {t('dialog.yourName')}
               </label>
               <input
                 id="player-name"
                 className="field-input"
                 maxLength={16}
-                value={name}
+                value={playerName(locale, name)}
                 onChange={(e) => setName(e.target.value)}
                 required
               />
               <label className="field-label" id="clock-label">
-                对局用时
+                {t('dialog.clock')}
               </label>
               <Select
                 value={minutes}
@@ -1263,7 +1391,7 @@ export default function Home() {
                 </SelectContent>
               </Select>
               <button className="primary-button" disabled={busy}>
-                {busy ? '正在准备棋桌…' : '创建对局并邀请好友'}
+                {t(busy ? 'dialog.preparing' : 'dialog.create')}
                 <ArrowRight size={17} />
               </button>
             </form>
@@ -1272,14 +1400,14 @@ export default function Home() {
             <>
               <input
                 className="field-input invite-url"
-                aria-label="邀请链接"
+                aria-label={t('dialog.inviteLink')}
                 value={inviteUrl}
                 readOnly
                 onFocus={(e) => e.target.select()}
               />
               <button className="primary-button" onClick={copyInvite}>
                 <Copy size={17} />
-                复制邀请链接
+                {t('room.copyInvite')}
               </button>
             </>
           )}
@@ -1292,53 +1420,34 @@ export default function Home() {
               }}
             >
               <input
-                aria-label="你的称呼"
+                aria-label={t('dialog.yourName')}
                 className="field-input"
-                value={name}
+                value={playerName(locale, name)}
                 maxLength={16}
                 required
                 onChange={(e) => setName(e.target.value)}
               />
               <button className="primary-button save-name" disabled={busy}>
-                保存称呼
+                {t('dialog.saveName')}
               </button>
             </form>
           )}
           {modal === 'rules' && (
             <div className="rules-content">
-              <p>
-                <strong>走棋与胜负</strong>
-                <br />
-                车走直线，马走日且不可蹩腿；象走田且不可塞眼、过河；士与将帅不出九宫；炮隔一子吃子；兵卒过河可横走、不可后退。将帅不能照面，也不能让己方被将军。将死、困毙、认输或计时耗尽均判负。
-              </p>
-              <p>
-                <strong>无限自由悔棋</strong>
-                <br />
-                任意一方可直接撤回最近一步，不限次数、无需确认。棋子、吃子、轮次与该步开始时的用时一并恢复。结束后也能悔棋继续。
-              </p>
-              <p>
-                <strong>推演与复盘</strong>
-                <br />
-                点击棋谱可以回看每一步，也可从任意局面独立推演。推演不会发送给对手；正式对局及计时照常进行。棋谱可导出保存。
-              </p>
-              <p>
-                <strong>好友局循环规则</strong>
-                <br />
-                同一局面第三次出现时，单方持续将军者判负；否则判和。连续 60
-                回合未吃子自动和棋。长捉等复杂竞赛争议采用好友协商提和，本平台不执行完整赛事裁判细则。
-              </p>
-              <p>
-                <strong>提和、重开与连接</strong>
-                <br />
-                提和、重新开局需对方同意；重开会交换红黑方。离线不会立即判负，计时局仍继续计时。原浏览器刷新可回到座位；清除浏览器数据会失去座位身份。
-              </p>
+              {([1, 2, 3, 4, 5] as const).map((n) => (
+                <p key={n}>
+                  <strong>{t(`rules.${n}.title`)}</strong>
+                  <br />
+                  {t(`rules.${n}.body`)}
+                </p>
+              ))}
               <a
                 href="https://www.wxf-xiangqi.org/images/wxf-rules/2018_World_XiangQi_Rules_English2018.pdf"
                 target="_blank"
                 rel="noreferrer"
                 className="rules-source"
               >
-                参考：世界象棋联合会规则 ↗
+                {t('rules.source')}
               </a>
             </div>
           )}
@@ -1352,15 +1461,21 @@ export default function Home() {
       >
         <AlertDialogContent className="chess-dialog">
           <AlertDialogTitle>
-            {confirm === 'resign' ? '确认认输？' : '邀请好友重新开局？'}
+            {t(
+              confirm === 'resign'
+                ? 'dialog.resign.title'
+                : 'dialog.rematch.title',
+            )}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {confirm === 'resign'
-              ? '本局将判对方获胜。之后仍可自由悔棋，或邀请再来一局。'
-              : '好友同意后，会清空本局棋谱并交换先后手。想保留本局，请先导出棋谱。'}
+            {t(
+              confirm === 'resign'
+                ? 'dialog.resign.body'
+                : 'dialog.rematch.body',
+            )}
           </AlertDialogDescription>
           <AlertDialogFooter>
-            <AlertDialogCancel>再想想</AlertDialogCancel>
+            <AlertDialogCancel>{t('dialog.think')}</AlertDialogCancel>
             <AlertDialogAction
               disabled={busy}
               onClick={async () => {
@@ -1372,7 +1487,11 @@ export default function Home() {
                   setConfirm(null);
               }}
             >
-              {confirm === 'resign' ? '确认认输' : '发出邀请'}
+              {t(
+                confirm === 'resign'
+                  ? 'dialog.resign.confirm'
+                  : 'dialog.rematch.confirm',
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

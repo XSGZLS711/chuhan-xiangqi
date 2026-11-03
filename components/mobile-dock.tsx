@@ -1,6 +1,8 @@
 'use client';
 import { useRef, useState, type CSSProperties, type SubmitEvent } from 'react';
 import { flushSync } from 'react-dom';
+import { LocaleMenuItems } from '@/components/language-switch';
+import { useLocale } from '@/lib/use-locale';
 import {
   Menu,
   ScrollText,
@@ -69,6 +71,7 @@ export default function MobileDock({
   onFlip: () => void;
   onToggleSound: () => void;
 }) {
+  const { t } = useLocale();
   const [chatOpen, setChatOpen] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatTriggerRef = useRef<HTMLButtonElement>(null);
@@ -91,11 +94,11 @@ export default function MobileDock({
 
   return (
     <>
-      <nav className="mobile-dock" aria-label="对局工具栏">
+      <nav className="mobile-dock" aria-label={t('dock.toolbar')}>
         <DropdownMenu>
           <DropdownMenuTrigger
             className="dock-button dock-menu"
-            aria-label="对局操作"
+            aria-label={t('play.actions')}
           >
             <Menu size={23} />
           </DropdownMenuTrigger>
@@ -107,61 +110,68 @@ export default function MobileDock({
           >
             <DropdownMenuItem disabled={!canDraw} onClick={onDraw}>
               <Handshake />
-              <span>提和</span>
+              <span>{t('play.draw')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem disabled={!canResign} onClick={onResign}>
               <Flag />
-              <span>认输</span>
+              <span>{t('play.resign')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onFlip}>
               <RotateCw />
-              <span>翻转棋盘</span>
+              <span>{t('room.flip')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onToggleSound}>
               {sound ? <Volume2 /> : <VolumeX />}
-              <span>{sound ? '关闭音效' : '开启音效'}</span>
+              <span>{t(sound ? 'room.sound.off' : 'room.sound.on')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => window.location.assign('./')}>
               <LogOut />
-              <span>离开棋室</span>
+              <span>{t('dock.leave')}</span>
             </DropdownMenuItem>
+            <LocaleMenuItems />
           </DropdownMenuContent>
         </DropdownMenu>
         <button
           className="dock-button"
-          aria-label="打开对局棋谱"
+          aria-label={t('dock.openMoves')}
           onClick={onRecord}
         >
           <ScrollText size={21} />
-          <span>棋谱</span>
+          <span>{t('dock.moves')}</span>
         </button>
         <button
           ref={chatTriggerRef}
           className="dock-chat"
-          aria-label={participant ? '打开聊天输入' : '观战中，无法聊天'}
+          aria-label={t(participant ? 'dock.chat.open' : 'dock.chat.watching')}
           aria-haspopup="dialog"
           aria-expanded={chatOpen}
           disabled={!participant}
           onClick={openChat}
         >
-          <span>{participant ? chat || '说句话…' : '观战中'}</span>
+          <span>
+            {participant
+              ? chat || t('dock.chat.placeholder')
+              : t('room.status.watching')}
+          </span>
         </button>
         <button
           className="dock-button dock-undo"
-          aria-label="悔棋"
+          aria-label={t('play.undo')}
           disabled={!canUndo}
           onClick={onUndo}
         >
           <Undo2 size={21} />
-          <span>悔棋</span>
+          <span>{t('play.undo')}</span>
         </button>
         <button
           className={`dock-button dock-analysis ${analysis ? 'active' : ''}`}
-          aria-label={analysis ? '退出推演，返回对局' : '开始独立推演'}
+          aria-label={t(
+            analysis ? 'dock.exploring.exit' : 'dock.exploring.start',
+          )}
           onClick={onAnalysis}
         >
           {analysis ? <ArrowLeft size={21} /> : <GitBranch size={21} />}
-          <span>{analysis ? '返回' : '推演'}</span>
+          <span>{t(analysis ? 'dock.back' : 'play.explore')}</span>
         </button>
       </nav>
       <Sheet open={chatOpen} onOpenChange={changeChatOpen}>
@@ -175,19 +185,22 @@ export default function MobileDock({
         >
           <div className="sheet-grip" aria-hidden="true" />
           <div className="game-sheet-heading">
-            <SheetTitle>棋友聊天</SheetTitle>
+            <SheetTitle>{t('chat.title')}</SheetTitle>
             <SheetDescription className="sr-only">
-              给对方发送消息，最多 120 字
+              {t('dock.chat.description')}
             </SheetDescription>
-            <SheetClose className="sheet-close-button" aria-label="关闭聊天">
+            <SheetClose
+              className="sheet-close-button"
+              aria-label={t('dock.chat.close')}
+            >
               <X size={21} />
             </SheetClose>
           </div>
           <form className="chat-composer" onSubmit={send}>
             <textarea
               ref={inputRef}
-              aria-label="发送聊天消息"
-              placeholder="说句话…"
+              aria-label={t('dock.chat.compose')}
+              placeholder={t('dock.chat.placeholder')}
               value={chat}
               maxLength={120}
               rows={3}
@@ -215,7 +228,7 @@ export default function MobileDock({
                 disabled={!participant || busy || !chat.trim()}
               >
                 <Send size={17} />
-                发送
+                {t('dock.send')}
               </button>
             </div>
           </form>

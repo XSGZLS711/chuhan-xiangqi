@@ -2,8 +2,10 @@ import { useId, type CSSProperties } from 'react';
 import {
   STAMP_TIMING,
   stampDuration,
+  stampWords,
   type BoardEffect as Effect,
 } from '@/lib/presentation';
+import { useLocale } from '@/lib/use-locale';
 
 const vars = (v: Record<string, string | number>) => v as CSSProperties;
 // Fixed, hand-spread values keep server and client markup identical.
@@ -30,10 +32,12 @@ const SPARKS = [
  * a gilded word that lands out of a zoom blur, with a ripple and spatter on impact.
  */
 export default function BoardEffect({ effect }: { effect: Effect | null }) {
+  const { locale, t } = useLocale();
   const brush = `brush-${useId().replace(/[^a-z0-9]/gi, '')}`;
   if (!effect) return null;
   const duration = stampDuration(effect.kind);
-  const title = effect.kind === 'check' ? '将' : effect.title;
+  const words = stampWords(locale, effect);
+  const title = words.word;
   const tactical = effect.kind === 'capture' || effect.kind === 'check';
   return (
     <output
@@ -44,9 +48,14 @@ export default function BoardEffect({ effect }: { effect: Effect | null }) {
         '--stamp-enter': `${STAMP_TIMING.enterMs}ms`,
         '--stamp-fade': `${STAMP_TIMING.fadeMs}ms`,
         '--stamp-fade-at': `${STAMP_TIMING.delayMs + duration - STAMP_TIMING.fadeMs}ms`,
+        // Latin words are longer than one brushed character: the stylesheet sizes them by this.
+        '--word-len': title.length,
       })}
       aria-live="polite"
-      aria-label={`${effect.analysis ? '独立推演 · ' : ''}${effect.title} · ${effect.detail}`}
+      aria-label={
+        (effect.analysis ? t('effect.analysis.prefix') : '') +
+        `${words.title} · ${words.detail}`
+      }
     >
       <div className="ink-stamp" aria-hidden="true">
         <i className="ink-glow" />
@@ -137,14 +146,14 @@ export default function BoardEffect({ effect }: { effect: Effect | null }) {
             />
           ))}
         {!tactical && effect.analysis && (
-          <span className="ink-stamp-context">独立推演</span>
+          <span className="ink-stamp-context">{t('effect.context')}</span>
         )}
         <span className="ink-word">
           <span className="ink-outline">{title}</span>
           <span className="ink-echo">{title}</span>
           <span className="ink-fill">{title}</span>
         </span>
-        {!tactical && <span className="effect-detail">{effect.detail}</span>}
+        {!tactical && <span className="effect-detail">{words.detail}</span>}
       </div>
     </output>
   );

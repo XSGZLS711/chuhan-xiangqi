@@ -1,14 +1,16 @@
 import { SlidersHorizontal } from 'lucide-react';
+import type { MessageKey } from '@/lib/i18n';
+import { useLocale } from '@/lib/use-locale';
 import type {
   EffectSettings as Settings,
   SettingKey,
 } from '@/lib/effect-settings';
 
-const labels: [SettingKey, string][] = [
-  ['sound', '音效'],
-  ['hints', '走子提示'],
-  ['moveEffects', '吃子/将军动画'],
-  ['resultEffects', '绝杀/结算动画'],
+const labels: [SettingKey, MessageKey][] = [
+  ['sound', 'fx.sound'],
+  ['hints', 'fx.hints'],
+  ['moveEffects', 'fx.moveEffects'],
+  ['resultEffects', 'fx.resultEffects'],
 ];
 export default function EffectSettings({
   settings,
@@ -17,19 +19,20 @@ export default function EffectSettings({
   settings: Settings;
   onChange: (key: SettingKey, value: boolean) => void;
 }) {
+  const { t } = useLocale();
   return (
     <details className="effect-settings">
-      <summary aria-label="对局设置" title="对局设置">
+      <summary aria-label={t('fx.title')} title={t('fx.title')}>
         <SlidersHorizontal size={17} />
       </summary>
       <fieldset>
-        <legend className="sr-only">对局设置</legend>
+        <legend className="sr-only">{t('fx.title')}</legend>
         <p className="effect-settings-title" aria-hidden="true">
-          对局设置
+          {t('fx.title')}
         </p>
         {labels.map(([key, text]) => (
           <label key={key}>
-            <span>{text}</span>
+            <span>{t(text)}</span>
             <input
               type="checkbox"
               checked={settings[key]}

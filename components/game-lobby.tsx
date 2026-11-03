@@ -1,6 +1,7 @@
 'use client';
 /* oxlint-disable next/no-html-link-for-pages -- The AI entry is a separate document with its own browser isolation. */
 import RecentGames from './recent-games';
+import { useLocale } from '@/lib/use-locale';
 import { ArrowRight, Bot, GitBranch, Users } from 'lucide-react';
 
 export default function GameLobby({
@@ -14,6 +15,7 @@ export default function GameLobby({
   onCreate: () => void;
   onExplore: () => void;
 }) {
+  const { t } = useLocale();
   return (
     <section className="game-lobby" aria-labelledby="lobby-title">
       <div className="lobby-welcome">
@@ -28,7 +30,7 @@ export default function GameLobby({
           <span className="lobby-piece lobby-piece-red">帅</span>
         </div>
         <div className="lobby-intro">
-          <h1 id="lobby-title">今天，和谁下盘棋？</h1>
+          <h1 id="lobby-title">{t('lobby.title')}</h1>
         </div>
       </div>
       <div className="lobby-choices">
@@ -41,7 +43,7 @@ export default function GameLobby({
             <Users size={25} />
           </span>
           <span className="lobby-mode-copy">
-            <strong>好友对弈</strong>
+            <strong>{t('lobby.friend')}</strong>
           </span>
           <ArrowRight size={21} />
         </button>
@@ -50,12 +52,12 @@ export default function GameLobby({
             <Bot size={25} />
           </span>
           <span className="lobby-mode-copy">
-            <strong>人机对弈</strong>
+            <strong>{t('lobby.ai')}</strong>
           </span>
           <ArrowRight size={21} />
         </a>
         <button className="lobby-explore" onClick={onExplore}>
-          <GitBranch size={16} /> 先随手推演
+          <GitBranch size={16} /> {t('lobby.explore')}
         </button>
       </div>
       <RecentGames signedIn={signedIn} />

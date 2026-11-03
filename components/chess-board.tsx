@@ -1,6 +1,8 @@
 'use client';
 import { useEffect, useState, type CSSProperties } from 'react';
 import { Board, label, Side, type Piece } from '@/lib/xiangqi';
+import { sidePieceName } from '@/lib/i18n';
+import { useLocale } from '@/lib/use-locale';
 import {
   boardSignature,
   boardTransition,
@@ -79,6 +81,7 @@ export default function ChessBoard({
   marks?: BoardMark[];
 }) {
   const signature = boardSignature(board);
+  const { locale, t } = useLocale();
   const [frame, setFrame] = useState<Frame>({
     sig: signature,
     board,
@@ -164,7 +167,7 @@ export default function ChessBoard({
     <div className={`board-frame ${effect ? `fx-${effect.kind}` : ''}`}>
       <fieldset
         className={`chess-board ${captureEffects ? '' : 'tactics-off'}`}
-        aria-label="中国象棋棋盘"
+        aria-label={t('board.label')}
         style={css({
           '--slide': `${PIECE_MOTION.slideMs}ms`,
           // The landing halo waits for the drop; jumps without a move show it at once.
@@ -229,7 +232,12 @@ export default function ChessBoard({
               onClick={() => onSquare(n)}
               style={position(n)}
               className={`intersection ${selected === n ? 'selected' : ''} ${possible ? 'legal-target' : ''} ${last?.to === n ? 'last-to' : ''} ${last?.from === n ? 'last-from' : ''}`}
-              aria-label={`${Math.floor(n / 9) + 1}行${(n % 9) + 1}列${p ? `${p.side === 'red' ? '红' : '黑'}${label(p)}` : '空位'}${possible ? '，可走' : ''}`}
+              aria-label={t('board.square', {
+                row: Math.floor(n / 9) + 1,
+                col: (n % 9) + 1,
+                what: p ? sidePieceName(locale, p) : t('board.empty'),
+                move: possible ? t('board.reachable') : '',
+              })}
               aria-pressed={selected === n}
             >
               {possible &&

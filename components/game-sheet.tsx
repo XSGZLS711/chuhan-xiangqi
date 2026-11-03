@@ -1,6 +1,7 @@
 'use client';
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
+import { useLocale } from '@/lib/use-locale';
 import {
   Sheet,
   SheetContent,
@@ -21,6 +22,7 @@ export default function GameSheet({
   description: string;
   children: ReactNode;
 }) {
+  const { t } = useLocale();
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
@@ -34,7 +36,10 @@ export default function GameSheet({
             <SheetTitle>{title}</SheetTitle>
             <SheetDescription>{description}</SheetDescription>
           </div>
-          <SheetClose className="sheet-close-button" aria-label="关闭窗口">
+          <SheetClose
+            className="sheet-close-button"
+            aria-label={t('sheet.close')}
+          >
             <X size={21} />
           </SheetClose>
         </div>

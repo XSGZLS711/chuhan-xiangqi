@@ -9,6 +9,7 @@ import {
   ChevronDown,
   RefreshCw,
 } from 'lucide-react';
+import { useLocale } from '@/lib/use-locale';
 import {
   Collapsible,
   CollapsibleTrigger,
@@ -27,6 +28,7 @@ type Props = {
   onRematch: () => void;
 };
 export default function GameActions(props: Props) {
+  const { t } = useLocale();
   const [open, setOpen] = useState(false);
   function choose(action: () => void) {
     setOpen(false);
@@ -41,14 +43,14 @@ export default function GameActions(props: Props) {
           onClick={props.onUndo}
         >
           <Undo2 size={20} />
-          <span>悔棋</span>
+          <span>{t('play.undo')}</span>
         </button>
         <button
           className="board-action"
           onClick={() => choose(props.onAnalysis)}
         >
           <GitBranch size={20} />
-          <span>推演</span>
+          <span>{t('play.explore')}</span>
         </button>
         <button
           className="board-action"
@@ -56,7 +58,7 @@ export default function GameActions(props: Props) {
           onClick={() => choose(props.onDraw)}
         >
           <Handshake size={20} />
-          <span>提和</span>
+          <span>{t('play.draw')}</span>
         </button>
         <button
           className="board-action"
@@ -64,7 +66,7 @@ export default function GameActions(props: Props) {
           onClick={() => choose(props.onResign)}
         >
           <Flag size={20} />
-          <span>认输</span>
+          <span>{t('play.resign')}</span>
         </button>
       </>
     );
@@ -80,7 +82,7 @@ export default function GameActions(props: Props) {
         <div className="mobile-action-toolbar">
           <CollapsibleTrigger className="actions-trigger">
             <Menu size={18} />
-            <span>对局操作</span>
+            <span>{t('play.actions')}</span>
             <ChevronDown size={16} className={open ? 'expanded' : ''} />
           </CollapsibleTrigger>
           <span className="actions-spacer" />
@@ -88,10 +90,10 @@ export default function GameActions(props: Props) {
             className="rematch-shortcut"
             disabled={!props.canRematch}
             onClick={props.onRematch}
-            aria-label="邀请重新开局"
+            aria-label={t('play.rematchInvite')}
           >
             <RefreshCw size={16} />
-            <span>重开</span>
+            <span>{t('play.rematchShort')}</span>
           </button>
         </div>
         <CollapsibleContent className="mobile-action-panel">
