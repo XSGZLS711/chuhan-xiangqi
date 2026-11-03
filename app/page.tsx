@@ -18,6 +18,8 @@ import {
 } from '@/lib/mobile-game';
 import { useGameViewport } from '@/lib/use-game-viewport';
 import { useAutoArchive } from '@/lib/use-auto-archive';
+import { archiveGame } from '@/lib/archive';
+import { gameArchive } from '@/lib/archive-storage';
 import EffectSettings from '@/components/effect-settings';
 import { useEffectSettings } from '@/lib/use-effect-settings';
 import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
@@ -488,6 +490,27 @@ export default function Home() {
     setReview(Math.max(0, Math.min(historyMoves.length, n)));
     setAnalysis(null);
     setSelected(null);
+  }
+  /** The full review (graph, report, drills) runs on the AI page, where the engine
+   * can. Save first so it opens even if the automatic save has not landed yet. */
+  async function openReview() {
+    if (!room?.result) return;
+    const id = `friend:${room.id}:${room.round}`;
+    try {
+      await gameArchive().save(
+        archiveGame(room, {
+          id,
+          mode: { kind: 'friend' },
+          viewerSide: room.you,
+          date: new Date().toISOString(),
+        }),
+      );
+      location.assign(`./ai/?game=${encodeURIComponent(id)}&back=room`);
+    } catch {
+      // Without local storage the full review cannot load; step through here.
+      navigate(0);
+      setSheet('record');
+    }
   }
   const inviteUrl =
     typeof window !== 'undefined' && room
@@ -990,15 +1013,12 @@ export default function Home() {
                     disabled={!canAct}
                     onClick={() => void undoAndContinue()}
                   >
-                    再蒸一下<small>悔棋继续</small>
+                    再争一下<small>悔棋继续</small>
                   </button>
                   <button
                     className="secondary-button"
                     disabled={!historyMoves.length}
-                    onClick={() => {
-                      navigate(0);
-                      setSheet('record');
-                    }}
+                    onClick={() => void openReview()}
                   >
                     复盘
                   </button>
