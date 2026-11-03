@@ -70,6 +70,10 @@ export async function signIn(
               "UPDATE identities SET email = ? WHERE provider = 'google' AND subject = ?",
             )
             .bind(google.email, google.subject),
+          // There is no renaming yet, so the name follows Google's.
+          db
+            .prepare('UPDATE users SET name = ? WHERE id = ?')
+            .bind(google.name, userId),
         ]
       : [
           db
