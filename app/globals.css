@@ -4537,6 +4537,50 @@ html {
   }
 }
 
+/* The header row never pushes the tools or the account button off the screen, whatever the
+ * language: only the brand gives way, ending in an ellipsis when it has to. */
+.site-header .header-tools {
+  flex: none;
+}
+.site-header .brand {
+  min-width: 0;
+}
+.site-header .brand-seal {
+  flex: none;
+}
+.site-header .brand > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 660px) {
+  /* "Rules" and "Luật chơi" are wider than the seal-script name and take the room the Latin
+   * brand needs: the button keeps its icon, and its name for screen readers. */
+  html:not(:lang(zh)) .header-tools .rules-button .tool-label {
+    display: none;
+  }
+}
+@media (max-width: 380px) {
+  /* Nothing in the row may be pushed out, so on the narrowest phones the brand's spacing and
+   * the row's gap and the buttons' padding give a few pixels back for every language; the
+   * Latin brand is also a size smaller. */
+  .site-header {
+    gap: 6px;
+  }
+  .site-header .brand {
+    letter-spacing: 0.5px;
+  }
+  html:not(:lang(zh)) .site-header .brand {
+    font-size: 16px;
+    gap: 6px;
+  }
+  .site-header .header-tools > .text-button {
+    padding: 8px 4px;
+    gap: 4px;
+  }
+}
+
 /* Words in the stamp are sized for one or two brushed characters. A Latin word is longer, so
  * it shrinks to keep inside the ring (about 0.55em per letter). */
 html:not(:lang(zh)) .ink-word {
