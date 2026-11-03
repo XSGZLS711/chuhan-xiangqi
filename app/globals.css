@@ -4577,29 +4577,33 @@ html:lang(vi)
   ) {
   font-family: 'Times New Roman', 'Noto Serif', 'Songti SC', serif;
 }
-/* "Đi lại và chơi tiếp" is wider than the endgame row's middle button (friend room and AI
- * page): the words wrap, as in the primary button beside it, instead of running past the
- * border. */
-html:lang(vi) .endgame-buttons button {
+/* "Undo and play on" (or "Đi lại và chơi tiếp") is wider than the endgame row's middle
+ * button, in the friend room and on the AI page: the words wrap, as in the primary button
+ * beside it, instead of running past the border. Chinese fits on one line and is untouched. */
+html:not(:lang(zh)) .endgame-buttons button {
   white-space: normal;
 }
-/* The review report's long middle labels left the scores too little room on a phone, and
- * "0 / 0 / 0" or "92 điểm" broke across lines: the scores stay whole, the label wraps. */
-html:lang(vi) .report-table td {
+/* The review report's long middle labels leave the scores little room on a phone, and
+ * "0 / 0 / 0", "92 điểm" or "Not reached" broke across lines: the scores stay whole, the
+ * label wraps. */
+html:not(:lang(zh)) .report-table td {
   white-space: nowrap;
 }
-/* At phone width the explore view (no room yet) has no room for the "Luật chơi" label beside
- * the brand, and "Chơi với máy và phân tích thế cờ" would squeeze the button next to it: the
- * rules button keeps its icon and its name for screen readers, and the two buttons share the
- * row evenly, wrapping their words. */
+/* At phone width the explore view (no room yet) has no room for the "Rules" label beside the
+ * Latin brand, and "Play the computer and analyze positions" squeezed "Create a friend game"
+ * out of its button: the rules button keeps its icon and its name for screen readers, and the
+ * two buttons share the row evenly, wrapping their words. */
 @media (max-width: 660px) {
-  html:lang(vi) .is-analysis:not(.in-room) .header-tools .tool-label {
+  html:not(:lang(zh)) .is-analysis:not(.in-room) .header-tools .tool-label {
     display: none;
   }
-  html:lang(vi) .is-analysis:not(.in-room) .invite-panel {
+  html:not(:lang(zh)) .is-analysis:not(.in-room) .invite-panel {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  html:lang(vi) .is-analysis:not(.in-room) .invite-panel > .secondary-button {
+  html:not(:lang(zh))
+    .is-analysis:not(.in-room)
+    .invite-panel
+    > :is(.primary-button, .secondary-button) {
     white-space: normal;
     line-height: 1.25;
   }
