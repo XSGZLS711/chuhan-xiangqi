@@ -106,11 +106,11 @@ export async function signOut(db: D1Database, device: string) {
   await db.prepare('DELETE FROM sessions WHERE id = ?').bind(device).run();
 }
 
-/** Removes the account, its sign-in methods and every session. Rooms keep only the
- * account's random id in their seats, which then belongs to no one. */
+/** Removes the account, its sign-in methods, its saved games and every session.
+ * Rooms keep only the account's random id in their seats, which then belongs to no one. */
 export async function deleteAccount(db: D1Database, userId: string) {
   await db.batch(
-    ['sessions', 'identities', 'users'].map((table) =>
+    ['archived_games', 'sessions', 'identities', 'users'].map((table) =>
       db
         .prepare(
           `DELETE FROM ${table} WHERE ${table === 'users' ? 'id' : 'user_id'} = ?`,

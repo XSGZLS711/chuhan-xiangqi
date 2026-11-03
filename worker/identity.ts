@@ -11,6 +11,16 @@ export function validateRequestOrigin(req: Request): void {
   if (req.headers.get('sec-fetch-site') === 'cross-site')
     throw new GameError('请在棋室页面操作。', 403);
 }
+/** The same check as a response for the account routes: null when the request may go on. */
+export function sameOrigin(req: Request): Response | null {
+  try {
+    validateRequestOrigin(req);
+    return null;
+  } catch (error) {
+    const status = error instanceof GameError ? error.status : 403;
+    return Response.json({ error: '请求来源不匹配。' }, { status });
+  }
+}
 
 export const hex = (bytes: Uint8Array) =>
   Array.from(bytes, (n) => n.toString(16).padStart(2, '0')).join('');

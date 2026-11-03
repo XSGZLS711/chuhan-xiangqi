@@ -88,15 +88,38 @@
       <h2>棋局数据</h2>
       <ul>
         <li>好友棋室的棋盘、着法、聊天和你填写的称呼保存在服务器上，供对局双方使用。</li>
-        <li>本机的「最近对局」和引擎分析结果只保存在你的浏览器里，不会上传。</li>
+        <li>不登录时，「最近对局」只保存在你的浏览器里。</li>
+        <li>
+          登录后，下完的对局（着法、双方称呼、结果和日期）也保存在服务器上你的账号下，最多保留最近
+          200 局，换台设备登录也能看到；登录时这个浏览器里已有的对局会一并存进账号。
+        </li>
+        <li>引擎分析结果只保存在你的浏览器里，不会上传。</li>
         <li>不投放广告，不使用第三方统计或追踪 Cookie。</li>
         <li>网站托管在 Cloudflare，Cloudflare 会按它自己的政策处理访问日志。</li>
       </ul>
 
       <h2>删除账号</h2>
       <p>
-        登录后点右上角的账号，选「删除账号」。账号、登录方式和所有设备上的登录状态会立即删除；棋室记录里只剩一个不再对应任何人的随机编号。
+        登录后点右上角的账号，选「删除账号」。账号、登录方式、存在账号下的对局和所有设备上的登录状态会立即删除；棋室记录里只剩一个不再对应任何人的随机编号。浏览器里保存的「最近对局」不受影响，可以在浏览器设置里清除网站数据。
       </p>
+
+      <h2>使用的开源软件</h2>
+      <ul>
+        <li>
+          人机对弈和复盘分析使用象棋引擎
+          <a href="https://github.com/fairy-stockfish/Fairy-Stockfish">Fairy-Stockfish</a>，以 GNU GPL
+          第 3 版授权。本站提供的是它未经修改的浏览器版本（fairy-stockfish-nnue.wasm
+          1.1.12），在你的设备上运行：<a href="/ai/engine/Copying.txt">许可证全文</a> ·
+          <a href="/ai/engine/AUTHORS">作者</a> ·
+          <a href="https://github.com/fairy-stockfish/fairy-stockfish.wasm/tree/b2e693ef1e111233ce3fb40685921708b3276ed6">对应源代码</a> ·
+          <a href="/ai/engine/SOURCE.md">版本与构建说明</a>
+        </li>
+        <li>
+          棋子字体是 Ma Shan Zheng 的子集，以 SIL Open Font License 1.1
+          授权（<a href="/fonts/OFL-MaShanZheng.txt">许可证</a>）。
+        </li>
+        <li>页面里其他开源组件及其许可：<a href="/third-party-licenses.md">third-party-licenses.md</a>。</li>
+      </ul>
 
       <h2>其他</h2>
       <p>本站不面向 13 岁以下的儿童。</p>
@@ -123,14 +146,30 @@
         </p>
         <p>
           <strong>Games</strong>: friend rooms (board, moves, chat, the name you chose) are stored
-          on the server for both players. Your recent-games list and engine analysis stay in your
-          browser. No ads, no third-party analytics or tracking cookies. The site is hosted on
-          Cloudflare, which handles access logs under its own policy.
+          on the server for both players. Without an account, your recent-games list stays in
+          your browser. Signed in, your finished games (moves, both names, result and date) are
+          also stored on the server under your account, the latest 200, so you can see them on
+          another device; games already in the browser when you sign in are added too. Engine
+          analysis stays in your browser. No ads, no third-party analytics or tracking cookies.
+          The site is hosted on Cloudflare, which handles access logs under its own policy.
         </p>
         <p>
           <strong>Deleting your account</strong>: open the account menu (top right) and choose
-          删除账号 (Delete account). The account, its sign-in method and all sessions are removed
-          at once.
+          删除账号 (Delete account). The account, its sign-in method, the games stored under it
+          and all sessions are removed at once. Games saved in a browser stay there until you
+          clear the site's data.
+        </p>
+        <p>
+          <strong>Open-source software</strong>: computer play and the review use the xiangqi
+          engine <a href="https://github.com/fairy-stockfish/Fairy-Stockfish">Fairy-Stockfish</a>,
+          licensed under the GNU GPL version 3. The site serves its unmodified browser build
+          (fairy-stockfish-nnue.wasm 1.1.12), which runs on your device:
+          <a href="/ai/engine/Copying.txt">license</a> · <a href="/ai/engine/AUTHORS">authors</a> ·
+          <a href="https://github.com/fairy-stockfish/fairy-stockfish.wasm/tree/b2e693ef1e111233ce3fb40685921708b3276ed6">corresponding source</a> ·
+          <a href="/ai/engine/SOURCE.md">version and build notes</a>. The pieces use a subset of
+          the Ma Shan Zheng font, under the SIL Open Font License 1.1
+          (<a href="/fonts/OFL-MaShanZheng.txt">license</a>). Other open-source components in the
+          pages and their licenses: <a href="/third-party-licenses.md">third-party-licenses.md</a>.
         </p>
         <p>
           Not intended for children under 13. Questions:

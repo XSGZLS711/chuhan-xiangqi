@@ -7,6 +7,7 @@ import {
   replayArchive,
   mergeGame,
   newestGames,
+  syncArchives,
   archiveLabel,
   type ArchivedGame,
   type ArchiveMode,
@@ -143,6 +144,37 @@ assert.equal(
     .date,
   game.date,
 );
+const minutes = (n: number) => new Date(now + n * 60000).toISOString();
+const ids = (games: ArchivedGame[]) => games.map((entry) => entry.id);
+const local = [
+  { ...game, id: 'both', date: minutes(5) },
+  { ...game, id: 'local-only', date: minutes(3) },
+];
+const server = [
+  { ...game, id: 'both', date: minutes(5) },
+  { ...game, id: 'server-only', date: minutes(4) },
+];
+const synced = syncArchives(local, server);
+assert.deepEqual(ids(synced.games), ['both', 'server-only', 'local-only']);
+assert.deepEqual(ids(synced.upload), ['local-only']);
+assert.deepEqual(ids(syncArchives(local, []).upload), ['both', 'local-only']);
+assert.deepEqual(syncArchives([], server).upload, []);
+// The account already holds 200 newer games: an older local one would be dropped again.
+const full = newestGames(many);
+const ancient = { ...game, id: 'ancient', date: minutes(-10) };
+assert.deepEqual(syncArchives([ancient], full).upload, []);
+assert.deepEqual(syncArchives([ancient], full).games, full);
+const latest = { ...game, id: 'latest', date: minutes(9999) };
+assert.deepEqual(ids(syncArchives([latest], full).upload), ['latest']);
+assert.equal(syncArchives([latest], full).games.length, 200);
+assert.equal(syncArchives([latest], full).games[0].id, 'latest');
+const huge = {
+  ...game,
+  id: 'huge',
+  players: { red: '长'.repeat(40000), black: '黑棋友' },
+};
+assert.deepEqual(syncArchives([huge], []).upload, [], '太大的不上传');
+assert.deepEqual(ids(syncArchives([huge], []).games), ['huge'], '本机照常显示');
 const values = new Map<string, string>();
 const storage = {
   getItem: (key: string) => values.get(key) ?? null,
@@ -187,5 +219,5 @@ await assert.rejects(() => createArchiveStore(failed, failed).list());
 values.set('chuhan-archive', 'bad data');
 assert.deepEqual(await fallback.list(), []);
 console.log(
-  '✓ 存档往返、吃子重放、认输/超时/提和/规则终局、非法数据拒绝、去重、200 局上限与存储降级',
+  '✓ 存档往返、吃子重放、认输/超时/提和/规则终局、非法数据拒绝、去重、200 局上限、账号同步合并与存储降级',
 );

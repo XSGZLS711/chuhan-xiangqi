@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { archiveGame, type ArchiveMode, type ArchiveSource } from './archive';
 import { gameArchive } from './archive-storage';
+import { uploadGame } from './client-api';
 import type { Side } from './xiangqi';
 
 export function useAutoArchive(
@@ -8,6 +9,7 @@ export function useAutoArchive(
   id: string | null,
   mode: ArchiveMode,
   viewerSide: Side | null,
+  signedIn: boolean,
 ): string {
   const queued = useRef(new Set<string>());
   const [error, setError] = useState('');
@@ -33,6 +35,8 @@ export function useAutoArchive(
         queued.current.delete(key);
         setError('这盘棋暂未保存：浏览器的本地存储不可用或空间已满。');
       });
-  }, [room, id, mode, viewerSide]);
+    // Signed in, the account keeps a copy too. The lobby resends any that failed.
+    if (signedIn) void uploadGame(game).catch(() => {});
+  }, [room, id, mode, viewerSide, signedIn]);
   return room?.result && id ? error : '';
 }
