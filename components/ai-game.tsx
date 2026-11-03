@@ -61,6 +61,8 @@ import {
   archiveLabel,
   type ArchivedGame,
 } from '@/lib/archive';
+import AccountMenu from '@/components/account-menu';
+import { useAccount } from '@/lib/use-account';
 import EffectSettings from '@/components/effect-settings';
 import { useEffectSettings } from '@/lib/use-effect-settings';
 import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
@@ -91,6 +93,7 @@ type AnalysisResult = { key: string; info: EngineInfo };
 
 export default function AiGame() {
   const { settings, setSetting } = useEffectSettings();
+  const account = useAccount();
   const sound = settings.sound;
   const [sessionId] = useState(() => crypto.randomUUID());
   const [archiveId, setArchiveId] = useState(() =>
@@ -651,10 +654,13 @@ export default function AiGame() {
           <span className="brand-seal">楚</span>
           <span>楚汉棋社</span>
         </a>
-        <button className="text-button" onClick={() => setSetup(true)}>
-          <Settings2 size={17} />
-          新的一局
-        </button>
+        <div className="header-tools">
+          <button className="text-button" onClick={() => setSetup(true)}>
+            <Settings2 size={17} />
+            新的一局
+          </button>
+          <AccountMenu account={account} />
+        </div>
       </header>
       <div className="ai-mobile-nav">
         <a href="../" aria-label="返回棋社">
@@ -698,6 +704,14 @@ export default function AiGame() {
             </p>
           )}
         </div>
+      )}
+      {account.notice && (
+        <output className="notice">
+          <span>{account.notice}</span>
+          <button aria-label="关闭提示" onClick={account.clearNotice}>
+            <X size={15} />
+          </button>
+        </output>
       )}
       {archiveError && (
         <p className="ai-error" role="alert">

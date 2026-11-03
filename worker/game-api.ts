@@ -1,4 +1,5 @@
-import { identity, validateRequestOrigin } from './identity';
+import { validateRequestOrigin } from './identity';
+import { player } from './accounts';
 import { database } from './db';
 import {
   Room,
@@ -76,7 +77,7 @@ async function publicState(
 async function handleGet(req: Request) {
   let cookie = '';
   try {
-    const identityValue = await identity(req);
+    const identityValue = await player(req, database());
     cookie = identityValue.cookie;
     const id = new URL(req.url).searchParams.get('room');
     if (!id) return reply({ ready: true }, cookie);
@@ -114,7 +115,7 @@ async function handlePost(req: Request) {
     }
     if (!a || typeof a !== 'object' || Array.isArray(a))
       throw new GameError('请求格式不正确。');
-    const me = await identity(req);
+    const me = await player(req, database());
     cookie = me.cookie;
     const now = Date.now();
     if (a.action === 'create') {
