@@ -18,7 +18,8 @@
 - 棋子字母：**Tg** 将/帅、**S** 士/仕、**T** 象/相、**X** 车、**P** 炮、**M** 马、**B** 兵/卒（Binh，避免和 Tượng 的 T 冲突）。
 - 动作：`.` 进（tiến）、`/` 退（thoái）、`-` 平（bình）。路数各自从己方右手边数 1–9；马、象、士写落点的路数，车、炮、兵、将直走时写步数。
 - 同一路两个同样的棋子：在字母后面写 **t**（trước，前）或 **s**（sau，后），代替路数，例如规则书里的 `Pt/1`、`Xs.2`；同一路三个兵，中间的写 **g**（giữa），例如 `Bg.1`。
-- **没查到资料的两处，请朋友确认：**（1）同一路四五个兵时，中间几个兵怎么写——现在按 WXF 的做法在字母前编号（`2B-8`）；（2）两个士或两个象在同一路时是否也用 t / s（现在和中文记谱、WXF 一样会用，例如 `St/5`；有资料说越南习惯不用）。
+- ⚑ **待确认**：同一路四五个兵时，中间几个兵怎么写——没查到资料，现在按 WXF 的做法在字母前编号（`2B-8`），请朋友告诉我越南习惯的写法。
+- **所有者已决定**：两个士或两个象在同一路时，和中文记谱、WXF 一样也写 t / s（例如 `St/5`），保留。
 
 | # | 局面 | 中文 | WXF | 越南 |
 |---|---|---|---|---|
@@ -36,7 +37,8 @@
 | 12 | 同路两炮：前炮退一（越南规则书的例子 Pt/1） | 前炮退一 | +C-1 | Pt/1 |
 | 13 | 同路三兵：中兵平移 | 中兵平六 | 2P=6 | Bg-6 |
 | 14 | 同路三兵：后兵平移 | 后兵平四 | -P=4 | Bs-4 |
-| 15 | 同路五兵：第二个兵（越南写法未查到，按 WXF 编号） | 二兵平八 | 2P=8 | 2B-8 |
+| 15 | ⚑ 待确认：同路五兵的第二个兵（越南写法未查到，按 WXF 编号） | 二兵平八 | 2P=8 | 2B-8 |
+| 16 | 同路两仕：前仕退中（所有者决定保留 t / s） | 前仕退五 | +A-5 | St/5 |
 
 ## 大厅
 
@@ -44,7 +46,7 @@
 
 | 键 | 中文 | English | Tiếng Việt |
 |---|---|---|---|
-| `brand.name` | 楚汉棋社 | Chuhan Xiangqi | Chuhan Xiangqi ⚑ *专有名词：暂用和英文相同的 Chuhan Xiangqi（与域名一致）；也可以考虑 Cờ tướng Sở Hán，请所有者决定* |
+| `brand.name` | 楚汉棋社 | Chuhan Xiangqi | Chuhan Xiangqi *所有者已决定：保留 Chuhan Xiangqi（与域名一致），不用改* |
 | `meta.home.title` | 楚汉棋社 · 好友象棋对战 | Chuhan Xiangqi · Play Xiangqi with Friends | Chuhan Xiangqi · Chơi cờ tướng cùng bạn bè |
 | `meta.home.description` | 邀请好友在线下中国象棋。无限悔棋、独立推演、棋谱复盘，打开链接即可入座。 | Play Chinese chess online with friends. Unlimited undo, free exploration and move-by-move review. Open the link and take a seat. | Chơi cờ tướng trực tuyến với bạn bè. Đi lại không giới hạn, tự do thử nước và xem lại từng nước. Mở liên kết là vào bàn. |
 | `meta.ai.title` | 人机练习 · 楚汉棋社 | Play the Computer · Chuhan Xiangqi | Chơi với máy · Chuhan Xiangqi |
