@@ -3,7 +3,7 @@ import { errorBody } from '../lib/errors';
 import { deleteGame, listGames, saveGame } from './archive-api';
 import { googleCallback, logout, me, removeAccount, startGoogle } from './auth';
 import { database } from './db';
-import { GET, POST } from './game-api';
+import { GET, POST, SOCKET } from './game-api';
 
 // Static pages are served by the assets binding; only /api/* reaches this Worker.
 const app = new Hono();
@@ -14,6 +14,7 @@ app.use('/api/*', async (c, next) => {
   c.header('Referrer-Policy', 'same-origin');
 });
 app.get('/api/game', (c) => GET(c.req.raw));
+app.get('/api/game/ws', (c) => SOCKET(c.req.raw));
 app.post('/api/game', (c) => POST(c.req.raw));
 app.get('/api/me', (c) => me(c.req.raw));
 app.delete('/api/me', (c) => removeAccount(c.req.raw));
@@ -33,3 +34,4 @@ app.onError((error, c) => {
 });
 
 export default app;
+export { GameRoom, PlayerSeats } from './room-object';
