@@ -165,6 +165,7 @@ const messages: Record<MessageKey, string> = {
   'account.wait': 'Chờ một chút…',
   'account.signOut': 'Đăng xuất',
   'account.privacy': 'Quyền riêng tư',
+  'account.feedback': 'Góp ý',
   'account.delete': 'Xóa tài khoản',
   'account.signIn.label': 'Đăng nhập bằng Google',
   'account.signIn': 'Đăng nhập',
