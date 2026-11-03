@@ -446,6 +446,11 @@ button:not(:disabled):active {
     0 calc(var(--pt) + 3px) 7px #4a2c0f70;
   /* Held above the board: the edge thins and a soft shadow falls down-right,
      scaled with the board so phones and desktops look the same. */
+  /* Tipping down: the shadow has almost caught up with the piece. */
+  --piece-tip:
+    inset 0 1.5px 1px #fffbe6, inset 0 -3px 4px #9c6a3059,
+    0 var(--pt) 0 #9a6c3a, 0 calc(var(--pt) + 1px) 0 #6f4622,
+    0.4cqw 1cqw 1.2cqw #3a200a52;
   --piece-lift:
     inset 0 1.5px 1px #fffbe6, inset 0 -3px 4px #9c6a3059,
     0 calc(var(--pt) * 0.6) 0 #9a6c3a, 0 calc(var(--pt) * 0.6 + 1px) 0 #6f4622,
@@ -1841,23 +1846,63 @@ p {
 .piece-position.latest-piece {
   z-index: 2;
 }
-/* A travelling piece is picked up, carried over its neighbours and set down. */
+/* A travelling piece is carried over its neighbours, then set down edge first:
+   it tips its leading edge into the board, lies flat at the landing (the knock),
+   and rocks once before it settles. --lean-x/--lean-y give the tipping axis. */
 .piece-position.moving {
   z-index: 6;
+  perspective: 22cqw;
 }
 .piece-position.moving .piece {
-  animation: piece-hop var(--drop) ease-out var(--hover) backwards;
+  animation:
+    piece-hop var(--drop) linear var(--hover) backwards,
+    piece-settle var(--settle) ease-out calc(var(--hover) + var(--drop));
 }
 @keyframes piece-hop {
   from {
     translate: 0 -3%;
     scale: 1.3;
+    rotate: var(--lean-x) var(--lean-y) 0 0deg;
     box-shadow: var(--piece-lift);
+    animation-timing-function: cubic-bezier(0.3, 0, 0.7, 0.6);
+  }
+  62% {
+    translate: 0 -1%;
+    scale: 1.08;
+    rotate: var(--lean-x) var(--lean-y) 0 36deg;
+    box-shadow: var(--piece-tip);
+    animation-timing-function: cubic-bezier(0.4, 0.3, 0.7, 1);
   }
   to {
     translate: 0 0;
     scale: 1;
+    rotate: var(--lean-x) var(--lean-y) 0 0deg;
     box-shadow: var(--piece-rest);
+  }
+}
+/* After the knock the piece rocks back past flat, then twice smaller, and rests. */
+@keyframes piece-settle {
+  from {
+    scale: 1;
+    rotate: var(--lean-x) var(--lean-y) 0 0deg;
+  }
+  12% {
+    scale: 0.94 0.92;
+  }
+  30% {
+    scale: 1.02;
+    rotate: var(--lean-x) var(--lean-y) 0 -13deg;
+  }
+  56% {
+    scale: 1;
+    rotate: var(--lean-x) var(--lean-y) 0 6deg;
+  }
+  78% {
+    rotate: var(--lean-x) var(--lean-y) 0 -2.5deg;
+  }
+  to {
+    scale: 1;
+    rotate: var(--lean-x) var(--lean-y) 0 0deg;
   }
 }
 /* An undone capture returns once the capturing piece has stepped away. */
@@ -2074,9 +2119,18 @@ p {
   }
 }
 
-/* Our own ink stamp, shared by captures, checks and results: an open brush ring
-   with a large pale-gold word, arriving out of a zoom blur as the piece lands. */
+/* Our own ink stamp, shared by captures, checks and results. Timeline from the
+   move: the word zooms in at --stamp-delay, the ring is drawn around it, and on
+   impact a ripple and ink spatter leave the stamp; nothing darkens the board. */
+@property --sweep {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
 .board-effect {
+  --ink: #15110e;
+  --glow: #ffd88c8c;
+  --impact: calc(var(--stamp-delay) + var(--stamp-enter));
   position: absolute;
   inset: 0;
   z-index: 8;
@@ -2084,30 +2138,20 @@ p {
   place-items: center;
   pointer-events: none;
   overflow: hidden;
-  color: #1f1a17;
-  animation: stamp-fade var(--stamp-fade) ease-out var(--stamp-fade-at) forwards;
+  color: var(--ink);
+  animation: stamp-fade var(--stamp-fade) ease-in var(--stamp-fade-at) forwards;
 }
 .effect-check {
-  color: #7e2219;
+  --ink: #8c1f15;
+  --glow: #ff7a5a80;
 }
 .effect-mate {
-  color: #a3362a;
+  --ink: #a2291c;
+  --glow: #ff9a5c99;
 }
-/* A capture is stamped where it happened, about a third of the board across. */
-.board-effect.at-point {
-  inset: auto;
-  left: var(--at-x);
-  top: var(--at-y);
-  width: 34%;
-  aspect-ratio: 1;
-  translate: -50% -50%;
-  overflow: visible;
-}
-.at-point .ink-stamp {
-  width: 100%;
-}
-.at-point .ink-stamp strong {
-  font-size: 19cqw;
+.effect-result {
+  --ink: #2a221d;
+  --glow: #ffe6b473;
 }
 .ink-stamp {
   position: relative;
@@ -2120,54 +2164,151 @@ p {
   gap: 2cqw;
   text-align: center;
 }
+.ink-stamp > i {
+  position: absolute;
+  pointer-events: none;
+}
+.ink-glow {
+  inset: -22%;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--glow) 0, transparent 64%);
+  animation: glow-bloom 900ms var(--ease-out) var(--stamp-delay) both;
+}
 .ink-ring,
 .ink-slash {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  overflow: visible;
 }
+/* The ring is drawn clockwise from the upper left, like one turn of the wrist. */
 .ink-ring {
-  animation: ring-arrive calc(var(--stamp-enter) + 30ms) var(--ease-out)
-    calc(var(--stamp-delay) + 30ms) both;
+  -webkit-mask: conic-gradient(from -40deg, #000 var(--sweep), transparent 0);
+  mask: conic-gradient(from -40deg, #000 var(--sweep), transparent 0);
+  animation: ring-draw 220ms cubic-bezier(0.5, 0, 0.3, 1)
+    calc(var(--stamp-delay) + 20ms) both;
 }
 .ink-slash {
-  inset: -14%;
-  width: 128%;
-  height: 128%;
-  fill: #6f1f18;
-  animation: slash-arrive var(--stamp-enter) var(--ease-out) var(--stamp-delay)
-    both;
+  inset: -16%;
+  width: 132%;
+  height: 132%;
+  fill: #6c1c15;
+  animation: slash-arrive 200ms var(--ease-out) var(--stamp-delay) both;
 }
-.ink-stamp strong {
+/* Check: a single blade of light cuts across behind the word. */
+.ink-blade {
+  z-index: 3;
+  left: -30%;
+  right: -30%;
+  top: calc(50% - 0.9cqw);
+  height: 1.8cqw;
+  border-radius: 50%;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #ff8a5c 22%,
+    #fff4e4 46%,
+    #ffffff 50%,
+    #fff4e4 54%,
+    #ff8a5c 78%,
+    transparent
+  );
+  box-shadow:
+    0 0 1.6cqw 0.3cqw #ff7a52,
+    0 0 5cqw 1cqw #ff4a2a66;
+  rotate: -32deg;
+  animation: blade-cut 520ms var(--ease-out) calc(var(--impact) - 40ms) both;
+}
+.ink-ripple {
+  inset: 4%;
+  border-radius: 50%;
+  border: 0.7cqw solid currentColor;
+  /* Hidden until the impact: no backwards fill, so the delay shows nothing. */
+  opacity: 0;
+  animation: ripple-out 560ms var(--ease-out) var(--impact) forwards;
+}
+.ink-splat {
+  /* Sizes and distances are in stamp percent; the stamp is 58% of the board. */
+  left: 50%;
+  top: 50%;
+  width: calc(var(--s) * 0.58cqw);
+  aspect-ratio: 1;
+  margin: calc(var(--s) * -0.29cqw);
+  border-radius: 48% 52% 44% 56%;
+  background: currentColor;
+  animation: splat-burst 360ms cubic-bezier(0.2, 0.9, 0.3, 1.2)
+    calc(var(--impact) + var(--i) * 12ms) both;
+}
+.ink-spark {
+  z-index: 3;
+  left: var(--x);
+  bottom: 34%;
+  /* Deep gold with a thin dark rim, so sparks read on the pale board. */
+  width: 1.8cqw;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff3c4 0 30%, #f3a93a 70%);
+  box-shadow:
+    0 0 0 0.2cqw #7a380f99,
+    0 0 1.6cqw #ff8a2acc;
+  animation: spark-rise 1100ms ease-out calc(var(--impact) + var(--sd)) both;
+}
+/* The word: a dark outline under a gilded face, with a zoom echo while it lands. */
+.ink-word {
   position: relative;
+  z-index: 4;
+  display: grid;
   font-family: 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
   font-size: 32cqw;
   line-height: 1.1;
   font-weight: 400;
-  color: #f8e7b9;
-  -webkit-text-stroke: 0.7cqw #2a1d14;
-  paint-order: stroke fill;
-  text-shadow:
-    0 0.5cqw 1.2cqw #000a,
-    0 0 3cqw #fff3cf55;
-  animation: glyph-arrive var(--stamp-enter) var(--ease-out) var(--stamp-delay)
-    both;
+  white-space: nowrap;
+  animation: glyph-arrive var(--stamp-enter) cubic-bezier(0.3, 0, 0.2, 1)
+      var(--stamp-delay) both,
+    glyph-settle 180ms var(--ease-out) var(--impact) both;
 }
-/* A larger, fading echo of the word reads as the zoom blur of a stamp coming down. */
-.ink-stamp strong::after {
-  content: attr(data-text);
-  position: absolute;
-  inset: 0;
-  color: #fff3cf;
-  -webkit-text-stroke: 0;
-  opacity: 0;
-  animation: glyph-echo calc(var(--stamp-enter) + 120ms) ease-out
-    var(--stamp-delay) both;
+.effect-mate .ink-word {
+  font-size: 22cqw;
 }
-.effect-mate strong,
-.effect-result strong {
+.effect-result .ink-word {
   font-size: 18cqw;
+}
+.ink-word > span {
+  position: relative;
+  grid-area: 1 / 1;
+}
+/* The filtered outline forms its own layer, so stack the three layers explicitly. */
+.ink-outline {
+  z-index: 0;
+  color: #22160e;
+  -webkit-text-stroke: 1.5cqw #22160e;
+  filter: drop-shadow(0 0.6cqw 0.8cqw #000a);
+}
+.ink-fill {
+  z-index: 2;
+  color: transparent;
+  background: linear-gradient(
+    100deg,
+    #f4d690 0%,
+    #e6bd68 30%,
+    #fff6dc 44%,
+    #f2d184 52%,
+    #c48f3e 78%,
+    #edcf88 100%
+  );
+  background-size: 300% 100%;
+  background-position: 100% 0;
+  -webkit-background-clip: text;
+  background-clip: text;
+  animation: glyph-shine 760ms ease-in-out calc(var(--impact) + 60ms) both;
+}
+.ink-echo {
+  z-index: 1;
+  color: #fff3cf;
+  opacity: 0;
+  animation: glyph-echo calc(var(--stamp-enter) + 140ms) ease-out
+    var(--stamp-delay) both;
 }
 .ink-stamp-context,
 .effect-detail {
@@ -2179,49 +2320,68 @@ p {
   background: #fff3d9ed;
   border-radius: 4px;
   padding: 0.2cqw 1.4cqw;
-  animation: glyph-arrive var(--stamp-enter) var(--ease-out)
-    calc(var(--stamp-delay) + 80ms) both;
-}
-.ink-stamp-context:empty {
-  display: none;
+  animation: glyph-echo-in 220ms var(--ease-out) calc(var(--impact) + 80ms)
+    both;
 }
 @keyframes glyph-arrive {
   from {
     opacity: 0;
-    scale: 1.8;
-    filter: blur(12px);
+    scale: 1.9;
+    filter: blur(14px);
   }
-  55% {
+  50% {
     opacity: 1;
   }
   to {
     opacity: 1;
-    scale: 1;
+    scale: 0.95;
     filter: blur(0);
+  }
+}
+@keyframes glyph-settle {
+  from {
+    scale: 0.95;
+  }
+  to {
+    scale: 1;
   }
 }
 @keyframes glyph-echo {
   from {
-    opacity: 0.55;
-    scale: 1.6;
-    filter: blur(6px);
+    opacity: 0.6;
+    scale: 1.7;
+    filter: blur(7px);
   }
   to {
     opacity: 0;
-    scale: 1.15;
+    scale: 1.12;
     filter: blur(2px);
   }
 }
-@keyframes ring-arrive {
+@keyframes glyph-echo-in {
   from {
     opacity: 0;
-    scale: 1.3;
-    rotate: -24deg;
+    translate: 0 1cqw;
+  }
+}
+@keyframes glyph-shine {
+  from {
+    background-position: 100% 0;
   }
   to {
+    background-position: 0 0;
+  }
+}
+@keyframes ring-draw {
+  from {
+    --sweep: 0deg;
+    opacity: 0.6;
+    scale: 1.08;
+  }
+  to {
+    --sweep: 361deg;
     opacity: 1;
     scale: 1;
-    rotate: 0deg;
   }
 }
 @keyframes slash-arrive {
@@ -2234,19 +2394,87 @@ p {
     clip-path: inset(0 0 0 0);
   }
 }
+@keyframes blade-cut {
+  from {
+    opacity: 0;
+    scale: 0.1 1;
+    translate: -18% 12%;
+  }
+  30% {
+    opacity: 1;
+    scale: 1 1;
+    translate: 0 0;
+  }
+  to {
+    opacity: 0;
+    scale: 1.15 0.25;
+    translate: 6% -4%;
+  }
+}
+@keyframes ripple-out {
+  from {
+    opacity: 0.5;
+    scale: 0.92;
+  }
+  to {
+    opacity: 0;
+    scale: 1.5;
+  }
+}
+@keyframes splat-burst {
+  from {
+    opacity: 0;
+    transform: rotate(var(--a)) translateX(0) scale(0.2);
+  }
+  to {
+    opacity: 0.9;
+    transform: rotate(var(--a)) translateX(calc(var(--d) * 0.58cqw)) scale(1);
+  }
+}
+@keyframes spark-rise {
+  from {
+    opacity: 0;
+    translate: 0 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+    translate: 0 calc(var(--h) * -4.5);
+  }
+}
+@keyframes glow-bloom {
+  from {
+    opacity: 0;
+    scale: 0.6;
+  }
+  30% {
+    opacity: 1;
+    scale: 1;
+  }
+  to {
+    opacity: 0.4;
+    scale: 1.05;
+  }
+}
 @keyframes stamp-fade {
   to {
     opacity: 0;
+    filter: blur(3px);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .ink-ring,
-  .ink-slash,
-  .ink-stamp strong,
-  .ink-stamp strong::after,
-  .ink-stamp-context,
-  .effect-detail {
-    animation-duration: 1ms;
+  .board-effect *,
+  .board-effect {
+    animation-duration: 1ms !important;
+  }
+  .ink-ripple,
+  .ink-splat,
+  .ink-spark,
+  .ink-blade,
+  .ink-echo {
+    display: none;
   }
 }
 @keyframes fade-rise {
@@ -4075,4 +4303,77 @@ html {
 .game-sheet .move-row .move-rating {
   font-size: 12px;
   min-height: 36px;
+}
+
+/* Free play from the lobby has no opponent and no room: drop the empty seats and
+   the record, put the two ways out side by side, and give the board the rest of
+   one screen, sized the same way as a room. */
+@media (max-width: 660px), (max-height: 500px) and (pointer: coarse), (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
+  html:has(.app-shell.is-analysis:not(.in-room)),
+  body:has(.app-shell.is-analysis:not(.in-room)) {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+  .app-shell.is-analysis:not(.in-room) {
+    height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .is-analysis:not(.in-room) .workspace {
+    flex: 1 1 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+  }
+  .is-analysis:not(.in-room) .play-column {
+    display: flex;
+    flex: 1 1 0;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 0;
+  }
+  /* Portrait tablets hide the side column elsewhere; here its two buttons lead the page. */
+  .is-analysis:not(.in-room) .room-column {
+    display: contents;
+  }
+  .is-analysis:not(.in-room) .player-seat,
+  .is-analysis:not(.in-room) .score-panel,
+  .is-analysis:not(.in-room) .invite-panel .room-card-label {
+    display: none;
+  }
+  .is-analysis:not(.in-room) .invite-panel {
+    order: -1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 8px;
+  }
+  .is-analysis:not(.in-room) .invite-panel > .primary-button,
+  .is-analysis:not(.in-room) .invite-panel > .secondary-button {
+    min-height: 40px;
+    margin: 0;
+    padding: 0 8px;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+  .is-analysis:not(.in-room) .board-stage {
+    flex: 1 1 0;
+    min-height: 0;
+    container-type: size;
+    display: grid;
+    place-items: center;
+  }
+  .is-analysis:not(.in-room) .board-stage .board-frame {
+    width: min(100cqw, calc(90cqh - 2px));
+    padding: 6px;
+    margin: 0 auto;
+  }
+  .is-analysis:not(.in-room) .analysis-controls {
+    flex: 0 0 auto;
+    margin: 0;
+  }
 }

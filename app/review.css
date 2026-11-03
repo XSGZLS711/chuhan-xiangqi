@@ -29,7 +29,7 @@
 }
 .review-header {
   display: grid;
-  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-columns: 40px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
@@ -151,7 +151,7 @@
 }
 .review-tabs {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 3px;
   padding: 3px;
   border: 1px solid var(--border);
@@ -559,16 +559,14 @@
   font-size: 12px;
   color: var(--muted-foreground);
 }
-.report-mistakes ul,
-.practice-list {
+.report-mistakes ul {
   display: grid;
   gap: 5px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
-.report-mistakes li button,
-.practice-list button {
+.report-mistakes li button {
   display: flex;
   align-items: center;
   gap: 6px;
@@ -581,41 +579,48 @@
   color: var(--foreground);
   background: transparent;
 }
-.report-mistakes li button span,
-.practice-list button span {
+.report-mistakes li button span {
   color: var(--muted-foreground);
   font-variant-numeric: tabular-nums;
 }
-.report-mistakes li button i,
-.practice-list button i {
+.report-mistakes li button i {
   margin-left: auto;
 }
-.practice-list button[aria-current='true'] {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
-}
 
-/* Practice: retry the mistakes of one side, with a hint and the answer on demand. */
-.practice-sides {
+/* Practice: one question at a time; side and question are picked from two lists. */
+.review-practice {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.practice-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 6px;
 }
-.practice-sides button {
-  height: 34px;
+.practice-picker select {
+  min-width: 0;
+  height: 38px;
+  padding: 0 28px 0 10px;
   border: 1px solid var(--border);
-  border-radius: 9px;
-  font-size: 13px;
-  color: var(--muted-foreground);
-  background: transparent;
-}
-.practice-sides button[aria-pressed='true'] {
-  border-color: var(--primary);
+  border-radius: 10px;
+  font: inherit;
+  font-size: 14px;
   color: var(--foreground);
-  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  background:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%)
+      calc(100% - 15px) 50% / 5px 5px no-repeat,
+    linear-gradient(-45deg, transparent 50%, var(--muted-foreground) 50%)
+      calc(100% - 10px) 50% / 5px 5px no-repeat,
+    var(--card);
+  appearance: none;
+  text-overflow: ellipsis;
+}
+.practice-picker select:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
 }
 .practice-message {
-  margin: 10px 2px;
+  margin: 0 2px;
   font-size: 14px;
 }
 .practice-message.solved {
@@ -625,107 +630,16 @@
 .practice-message.wrong {
   color: #d27126;
 }
-.practice-actions {
-  position: sticky;
-  bottom: 0;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 6px;
-  margin-top: 12px;
-  padding-top: 8px;
-  background: var(--background);
-}
-.practice-actions button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  height: 40px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-  color: var(--foreground);
-  background: var(--card);
-}
-.practice-actions svg {
-  width: 16px;
-  height: 16px;
-}
 
 /* Commentary: why the move went wrong and why the engine's choice is better. */
-.compare-note {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-  margin: 0;
-  padding: 10px 12px;
-  border-left: 3px solid #d27126;
-  border-radius: 4px 10px 10px 4px;
-  font-size: 14px;
-  line-height: 1.55;
-  background: color-mix(in srgb, #d27126 9%, var(--card));
-}
-.compare-note button {
-  padding: 0;
-  border: 0;
-  font-size: 13px;
-  color: var(--emphasis);
-  background: none;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-.review-commentary {
-  display: grid;
-  gap: 10px;
-}
-.commentary-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.commentary-list button {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 9px;
-  border: 1px solid var(--border);
-  border-radius: 9px;
-  font-size: 14px;
-  color: var(--foreground);
-  background: transparent;
-}
-.commentary-list button span {
-  color: var(--muted-foreground);
-  font-variant-numeric: tabular-nums;
-}
-.commentary-list button[aria-current='true'] {
-  border-color: var(--primary);
-  background: color-mix(in srgb, var(--primary) 12%, transparent);
-}
 .commentary-card {
   padding: 12px 14px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--card);
 }
-.commentary-card header {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 8px;
-}
-.commentary-card header strong {
-  font-size: 16px;
-  font-weight: 600;
-}
-.commentary-card header span {
-  margin-left: auto;
-  font-size: 13px;
-  color: var(--muted-foreground);
+.commentary-card h4:first-child {
+  margin-top: 0;
 }
 .commentary-card h4 {
   margin: 12px 0 4px;
@@ -747,37 +661,11 @@
   font-size: 12px;
   color: var(--muted-foreground);
 }
-.commentary-actions {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin: 12px 0 10px;
-}
-.commentary-actions button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: 38px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  font-size: 13px;
-  color: var(--foreground);
-  background: transparent;
-}
-.commentary-actions button[aria-pressed='true'] {
-  border-color: var(--success);
-}
-.commentary-actions svg {
-  width: 15px;
-  height: 15px;
-}
 
 .review-nav {
   position: sticky;
   bottom: 0;
-  display: grid;
-  grid-template-columns: 44px 1fr 1fr 44px auto;
+  display: flex;
   gap: 6px;
   width: min(100%, 720px);
   margin: 0 auto;
@@ -785,17 +673,29 @@
   background: var(--background);
 }
 .review-nav button {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
+  gap: 2px;
   height: 44px;
-  padding: 0 10px;
+  padding: 0 8px;
+  white-space: nowrap;
   border: 1px solid var(--border);
   border-radius: 12px;
   font-size: 14px;
   color: var(--foreground);
   background: var(--card);
+}
+.review-nav button.icon {
+  flex: 0 0 44px;
+  padding: 0;
+}
+.review-nav button.primary {
+  border-color: var(--primary);
+  font-weight: 600;
+  color: #fff9ef;
+  background: var(--primary);
 }
 .review-nav svg {
   width: 18px;
