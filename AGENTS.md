@@ -7,6 +7,7 @@ Plan: `ROADMAP.md`. Competitor study notes live only on the owner's machine in `
 ## Rules
 - Reply to the user in Chinese. Report test results honestly; say what was not verified.
 - Work on a branch; `main` auto-deploys staging. Push and open a PR when the user asks. Cloud sessions may push their own branch and open PRs, never merge.
+- Workers Logs keeps only what the code logs: invocation logs are off in `wrangler.jsonc` (both environments), because they record request headers and the IP, and `public/privacy.html` promises we keep neither. Leave them off; turning them on means rewording the privacy page with the owner first.
 - Deploys, secrets and remote migrations belong to the owner (`npm run deploy`, `deploy:staging`, `wrangler deploy`, `wrangler secret put`, `db:migrate:staging`, `db:migrate:production`): hand the user the command to run. The D1 ids in `wrangler.jsonc` stay as they are.
 - Keep `lib/xiangqi.ts`, `lib/game.ts` and `lib/presentation.ts` pure (no DOM, no React): the long-term goal is a WeChat mini program on the same core.
 - Run `npm run format` (oxfmt) only on files you changed.
