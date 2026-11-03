@@ -19,7 +19,7 @@
     "lint": "oxlint",
     "format": "oxfmt",
     "test": "esbuild tests/rules.test.ts --bundle --platform=node --format=esm --outfile=work/rules.test.mjs && node work/rules.test.mjs",
-    "test:identity": "esbuild tests/identity.test.ts --bundle --platform=node --format=esm --outfile=work/identity.test.mjs && node work/identity.test.mjs && esbuild tests/auth.test.ts tests/accounts.test.ts --bundle --packages=external --platform=node --format=esm --outdir=work/auth-tests --out-extension:.js=.mjs && node work/auth-tests/auth.test.mjs && node work/auth-tests/accounts.test.mjs",
+    "test:identity": "esbuild tests/identity.test.ts --bundle --platform=node --format=esm --outfile=work/identity.test.mjs && node work/identity.test.mjs && esbuild tests/auth.test.ts tests/accounts.test.ts tests/room-poll.test.ts --bundle --packages=external --platform=node --format=esm --outdir=work/auth-tests --out-extension:.js=.mjs && node work/auth-tests/auth.test.mjs && node work/auth-tests/accounts.test.mjs && node work/auth-tests/room-poll.test.mjs",
     "test:online": "node tests/online.test.mjs",
     "test:ai": "esbuild tests/ai.test.ts tests/ai-engine.test.ts --bundle --platform=node --format=esm --outdir=work/ai-tests --out-extension:.js=.mjs && node --test work/ai-tests/ai.test.mjs && node work/ai-tests/ai-engine.test.mjs",
     "test:ui": "esbuild tests/presentation.test.ts --bundle --platform=node --format=esm --outfile=work/presentation.test.mjs && node work/presentation.test.mjs",

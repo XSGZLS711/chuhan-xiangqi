@@ -5,7 +5,8 @@ export type PublicRoom=Omit<Room,'players'> & {players:{red:{name:string;online:
 export class GameError extends Error{constructor(message:string,public status=400){super(message)}}
 export function newRoom(id:string,player:Player,clockMinutes:number,now:number):Room{return {id,board:initialBoard(),turn:'red',players:{red:player,black:null},history:[],result:null,offer:null,clockMinutes,clocks:{red:clockMinutes*60000,black:clockMinutes*60000},turnAt:now,quiet:0,round:1,note:'棋桌已备好，等待好友入座',chat:[],createdAt:now};}
 export function playerSide(r:Room,id:string):Side|null{return r.players.red.id===id?'red':r.players.black?.id===id?'black':null;}
-export function expireClock(r:Room,now:number):boolean{if(r.clockMinutes&&r.players.black&&!r.result&&now-r.turnAt>=r.clocks[r.turn]){r.clocks[r.turn]=0;r.result={winner:opposite(r.turn),reason:'超时'};r.offer=null;return true;}return false;}
+export function clockDeadline(r:Room):number{return r.clockMinutes&&r.players.black&&!r.result?r.turnAt+r.clocks[r.turn]:Infinity;}
+export function expireClock(r:Room,now:number):boolean{if(now>=clockDeadline(r)){r.clocks[r.turn]=0;r.result={winner:opposite(r.turn),reason:'超时'};r.offer=null;return true;}return false;}
 export function applyAction(r:Room,id:string,a:Record<string,unknown>,now:number):void{
  const side=playerSide(r,id);const type=a.action;
  if(type==='join'){if(side)return;if(r.players.black)throw new GameError('棋桌已坐满，你可以观战。',409);r.players.black={id,name:cleanName(a.name)};r.turnAt=now;r.note='好友已入座，红方先行';return;}

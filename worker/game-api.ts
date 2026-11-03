@@ -1,11 +1,13 @@
 import { validateRequestOrigin } from './identity';
 import { player } from './accounts';
 import { database } from './db';
+import { HOLD_MS, present, touchPresence, waitForChange } from './room-poll';
 import {
   Room,
   PublicRoom,
   newRoom,
   playerSide,
+  clockDeadline,
   expireClock,
   applyAction,
   GameError,
@@ -43,24 +45,14 @@ async function publicState(
   const db = database(),
     side = playerSide(room, id),
     now = Date.now();
-  if (side)
-    await db
-      .prepare(
-        'INSERT INTO presence (id, seen_at) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET seen_at=excluded.seen_at',
-      )
-      .bind(room.id + ':' + id, now)
-      .run();
-  const online = async (pid: string) => {
-    const v = await db
-      .prepare('SELECT seen_at FROM presence WHERE id = ?')
-      .bind(room.id + ':' + pid)
-      .first<{ seen_at: number }>();
-    return !!v && now - v.seen_at < 18000;
-  };
-  const [red, black] = await Promise.all([
-    online(room.players.red.id),
-    room.players.black ? online(room.players.black.id) : Promise.resolve(false),
-  ]);
+  if (side) await touchPresence(db, room.id + ':' + id, now);
+  const [red, black = false] = await present(
+    db,
+    [room.players.red, room.players.black].flatMap((seat) =>
+      seat ? [room.id + ':' + seat.id] : [],
+    ),
+    now,
+  );
   return {
     ...room,
     players: {
@@ -79,10 +71,22 @@ async function handleGet(req: Request) {
   try {
     const identityValue = await player(req, database());
     cookie = identityValue.cookie;
-    const id = new URL(req.url).searchParams.get('room');
+    const params = new URL(req.url).searchParams;
+    const id = params.get('room');
     if (!id) return reply({ ready: true }, cookie);
     const { db, ...current } = await readRoom(id);
     let { room, version } = current;
+    // The page already has this version: wait here for the next change rather than
+    // answering now and being asked again a moment later.
+    if (params.get('since') === String(version)) {
+      await waitForChange(
+        db,
+        id,
+        version,
+        Math.min(Date.now() + HOLD_MS, clockDeadline(room)),
+      );
+      ({ room, version } = await readRoom(id));
+    }
     if (expireClock(room, Date.now())) {
       const saved = await db
         .prepare(

@@ -220,11 +220,13 @@ export default function Home() {
       orientationRoom.current = r.id;
     }
   }
-  async function fetchRoom(id: string) {
-    const res = await gameFetch('/api/game?room=' + encodeURIComponent(id), {
-      cache: 'no-store',
-      signal: AbortSignal.timeout(12000),
-    });
+  /** With `since`, the server holds the answer until the room moves past that version. */
+  async function fetchRoom(id: string, since?: number) {
+    const query = since === undefined ? '' : '&since=' + since;
+    const res = await gameFetch(
+      '/api/game?room=' + encodeURIComponent(id) + query,
+      { cache: 'no-store', signal: AbortSignal.timeout(12000) },
+    );
     const data = (await res.json()) as PublicRoom & { error?: string };
     if (!res.ok) throw new Error(data.error);
     return data as PublicRoom;
@@ -261,8 +263,13 @@ export default function Home() {
     let disposed = false;
     let timer: ReturnType<typeof setTimeout>;
     const poll = async () => {
+      const started = Date.now();
       try {
-        const r = await fetchRoom(roomId);
+        const known = roomRef.current;
+        const r = await fetchRoom(
+          roomId,
+          known?.id === roomId ? known.version : undefined,
+        );
         if (disposed) return;
         update(r);
         if (
@@ -299,7 +306,13 @@ export default function Home() {
           );
         }
       } finally {
-        if (!disposed) timer = setTimeout(poll, document.hidden ? 5000 : 1400);
+        // Spaced from the start of the last request, so an answer that comes back at
+        // once never makes the page ask faster than it did before polls were held.
+        if (!disposed)
+          timer = setTimeout(
+            poll,
+            Math.max(0, started + (document.hidden ? 5000 : 1400) - Date.now()),
+          );
       }
     };
     void poll();

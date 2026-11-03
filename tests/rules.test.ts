@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {initialBoard,legalMove,legalTargets,moveBoard,pseudoLegal,inCheck,hasLegalMove,notation,opposite,outcome,type Board,type Side,type Kind} from '../lib/xiangqi';
-import {newRoom,applyAction,expireClock,playerSide} from '../lib/game';
+import {newRoom,applyAction,clockDeadline,expireClock,playerSide} from '../lib/game';
 let count=0;const test=(name:string,fn:()=>void)=>{fn();count++;console.log('✓ '+name);};
 function setup(pieces:[number,Side,Kind][]):Board{const b:Board=Array(90).fill(null);for(const [i,side,kind]of pieces)b[i]={side,kind,id:String(i)};return b;}
 const b=initialBoard();
@@ -45,6 +45,7 @@ test('拒绝和棋后继续，走棋撤回提和',()=>{const r=fresh();applyActi
 test('重开需双方同意并交换红黑',()=>{const r=fresh();applyAction(r,red,{action:'offer-rematch'},now);assert.equal(r.round,1);applyAction(r,black,{action:'respond',accept:true},now+1000);assert.equal(r.round,2);assert.equal(r.players.red.id,black);assert.equal(r.players.black?.id,red);assert.deepEqual(r.board,b);});
 test('时钟超时仅判当前方负，未入座不计时',()=>{const r=fresh(10);assert(expireClock(r,now+600000));assert.equal(r.result?.winner,'black');assert.equal(expireClock(newRoom('x',{id:red,name:'红'},10,now),now+900000),false);});
 test('不限时对局不会超时',()=>assert.equal(expireClock(fresh(),now+999999999),false));
+test('计时截止点与超时判定一致，停表时为无穷',()=>{const r=fresh(10);const end=clockDeadline(r);assert.equal(end,r.turnAt+600000);assert.equal(expireClock(r,end-1),false);assert(expireClock(r,end));assert.equal(clockDeadline(r),Infinity);assert.equal(clockDeadline(fresh()),Infinity);assert.equal(clockDeadline(newRoom('x',{id:red,name:'红'},10,now)),Infinity);});
 test('三次重复局面判和',()=>{const r=fresh();for(let i=0;i<2;i++)for(const [id,from,to]of [[red,82,63],[black,1,18],[red,63,82],[black,18,1]] as [string,number,number][])applyAction(r,id,{action:'move',from,to},now);assert.equal(r.result?.reason,'三次重复局面');});
 test('单方循环长将判负',()=>{const x=setup([[4,'black','k'],[85,'red','k'],[49,'red','p'],[12,'red','r']]);const history=Array.from({length:4},(_,i)=>({before:x,side:(i%2?'black':'red') as Side,check:i%2===0,from:12,to:13,text:'测试',captured:null,clocks:{red:0,black:0},quietBefore:0}));assert.equal(outcome(x,'red',history,4)?.winner,'black');});
 test('连续 60 回合不吃子自动和棋',()=>assert.equal(outcome(b,'red',[],120)?.reason,'连续 60 回合未吃子'));
