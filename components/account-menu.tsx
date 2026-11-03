@@ -1,10 +1,9 @@
 import { LogIn, LogOut } from 'lucide-react';
+import { FEEDBACK_ADDRESS, PRIVACY_PAGE } from '@/components/site-links';
 import { localeMeta, playerName } from '@/lib/i18n';
 import type { useAccount } from '@/lib/use-account';
 import { useLocale } from '@/lib/use-locale';
 
-// A static page in public/, outside the React app.
-const PRIVACY_PAGE = '/privacy';
 // The first character as people see it, even for an emoji or a combined glyph.
 const initial = (name: string, language: string, fallback: string) =>
   new Intl.Segmenter(language, { granularity: 'grapheme' })
@@ -42,6 +41,9 @@ export default function AccountMenu({
           </button>
           <div className="account-links">
             <a href={PRIVACY_PAGE}>{t('account.privacy')}</a>
+            <a href={`mailto:${FEEDBACK_ADDRESS}`} title={FEEDBACK_ADDRESS}>
+              {t('account.feedback')}
+            </a>
             <button disabled={account.busy} onClick={account.deleteAccount}>
               {t('account.delete')}
             </button>
