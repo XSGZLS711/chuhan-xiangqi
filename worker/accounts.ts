@@ -53,6 +53,8 @@ export async function signIn(
   google: GoogleAccount,
   before: Player,
   now: number,
+  // Rooms in Durable Objects keep their own seats (`moveLiveSeats`).
+  moveLive?: (from: string, to: string, since: number) => Promise<void>,
 ): Promise<string> {
   const known = await db
     .prepare(
@@ -98,7 +100,10 @@ export async function signIn(
       .bind(userId, now),
   ]);
   // Seats taken anonymously come along; one account's seats never move to another.
-  if (!before.signedIn) await moveSeats(db, before.id, userId, now);
+  if (!before.signedIn) {
+    await moveSeats(db, before.id, userId, now);
+    await moveLive?.(before.id, userId, now - SEAT_DAYS * DAY);
+  }
   return token;
 }
 

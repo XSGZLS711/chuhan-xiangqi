@@ -9,6 +9,7 @@ import {
   signOut,
 } from './accounts';
 import { database } from './db';
+import { forgetLiveSeats, moveLiveSeats } from './room-object';
 import {
   authorizationUrl,
   CALLBACK_PATH,
@@ -105,7 +106,13 @@ export async function googleCallback(req: Request) {
       { clientId: client.id, nonce: pending.nonce, now: Date.now() },
     );
     const db = database();
-    const token = await signIn(db, google, await player(req, db), Date.now());
+    const token = await signIn(
+      db,
+      google,
+      await player(req, db),
+      Date.now(),
+      moveLiveSeats,
+    );
     return redirect(back, [
       clear,
       sessionCookie(req, token, SESSION_DAYS * 86400),
@@ -141,5 +148,6 @@ export async function removeAccount(req: Request) {
       headers: noStore,
     });
   await deleteAccount(db, me.id);
+  await forgetLiveSeats(me.id);
   return signedOut(req);
 }
