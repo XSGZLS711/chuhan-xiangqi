@@ -10,7 +10,7 @@
 | 任务 | 负责的会话 | 分支 / PR | 状态 |
 |---|---|---|---|
 | 英文界面 | 另一个本地窗口 | PR #11 | 已合并并上线：预发和正式站都已是英文界面版本（2026-11-04 用 GitHub Actions 部署到正式站） |
-| 越南语界面与越南记谱 | 云端 `vietnamese` | `claude/admiring-mayer-ka8jhh` / PR #14 | 已验收（2026-11-04）：检查全过，代码不用改；等越南朋友校对 `docs/vi-review.md` 和记谱例子，等你定品牌名和英文溢出要不要一起修；合并前删掉 `docs/vi-review*` |
+| 越南语界面与越南记谱 | 云端 `vietnamese` | `claude/admiring-mayer-ka8jhh` / PR #14 | 已验收（2026-11-04）：检查全过；你已决定品牌名保留 Chuhan Xiangqi、英文溢出一起修，修改意见已发给云端会话；还等越南朋友校对 `docs/vi-review.md`，校对改完再删 `docs/vi-review*` 并合并 |
 | 上线准备包：搜索分享、访问统计、错误上报、反馈 | 云端 `launch-prep` | `claude/cool-wright-nemwef` / PR #12 | 已验收（2026-11-04）：检查全过，一处要改（关掉 Workers Logs 的调用日志，否则隐私说明「不含 IP」不成立）；修改意见已发给云端会话；标题、描述、隐私说明措辞等你定稿；`feedback@chuhanxiangqi.com` 的 Email Routing 已配好（2026-11-04） |
 | M2 实时对战（Durable Objects + WebSocket） | 云端 `realtime-do` | 待开 PR | 第一次没能启动，2026-11-04 重新派出 |
 
