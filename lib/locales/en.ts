@@ -334,7 +334,7 @@ const messages: Record<MessageKey, string> = {
   'dialog.name.title': 'What should we call you?',
   'dialog.rules.title': 'Friend game rules',
   'dialog.invite.description':
-    'Send the link below to a friend. The first visitor plays Black automatically; anyone after that can watch.',
+    'Send the link below to a friend. The first visitor takes the other seat automatically; anyone after that can watch.',
   'dialog.rules.description': 'Red moves first, and players take turns.',
   'dialog.yourName': 'Your name',
   'dialog.clock': 'Time control',

@@ -317,7 +317,7 @@ export const zhMessages = {
   'dialog.name.title': '如何称呼你？',
   'dialog.rules.title': '好友对局规则',
   'dialog.invite.description':
-    '把下面的链接发给好友。第一位访客自动执黑，之后的访客可以观战。',
+    '把下面的链接发给好友。第一位访客自动入座，之后的访客可以观战。',
   'dialog.rules.description': '红方先行，双方轮流落子。',
   'dialog.yourName': '你的称呼',
   'dialog.clock': '对局用时',
