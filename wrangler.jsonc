@@ -4,8 +4,8 @@
   "main": "worker/index.ts",
   "compatibility_date": "2026-05-15",
   "observability": { "enabled": true },
-  // Serve the site from your own domain once it is on Cloudflare:
-  // "routes": [{ "pattern": "chess.example.com", "custom_domain": true }],
+  // The workers.dev address keeps working; the domain is the public one.
+  "routes": [{ "pattern": "chuhanxiangqi.com", "custom_domain": true }],
   "assets": {
     // Pages are static; only /api/* wakes the Worker, so page views cost nothing.
     "html_handling": "auto-trailing-slash",
@@ -24,6 +24,9 @@
     "staging": {
       "name": "chuhan-xiangqi-staging",
       "observability": { "enabled": true },
+      "routes": [
+        { "pattern": "staging.chuhanxiangqi.com", "custom_domain": true }
+      ],
       "d1_databases": [
         {
           "binding": "DB",

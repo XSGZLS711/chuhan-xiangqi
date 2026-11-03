@@ -69,7 +69,7 @@ npm run preview      # 本地预览构建结果
 
 1. `npx wrangler login`，然后创建两个数据库：`npx wrangler d1 create chuhan-xiangqi` 与 `npx wrangler d1 create chuhan-xiangqi-staging`，把输出的 `database_id` 分别填进 `wrangler.jsonc`（顶层与 `env.staging`）。
 2. 先上预发：`npm run db:migrate:staging && npm run deploy:staging`，用 Cloudflare 给的 `*.workers.dev` 地址验证。
-3. 再上线：`npm run db:migrate:production && npm run deploy`。要用自己的域名，取消 `wrangler.jsonc` 中 `routes` 注释并改成你的域名。
+3. 再上线：`npm run db:migrate:production && npm run deploy`。正式环境在 https://chuhanxiangqi.com ，预发在 https://staging.chuhanxiangqi.com （见 `wrangler.jsonc` 的 `routes`）。
 4. 自动部署：在 GitHub 仓库的 Settings → Secrets 中添加 `CLOUDFLARE_API_TOKEN`（建议基于 “Edit Cloudflare Workers” 模板，并确认含 D1 编辑权限）与 `CLOUDFLARE_ACCOUNT_ID`。之后推送到 `main` 会先跑测试，再自动更新预发；上线则在 Actions 里手动运行 “Test and deploy” 并选择 `production`。未配置密钥时只跑测试，不部署。
 
 旧的 GitHub Pages 前端与旧后端互相独立：本版本不再向 Pages 发布，旧站停留在最后一次发布的状态；新旧站点使用各自的数据库，棋局不会迁移。
