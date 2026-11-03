@@ -1,10 +1,11 @@
+import { reasonText, sideName, t, type Locale, type MessageKey } from './i18n';
+import { REASON } from './tokens';
 import {
   hasLegalMove,
   inCheck,
   initialBoard,
   moveBoard,
   opposite,
-  sideLabel,
   type Board,
   type Kind,
   type Piece,
@@ -99,14 +100,48 @@ export type SoundKind =
   | 'check'
   | 'mate'
   | 'result';
+/** What a stamp says, as dictionary keys plus the side and reason it names. The overlay turns
+ * it into words in the viewer's language when it draws, so switching language mid-stamp works. */
+export type StampText = {
+  title: MessageKey;
+  detail: MessageKey;
+  side?: Side;
+  reason?: string;
+};
 export type BoardEffect = {
   id: string;
   kind: 'capture' | 'check' | 'mate' | 'result';
+  /** The Chinese words, kept for callers that read them; display with `stampWords`. */
   title: string;
   detail: string;
   side?: Side;
   analysis?: boolean;
+  text: StampText;
 };
+export function stampWords(
+  locale: Locale,
+  effect: Pick<BoardEffect, 'text' | 'analysis'>,
+): { title: string; detail: string; word: string } {
+  const { text } = effect;
+  const title = t(locale, text.title);
+  return {
+    title,
+    word: text.title === 'stamp.check' ? t(locale, 'stamp.check.word') : title,
+    detail:
+      (effect.analysis ? t(locale, 'stamp.exploring') : '') +
+      t(locale, text.detail, {
+        side: text.side ? sideName(locale, text.side) : '',
+        reason: text.reason ? reasonText(locale, text.reason) : '',
+      }),
+  };
+}
+function stamp(
+  base: Omit<BoardEffect, 'title' | 'detail'>,
+  locale: Locale = 'zh',
+): BoardEffect {
+  const { title, detail } = stampWords(locale, base);
+  return { ...base, title, detail };
+}
 export const STAMP_TIMING = { delayMs: 250, enterMs: 150, fadeMs: 400 };
 /** Visible lifetime, after the stamp's delayed entrance. */
 export const stampDuration = (kind: BoardEffect['kind']) =>
@@ -118,43 +153,56 @@ export function captureEffect(
   id: string,
   side: Side,
   analysis = false,
+  locale: Locale = 'zh',
 ): BoardEffect {
-  return {
-    id,
-    kind: 'capture',
-    title: '吃',
-    detail: (analysis ? '推演 · ' : '') + sideLabel(side) + '吃子',
-    side,
-    analysis,
-  };
+  return stamp(
+    {
+      id,
+      kind: 'capture',
+      side,
+      analysis,
+      text: { title: 'stamp.capture', detail: 'stamp.capture.detail', side },
+    },
+    locale,
+  );
+}
+function resultTitle(result: Result): MessageKey {
+  if (result.reason === REASON.mate) return 'stamp.mate';
+  if (result.winner === 'draw') return 'stamp.draw';
+  if (
+    result.reason === REASON.resigned.red ||
+    result.reason === REASON.resigned.black
+  )
+    return 'stamp.resigned';
+  if (result.reason === REASON.stalemate) return 'stamp.stalemate';
+  if (result.reason === REASON.timeout) return 'stamp.timeout';
+  if (result.reason === REASON.perpetual) return 'stamp.perpetual';
+  return 'stamp.over';
 }
 export function resultEffect(
   result: Result,
   id: string,
   analysis = false,
+  locale: Locale = 'zh',
 ): BoardEffect {
-  const mate = result.reason === '将死';
+  const mate = result.reason === REASON.mate;
   // Name how the game ended, not who won: both players and spectators see this stamp.
-  return {
-    id,
-    kind: mate ? 'mate' : 'result',
-    title: mate
-      ? '绝杀'
-      : result.winner === 'draw'
-        ? '和棋'
-        : result.reason.endsWith('认输')
-          ? '认输'
-          : ['困毙', '超时', '长将判负'].includes(result.reason)
-            ? result.reason
-            : '终局',
-    detail:
-      (analysis ? '推演 · ' : '') +
-      (result.winner === 'draw'
-        ? result.reason
-        : sideLabel(result.winner) + '获胜 · ' + result.reason),
-    side: result.winner === 'draw' ? undefined : result.winner,
-    analysis,
-  };
+  return stamp(
+    {
+      id,
+      kind: mate ? 'mate' : 'result',
+      side: result.winner === 'draw' ? undefined : result.winner,
+      analysis,
+      text: {
+        title: resultTitle(result),
+        detail:
+          result.winner === 'draw' ? 'result.reasonOnly' : 'result.withReason',
+        side: result.winner === 'draw' ? undefined : result.winner,
+        reason: result.reason,
+      },
+    },
+    locale,
+  );
 }
 
 export function updateFeedback<T extends FeedbackRoom>(
@@ -183,13 +231,16 @@ export function updateFeedback<T extends FeedbackRoom>(
       );
     if (move.check && !next.result) {
       sounds.push('check');
-      effect = {
+      effect = stamp({
         id: `${next.id}:${next.round}:${next.version}`,
         kind: 'check',
-        title: '将军',
-        detail: sideLabel(next.turn) + '应将',
         side: move.side,
-      };
+        text: {
+          title: 'stamp.check',
+          detail: 'stamp.check.detail',
+          side: next.turn,
+        },
+      });
     }
   }
   if (!previous.result && next.result) {
@@ -215,7 +266,10 @@ export function branchFeedback(
   const sounds: SoundKind[] = [board[to] ? 'capture' : 'move'];
   if (!hasLegalMove(next, nextTurn)) {
     const effect = resultEffect(
-      { winner: turn, reason: inCheck(next, nextTurn) ? '将死' : '困毙' },
+      {
+        winner: turn,
+        reason: inCheck(next, nextTurn) ? REASON.mate : REASON.stalemate,
+      },
       id,
       true,
     );
@@ -226,14 +280,17 @@ export function branchFeedback(
     sounds.push('check');
     return {
       sounds,
-      effect: {
+      effect: stamp({
         id,
         kind: 'check',
-        title: '将军',
-        detail: '推演 · ' + sideLabel(nextTurn) + '应将',
         side: turn,
         analysis: true,
-      },
+        text: {
+          title: 'stamp.check',
+          detail: 'stamp.check.detail',
+          side: nextTurn,
+        },
+      }),
     };
   }
   return { sounds, effect: board[to] ? captureEffect(id, turn, true) : null };

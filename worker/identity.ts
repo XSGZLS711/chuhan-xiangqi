@@ -1,3 +1,4 @@
+import { errorBody } from '../lib/errors';
 import { GameError } from '../lib/game';
 
 const cookiePattern = /(?:^|;\s*)chuhan_session=([a-f0-9]{64})(?:;|$)/;
@@ -7,9 +8,9 @@ const YEAR = 31536000;
 export function validateRequestOrigin(req: Request): void {
   const origin = req.headers.get('origin');
   if (origin && origin !== new URL(req.url).origin)
-    throw new GameError('请求来源不匹配。', 403);
+    throw new GameError('origin-mismatch', 403);
   if (req.headers.get('sec-fetch-site') === 'cross-site')
-    throw new GameError('请在棋室页面操作。', 403);
+    throw new GameError('cross-site', 403);
 }
 /** The same check as a response for the account routes: null when the request may go on. */
 export function sameOrigin(req: Request): Response | null {
@@ -18,7 +19,7 @@ export function sameOrigin(req: Request): Response | null {
     return null;
   } catch (error) {
     const status = error instanceof GameError ? error.status : 403;
-    return Response.json({ error: '请求来源不匹配。' }, { status });
+    return Response.json(errorBody('origin-mismatch'), { status });
   }
 }
 

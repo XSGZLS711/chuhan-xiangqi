@@ -1,4 +1,31 @@
 import type { ArchivedGame } from './archive';
+import type { ErrorCode } from './errors';
+import { t, type Params } from './i18n';
+
+/** A failed API call: the server's Chinese text, and its error code when it sent one. */
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+    readonly code?: string,
+    readonly params?: Params,
+  ) {
+    super(message);
+  }
+}
+/** The `{ error, code }` an API answers with, as an `ApiError`. */
+export function apiError(
+  body: { error?: unknown; code?: unknown } | null | undefined,
+  status: number,
+  fallback: ErrorCode,
+): ApiError {
+  const said = typeof body?.error === 'string' && body.error;
+  return new ApiError(
+    said || t('zh', `err.${fallback}`),
+    status,
+    typeof body?.code === 'string' ? body.code : said ? undefined : fallback,
+  );
+}
 
 /** All game requests stay on this origin; the player is identified by an HttpOnly cookie. */
 export function gameFetch(

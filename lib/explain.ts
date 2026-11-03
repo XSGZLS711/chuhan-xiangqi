@@ -1,11 +1,20 @@
 import type { MoveAnalysis } from './game-analysis';
+import {
+  notationFor,
+  sideName,
+  sidePieceName,
+  t,
+  tn,
+  type Locale,
+  type MessageKey,
+  type Params,
+} from './i18n';
+import { moveText, type NotationStyle } from './notation';
 import { lineSteps, playedScore, scoreText, type LineStep } from './review';
 import {
   inCheck,
-  label,
   legalMove,
   moveBoard,
-  notation,
   opposite,
   type Board,
   type Kind,
@@ -39,9 +48,6 @@ export function pieceValue(piece: Piece, at: number): number {
   const row = Math.floor(at / 9);
   return (piece.side === 'red' ? row <= 4 : row >= 5) ? 2 : 1;
 }
-const pieceName = (piece: Piece) =>
-  (piece.side === 'red' ? '红' : '黑') + label(piece);
-const sideName = (side: Side) => (side === 'red' ? '红方' : '黑方');
 // Below two points (a pawn, or an even trade) a loss is noise, not a lesson.
 const WORTH = 2;
 
@@ -105,20 +111,37 @@ const balance = (found: Capture[], side: Side) =>
   found.reduce((sum, c) => sum + (c.by === side ? c.value : -c.value), 0);
 const points = (value: number) =>
   Number.isInteger(value) ? value : value.toFixed(1);
-const join = (steps: LineStep[]) => steps.map((s) => s.text).join('，');
 
-export function explainMove(move: Move, result: MoveAnalysis): Commentary {
+/** Why `move` fell short, in `locale`. Moves are written in `style`, which follows the
+ * language unless the caller chooses otherwise. */
+export function explainMove(
+  move: Move,
+  result: MoveAnalysis,
+  locale: Locale = 'zh',
+  style: NotationStyle = notationFor(locale),
+): Commentary {
+  const say = (key: MessageKey, params?: Params) => t(locale, key, params);
+  const pieceName = (piece: Piece) => sidePieceName(locale, piece);
+  const side = (value: Side) => sideName(locale, value);
+  const join = (steps: LineStep[]) =>
+    steps.map((s) => s.text).join(say('list.moves'));
+  const text = (board: Board, from: number, to: number) =>
+    moveText(board, from, to, style);
   const me = move.side,
     them = opposite(me),
     moved = move.before[move.from]!,
     after = moveBoard(move.before, move.from, move.to),
     played = playedScore(result),
-    best = lineSteps(move.before, me, result.before.pv),
+    best = lineSteps(move.before, me, result.before.pv, style),
     actual = lineSteps(
       move.before,
       me,
       result.played?.pv ?? [result.move, ...result.after.pv],
+      style,
     ),
+    // The stored text is the Chinese notation; the other styles are rewritten from the position.
+    playedText =
+      style === 'chinese' ? move.text : text(move.before, move.from, move.to),
     first = best[0];
   const problem: string[] = [],
     reason: string[] = [],
@@ -129,7 +152,11 @@ export function explainMove(move: Move, result: MoveAnalysis): Commentary {
   if (played.kind === 'mate' && played.winner === them) {
     const line = actual.slice(1, 1 + played.plies);
     problem.push(
-      `这步之后${sideName(them)}有${Math.ceil(played.plies / 2)}步杀${line.length ? `：${join(line)}` : ''}。`,
+      say(line.length ? 'explain.mateAgainst.line' : 'explain.mateAgainst', {
+        side: side(them),
+        n: Math.ceil(played.plies / 2),
+        line: join(line),
+      }),
     );
   }
   const mate = result.before.score;
@@ -138,9 +165,13 @@ export function explainMove(move: Move, result: MoveAnalysis): Commentary {
     mate.winner === me &&
     !(played.kind === 'mate' && played.winner === me);
   if (missedMate && first) {
-    problem.push('错过了杀棋。');
+    problem.push(say('explain.missedMate'));
     reason.push(
-      `${first.text}起${Math.ceil(mate.plies / 2)}步成杀：${join(best.slice(0, mate.plies))}。`,
+      say('explain.mateLine', {
+        first: first.text,
+        n: Math.ceil(mate.plies / 2),
+        line: join(best.slice(0, mate.plies)),
+      }),
     );
   }
 
@@ -148,25 +179,38 @@ export function explainMove(move: Move, result: MoveAnalysis): Commentary {
   const hung = threat(after, move.to, them);
   if (hung) {
     problem.push(
-      `${move.text}把${pieceName(moved)}走到了${pieceName(after[hung.attacker]!)}${hung.free ? '可以白吃' : '能换掉并得子'}的位置。`,
+      say(hung.free ? 'explain.hung.free' : 'explain.hung.trade', {
+        move: playedText,
+        piece: pieceName(moved),
+        attacker: pieceName(after[hung.attacker]!),
+      }),
     );
     explained.add(move.to);
   }
   // Something else became loose, or was already attacked and stays so.
-  for (const t of threatsAgainst(after, me)) {
-    if (explained.has(t.victim)) continue;
-    const victim = pieceName(after[t.victim]!),
-      take = `${sideName(them)}可以${notation(after, t.attacker, t.victim)}吃掉它。`;
-    if (threat(move.before, t.victim, them)) {
-      problem.push(`${sideName(them)}已经在捉${victim}，这步没有应对。`);
-      threatened.push(t.victim);
-    } else if (attackers(move.before, t.victim, them).length)
-      problem.push(`${pieceName(moved)}走开后，${victim}失去保护，${take}`);
+  for (const danger of threatsAgainst(after, me)) {
+    if (explained.has(danger.victim)) continue;
+    const victim = pieceName(after[danger.victim]!),
+      take = say('explain.take', {
+        side: side(them),
+        move: text(after, danger.attacker, danger.victim),
+      });
+    if (threat(move.before, danger.victim, them)) {
+      problem.push(say('explain.ignored', { side: side(them), victim }));
+      threatened.push(danger.victim);
+    } else if (attackers(move.before, danger.victim, them).length)
+      problem.push(
+        say('explain.unprotected', { piece: pieceName(moved), victim, take }),
+      );
     else
       problem.push(
-        `这步之后${victim}暴露在${pieceName(after[t.attacker]!)}的攻击下，${take}`,
+        say('explain.exposed', {
+          victim,
+          attacker: pieceName(after[danger.attacker]!),
+          take,
+        }),
       );
-    explained.add(t.victim);
+    explained.add(danger.victim);
   }
   // What the engine's reply line actually costs.
   const lost = balance(captures(move.before, me, actual), me);
@@ -180,14 +224,24 @@ export function explainMove(move: Move, result: MoveAnalysis): Commentary {
     balance(bestCaptures, me) >= WORTH
   )
     problem.push(
-      `错过了得子的机会：${best[firstWin.index].text}可以吃掉${pieceName(firstWin.piece)}。`,
+      say('explain.missedCapture', {
+        move: best[firstWin.index].text,
+        piece: pieceName(firstWin.piece),
+      }),
     );
   if (lost <= -WORTH && !explained.size) {
     const taken = captures(move.before, me, actual).filter(
       (c) => c.by === them,
     );
     problem.push(
-      `按引擎的应对（${join(actual.slice(0, (taken.at(-1)?.index ?? 1) + 1))}），${sideName(me)}净亏约${points(-lost)}分子力：${[...new Set(taken.map((c) => pieceName(c.piece)))].join('、')}。`,
+      tn(locale, 'explain.loses', -lost, {
+        line: join(actual.slice(0, (taken.at(-1)?.index ?? 1) + 1)),
+        side: side(me),
+        points: points(-lost),
+        pieces: [...new Set(taken.map((c) => pieceName(c.piece)))].join(
+          say('list.pieces'),
+        ),
+      }),
     );
   }
 
@@ -197,38 +251,56 @@ export function explainMove(move: Move, result: MoveAnalysis): Commentary {
       const piece = move.before[square]!;
       if (first.from === square)
         reason.push(
-          `${first.text}把被捉的${pieceName(piece)}走到了安全的位置。`,
+          say('explain.escape', {
+            move: first.text,
+            piece: pieceName(piece),
+          }),
         );
       else if (!threat(bestBoard, square, them))
-        reason.push(`${first.text}保住了${pieceName(piece)}。`);
+        reason.push(
+          say('explain.protect', { move: first.text, piece: pieceName(piece) }),
+        );
     }
     if (inCheck(bestBoard, them))
-      reason.push(`${first.text}将军，先手逼${sideName(them)}应将。`);
+      reason.push(say('explain.check', { move: first.text, side: side(them) }));
     const forks = threatsAgainst(bestBoard, them).filter(
-      (t) => t.attacker === first.to,
+      (danger) => danger.attacker === first.to,
     );
     if (forks.length >= 2)
       reason.push(
-        `${first.text}同时捉${forks
-          .slice(0, 2)
-          .map((t) => pieceName(bestBoard[t.victim]!))
-          .join('和')}，${sideName(them)}难以兼顾。`,
+        say('explain.fork', {
+          move: first.text,
+          a: pieceName(bestBoard[forks[0].victim]!),
+          b: pieceName(bestBoard[forks[1].victim]!),
+          side: side(them),
+        }),
       );
     const won = captures(move.before, me, best);
     const gain = balance(won, me);
     if (gain >= WORTH)
       reason.push(
-        `按推荐的变化（${join(best.slice(0, (won.at(-1)?.index ?? 0) + 1))}），${sideName(me)}净得约${points(gain)}分子力。`,
+        tn(locale, 'explain.gain', gain, {
+          line: join(best.slice(0, (won.at(-1)?.index ?? 0) + 1)),
+          side: side(me),
+          points: points(gain),
+        }),
       );
   }
   const certain = problem.length > 0 || reason.length > 0;
   if (!problem.length)
     problem.push(
-      `这步没有直接丢子，但引擎认为局面从${scoreText(result.before.score)}变为${scoreText(played)}，差别多在子力位置和长远形势。`,
+      say('explain.noLoss', {
+        from: scoreText(result.before.score, locale),
+        to: scoreText(played, locale),
+      }),
     );
   if (!reason.length && first)
     reason.push(
-      `引擎更看好${first.text}：走后${scoreText(result.before.score)}，主要变化是${join(best.slice(0, 4))}。`,
+      say('explain.prefers', {
+        move: first.text,
+        score: scoreText(result.before.score, locale),
+        line: join(best.slice(0, 4)),
+      }),
     );
   return { problem, reason, certain };
 }

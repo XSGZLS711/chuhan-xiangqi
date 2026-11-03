@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { errorBody } from '../lib/errors';
 import {
   account,
   deleteAccount,
@@ -135,10 +136,10 @@ export async function removeAccount(req: Request) {
   const db = database(),
     me = await player(req, db);
   if (!me.signedIn)
-    return Response.json(
-      { error: '请先登录。' },
-      { status: 401, headers: noStore },
-    );
+    return Response.json(errorBody('sign-in-required'), {
+      status: 401,
+      headers: noStore,
+    });
   await deleteAccount(db, me.id);
   return signedOut(req);
 }

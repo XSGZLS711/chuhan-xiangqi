@@ -1,4 +1,5 @@
 import type { PublicRoom } from './game';
+import { t, type Locale } from './i18n';
 import type { Side } from './xiangqi';
 
 export function canPlayLive(room: PublicRoom | null, busy: boolean): boolean {
@@ -11,13 +12,24 @@ export function canPlayLive(room: PublicRoom | null, busy: boolean): boolean {
   );
 }
 
-export function rematchControl(room: PublicRoom, busy: boolean) {
+export function rematchControl(
+  room: PublicRoom,
+  busy: boolean,
+  locale: Locale = 'zh',
+) {
   const invited =
     room.offer?.kind === 'rematch' && room.offer.side !== room.you;
   const waiting =
     room.offer?.kind === 'rematch' && room.offer.side === room.you;
   return {
-    label: invited && room.you ? '应邀出战' : waiting ? '等待应战' : '再来一局',
+    label: t(
+      locale,
+      invited && room.you
+        ? 'room.offer.acceptRematch'
+        : waiting
+          ? 'room.rematch.waiting'
+          : 'room.rematch.again',
+    ),
     intent: invited ? ('accept' as const) : ('offer' as const),
     disabled:
       busy ||
@@ -36,4 +48,4 @@ export function recentChat(room: PublicRoom | null, side: Side, now: number) {
   return message;
 }
 
-export const displayNotation = (text: string) => text.replaceAll('车', '車');
+export { displayNotation } from './xiangqi';

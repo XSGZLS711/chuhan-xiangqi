@@ -6,7 +6,10 @@ import {
   squareToEngine,
   type AiLevel,
 } from './ai-game';
-import { opposite, sideLabel, type Result, type Side } from './xiangqi';
+import { AppError } from './errors';
+import { playerName, sideName, t, type Locale } from './i18n';
+import { REASON } from './tokens';
+import { opposite, type Result, type Side } from './xiangqi';
 
 export const ARCHIVE_LIMIT = 200;
 // Characters of serialized JSON. The 60-move rule caps a game near 3,700 plies,
@@ -121,24 +124,24 @@ export function replayArchive(game: ArchivedGame): Room {
   room.round = game.round;
   for (const token of game.moves) {
     const move = engineMove(token);
-    if (!move) throw new Error('存档中有无效着法');
+    if (!move) throw new AppError('archive-invalid');
     applyAction(room, room.turn, { action: 'move', ...move }, now);
   }
   if (!room.result) {
-    if (game.result.reason === '双方同意和棋') {
+    if (game.result.reason === REASON.agreed) {
       applyAction(room, 'red', { action: 'offer-draw' }, now);
       applyAction(room, 'black', { action: 'respond', accept: true }, now);
-    } else if (game.result.reason === '超时') {
+    } else if (game.result.reason === REASON.timeout) {
       room.clockMinutes = 1;
       room.clocks[room.turn] = 0;
       expireClock(room, now);
     } else if (
-      game.result.reason === '红方认输' ||
-      game.result.reason === '黑方认输'
+      game.result.reason === REASON.resigned.red ||
+      game.result.reason === REASON.resigned.black
     ) {
       applyAction(
         room,
-        game.result.reason.startsWith('红') ? 'red' : 'black',
+        game.result.reason === REASON.resigned.red ? 'red' : 'black',
         { action: 'resign' },
         now,
       );
@@ -149,7 +152,7 @@ export function replayArchive(game: ArchivedGame): Room {
     room.result?.reason !== game.result.reason ||
     boardFen(room.board, room.turn) !== game.finalFen
   )
-    throw new Error('存档的棋谱与终局不一致');
+    throw new AppError('archive-mismatch');
   return room;
 }
 
@@ -189,21 +192,30 @@ export function syncArchives(
     ),
   };
 }
-export function archiveLabel(game: ArchivedGame): {
+export function archiveLabel(
+  game: ArchivedGame,
+  locale: Locale = 'zh',
+): {
   opponent: string;
   result: string;
 } {
+  const name = (side: Side) => playerName(locale, game.players[side]);
   return {
     opponent: game.viewerSide
-      ? game.players[opposite(game.viewerSide)]
-      : `${game.players.red} / ${game.players.black}`,
+      ? name(opposite(game.viewerSide))
+      : `${name('red')} / ${name('black')}`,
     result:
       game.result.winner === 'draw'
-        ? '和棋'
+        ? t(locale, 'result.draw')
         : game.viewerSide
-          ? game.result.winner === game.viewerSide
-            ? '胜'
-            : '负'
-          : sideLabel(game.result.winner) + '胜',
+          ? t(
+              locale,
+              game.result.winner === game.viewerSide
+                ? 'result.won'
+                : 'result.lost',
+            )
+          : t(locale, 'result.sideWon', {
+              side: sideName(locale, game.result.winner),
+            }),
   };
 }

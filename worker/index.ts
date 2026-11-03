@@ -1,4 +1,5 @@
 import { Hono } from 'hono';
+import { errorBody } from '../lib/errors';
 import { deleteGame, listGames, saveGame } from './archive-api';
 import { googleCallback, logout, me, removeAccount, startGoogle } from './auth';
 import { database } from './db';
@@ -22,13 +23,13 @@ app.post('/api/auth/logout', (c) => logout(c.req.raw));
 app.get('/api/games', (c) => listGames(c.req.raw, database()));
 app.post('/api/games', (c) => saveGame(c.req.raw, database()));
 app.delete('/api/games', (c) => deleteGame(c.req.raw, database()));
-app.all('/api/*', (c) => c.json({ error: '接口不存在。' }, 404));
+app.all('/api/*', (c) => c.json(errorBody('no-such-endpoint'), 404));
 app.onError((error, c) => {
   console.error(
     'Unhandled error',
     error instanceof Error ? error.message : 'unknown',
   );
-  return c.json({ error: '棋室暂时连接不上，请稍后重试。' }, 503);
+  return c.json(errorBody('unavailable'), 503);
 });
 
 export default app;

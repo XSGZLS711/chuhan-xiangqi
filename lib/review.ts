@@ -7,9 +7,17 @@ import {
   type MoveRating,
 } from './game-analysis';
 import {
+  sideName,
+  sideShort,
+  t,
+  type Locale,
+  type MessageKey,
+  type Params,
+} from './i18n';
+import { historyMoveText, moveText, type NotationStyle } from './notation';
+import {
   legalMove,
   moveBoard,
-  notation,
   opposite,
   type Board,
   type Move,
@@ -24,20 +32,44 @@ export function scoreValue(score: AnalysisScore): number {
   if (score.winner === 'draw') return 0;
   return score.winner === 'red' ? SCORE_CAP : -SCORE_CAP;
 }
-const sideName = (side: Side) => (side === 'red' ? '红' : '黑');
-export function scoreText(score: AnalysisScore | null): string {
-  if (!score) return '分析中';
+/** The score as a label and, for centipawns, the amount: the advantage bar sets them apart. */
+export function scoreParts(
+  score: AnalysisScore | null,
+  locale: Locale = 'zh',
+): { label: string; value: string } {
+  const label = (key: MessageKey, params?: Params) => ({
+    label: t(locale, key, params),
+    value: '',
+  });
+  if (!score) return label('score.analyzing');
   // A finished game (resignation, draw, timeout) has no engine score left.
   if (score.kind === 'result')
-    return score.winner === 'draw' ? '和棋' : `${sideName(score.winner)}胜`;
+    return score.winner === 'draw'
+      ? label('score.draw')
+      : label('score.win', { side: sideShort(locale, score.winner) });
   if (score.kind === 'mate')
     return score.plies === 0
-      ? `${sideName(score.winner)}胜`
-      : `${sideName(score.winner)}方${Math.ceil(score.plies / 2)}步杀`;
+      ? label('score.win', { side: sideShort(locale, score.winner) })
+      : label('score.mate', {
+          side: sideName(locale, score.winner),
+          n: Math.ceil(score.plies / 2),
+        });
   const value = Math.round(score.value);
-  return Math.abs(value) < 10
-    ? '均势'
-    : `${value > 0 ? '红' : '黑'}优 ${Math.abs(value)}`;
+  if (Math.abs(value) < 10) return label('score.even');
+  const amount = Math.abs(value);
+  return {
+    label: t(locale, 'score.edge.label', {
+      side: sideShort(locale, value > 0 ? 'red' : 'black'),
+    }),
+    value: t(locale, 'score.edge.value', { value: amount }),
+  };
+}
+export function scoreText(
+  score: AnalysisScore | null,
+  locale: Locale = 'zh',
+): string {
+  const { label, value } = scoreParts(score, locale);
+  return value ? `${label} ${value}` : label;
 }
 /** Red's share of the advantage bar, 0..1. */
 export const redShare = (score: AnalysisScore | null) =>
@@ -82,10 +114,13 @@ export const FULL_MAJOR_MATERIAL = 70;
 export const ENDGAME_MATERIAL = 40;
 export type GamePhases = { middle: number | null; end: number | null };
 export type Phase = 'opening' | 'middle' | 'end';
+export const phaseLabel = (locale: Locale, phase: Phase) =>
+  t(locale, `phase.${phase}` as MessageKey);
+/** The Chinese names. */
 export const PHASE_LABELS: Record<Phase, string> = {
-  opening: '开局',
-  middle: '中局',
-  end: '残局',
+  opening: phaseLabel('zh', 'opening'),
+  middle: phaseLabel('zh', 'middle'),
+  end: phaseLabel('zh', 'end'),
 };
 /** Plies at which the middlegame and the endgame begin, by position after that ply.
  * The middlegame starts by move 10 at the latest, earlier once a chariot, horse or
@@ -147,6 +182,7 @@ export function reviewReport(
   history: readonly Move[],
   analysis: GameAnalysis | null,
   phases: GamePhases,
+  style: NotationStyle = 'chinese',
 ): Record<Side, SideReport> {
   const build = (side: Side): SideReport => {
     const all: number[] = [],
@@ -170,7 +206,7 @@ export function reviewReport(
         mistakes.push({
           ply: index + 1,
           side,
-          text: move.text,
+          text: style === 'chinese' ? move.text : historyMoveText(move, style),
           rating: result.rating,
         });
       }
@@ -201,6 +237,7 @@ export function lineSteps(
   start: Board,
   side: Side,
   pv: readonly string[],
+  style: NotationStyle = 'chinese',
 ): LineStep[] {
   const steps: LineStep[] = [];
   let board = start,
@@ -208,7 +245,7 @@ export function lineSteps(
   for (const token of pv.slice(0, LINE_LIMIT)) {
     const move = engineMove(token);
     if (!move || !legalMove(board, move.from, move.to, turn)) break;
-    const text = notation(board, move.from, move.to);
+    const text = moveText(board, move.from, move.to, style);
     board = moveBoard(board, move.from, move.to);
     steps.push({ ...move, text, board });
     turn = opposite(turn);
@@ -220,6 +257,7 @@ export function moveComparison(
   history: readonly Move[],
   analysis: GameAnalysis | null,
   ply: number,
+  style: NotationStyle = 'chinese',
 ): {
   played: Move;
   result: MoveAnalysis | null;
@@ -236,8 +274,10 @@ export function moveComparison(
   return {
     played,
     result,
-    best: result ? lineSteps(played.before, played.side, result.before.pv) : [],
-    actual: lineSteps(played.before, played.side, actualLine),
+    best: result
+      ? lineSteps(played.before, played.side, result.before.pv, style)
+      : [],
+    actual: lineSteps(played.before, played.side, actualLine, style),
   };
 }
 /** How good the played move was judged, from the same search as the rating. */

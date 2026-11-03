@@ -1,3 +1,4 @@
+import { REASON } from './tokens';
 export type Side = 'red' | 'black';
 export type Kind = 'k' | 'a' | 'e' | 'h' | 'r' | 'c' | 'p';
 export type Piece = { side: Side; kind: Kind; id: string };
@@ -49,13 +50,15 @@ export function notation(b:Board,from:number,to:number):string{
   const direction=(p.side==='red'?Y<y:Y>y)?'进':'退';
   return prefix+direction+(['h','a','e'].includes(p.kind)?file(X):num(Math.abs(Y-y)));
 }
+/** Older rooms stored a simplified 车; the board draws 車. */
+export const displayNotation = (text: string) => text.replaceAll('车', '車');
 export type Move = {from:number;to:number;text:string;side:Side;captured:Piece|null;check:boolean;before:Board;clocks:{red:number;black:number};quietBefore:number};
 export type Result = {winner:Side|'draw';reason:string};
 export function outcome(board:Board,turn:Side,history:Move[],quiet:number):Result|null{
-  if(!hasLegalMove(board,turn))return {winner:opposite(turn),reason:inCheck(board,turn)?'将死':'困毙'};
+  if(!hasLegalMove(board,turn))return {winner:opposite(turn),reason:inCheck(board,turn)?REASON.mate:REASON.stalemate};
   const key=positionKey(board,turn),matches:number[]=[];
   history.forEach((m,i)=>{if(positionKey(m.before,m.side)===key)matches.push(i);});
-  if(matches.length>=2){const segment=history.slice(matches[matches.length-2]);const checking=(side:Side)=>{const own=segment.filter(m=>m.side===side);return own.length>0&&own.every(m=>m.check);};const red=checking('red'),black=checking('black');if(red!==black)return {winner:red?'black':'red',reason:'长将判负'};return {winner:'draw',reason:'三次重复局面'};}
-  if(quiet>=120)return {winner:'draw',reason:'连续 60 回合未吃子'};
+  if(matches.length>=2){const segment=history.slice(matches[matches.length-2]);const checking=(side:Side)=>{const own=segment.filter(m=>m.side===side);return own.length>0&&own.every(m=>m.check);};const red=checking('red'),black=checking('black');if(red!==black)return {winner:red?'black':'red',reason:REASON.perpetual};return {winner:'draw',reason:REASON.repetition};}
+  if(quiet>=120)return {winner:'draw',reason:REASON.quiet};
   return null;
 }

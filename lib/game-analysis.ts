@@ -1,4 +1,5 @@
 import { engineMove } from './ai-game';
+import { t, type Locale, type MessageKey } from './i18n';
 import type { Side } from './xiangqi';
 
 /** All scores use red's perspective, including evaluations taken after black moves.
@@ -36,12 +37,21 @@ export type MoveRating =
   | 'missed-mate'
   | 'allowed-mate'
   | null;
+/** A rating in the viewer's language: the short badge (中, ?!, ??) or, with `long`, the word. */
+export function ratingLabel(
+  locale: Locale,
+  rating: Exclude<MoveRating, null>,
+  long = false,
+): string {
+  return t(locale, `rating.${rating}${long ? '.long' : ''}` as MessageKey);
+}
+/** The Chinese badges. */
 export const RATING_LABELS = {
-  inaccuracy: '中',
-  mistake: '差',
-  blunder: '错',
-  'missed-mate': '漏杀',
-  'allowed-mate': '送杀',
+  inaccuracy: ratingLabel('zh', 'inaccuracy'),
+  mistake: ratingLabel('zh', 'mistake'),
+  blunder: ratingLabel('zh', 'blunder'),
+  'missed-mate': ratingLabel('zh', 'missed-mate'),
+  'allowed-mate': ratingLabel('zh', 'allowed-mate'),
 } as const;
 export type MoveIdentity = { ply: number; side: Side; move: string };
 export type MoveAnalysis = MoveIdentity & {
