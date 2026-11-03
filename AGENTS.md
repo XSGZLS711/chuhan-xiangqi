@@ -1,48 +1,39 @@
 # 楚汉棋社 · Agent notes
 
-A free xiangqi web app (overseas, maintained solo): a Vite + React SPA plus one Cloudflare Worker (Hono, D1), served same-origin.
+A free xiangqi web app (overseas, maintained solo): a Vite + React SPA plus one Cloudflare Worker (Hono, D1), served same-origin at https://chuhanxiangqi.com (staging: https://staging.chuhanxiangqi.com).
 The browser AI is Fairy-Stockfish WASM under `/ai/`. It needs cross-origin isolation, which `public/_headers` provides.
-Plan: `ROADMAP.md`. Detailed notes for the current track are local-only in `research/tiantian/` (gitignored; read them, never commit them).
+Plan: `ROADMAP.md`. Competitor study notes live only on the owner's machine in `research/tiantian/` (gitignored): read them when present, keep them out of Git.
 
 ## Rules
-- Reply to the user in Chinese. Report test results honestly; if something was not verified, say so.
-- Work on a branch, never on `main`; pushing `main` auto-deploys staging. Do not `git push` unless the user asks.
-- Never run `npm run deploy`, `deploy:staging`, `wrangler deploy`, `db:migrate:staging` or `db:migrate:production`. Never edit the D1 ids in `wrangler.jsonc`.
-- Keep `lib/xiangqi.ts`, `lib/game.ts` and `lib/presentation.ts` pure (no DOM, no React) so the core stays portable.
-- Do not run `npm run format` (oxfmt) over files you did not change; it reformats them.
-- Sounds are synthesized with Web Audio (`lib/game-audio.ts`). No audio files and no copied assets. Art is our own SVG/CSS; fonts must be open-licensed and self-hosted.
+- Reply to the user in Chinese. Report test results honestly; say what was not verified.
+- Work on a branch; `main` auto-deploys staging. Push and open a PR when the user asks.
+- Deploys, secrets and remote migrations belong to the owner (`npm run deploy`, `deploy:staging`, `wrangler deploy`, `wrangler secret put`, `db:migrate:staging`, `db:migrate:production`): hand the user the command to run. The D1 ids in `wrangler.jsonc` stay as they are.
+- Keep `lib/xiangqi.ts`, `lib/game.ts` and `lib/presentation.ts` pure (no DOM, no React): the long-term goal is a WeChat mini program on the same core.
+- Run `npm run format` (oxfmt) only on files you changed.
+- Sound is Web Audio synthesis plus one CC0 move recording (`public/sounds/SOURCE.md`). Art is our own SVG/CSS; fonts are open-licensed and self-hosted (`/ai/` runs under COEP, so no font CDN).
+- UI copy is deliberate, wordplay included (「再蒸一下」 is intended): ask before rewording.
 - Match the surrounding code style: comment density, naming and idiom.
+- Lint baseline: several files already carry oxlint errors; files you touch end with no more than they started with.
 
 ## Commands
-- `npm run dev`: local dev server (applies local D1 migrations first).
-- Checks before you report done: `npm run typecheck`, `npm run lint`, `npm test`, `npm run test:ui`, `npm run test:mobile`, `npm run test:ai`, `npm run test:identity`, `npm run build`.
+- `npm run dev`: local dev server on :5173, applying local D1 migrations first. Google sign-in needs `.dev.vars` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, owner's machine only); without it the login button stays hidden.
+- Checks before you report done, the same list CI runs: `typecheck`, `test`, `test:ui`, `test:mobile`, `test:ai`, `test:identity`, `test:archive`, `test:analysis`, `test:audio`, `build`.
+- `node tests/online.test.mjs <base-url>` against a dev server or staging (it leaves a test room behind, so keep it off production).
 
 ## Map
-- `app/page.tsx`: friend rooms. `components/ai-game.tsx`: the AI game with live analysis. `components/chess-board.tsx`: the board.
-- `components/board-effect.tsx`: check/mate/result overlays. `lib/presentation.ts`: which sounds and effects a move triggers.
-- `app/globals.css`: board motion (`piece-hop`, `.move-dot`, `.capture-target`, `.piece-position.selected`, capture ghost).
-- `worker/`: the API (`/api/game`) and same-origin cookie identity. Google sign-in: `worker/google.ts` (OAuth, pure), `worker/accounts.ts` (D1: accounts, sessions, seat moves), `worker/auth.ts` (routes).
+- `app/page.tsx`: lobby and friend rooms. `components/ai-game.tsx`: AI games, and the review of any archived game at `/ai/?game=<id>`.
+- `components/review-screen.tsx`, `lib/review.ts`, `lib/explain.ts`: the review (chart, analysis, report, practice) and its rule-based commentary.
+- `lib/archive.ts`, `lib/archive-storage.ts`, `lib/use-auto-archive.ts`, `components/recent-games.tsx`: the local archive (IndexedDB, newest 200), saved when a game ends, listed as 最近对局.
+- `components/chess-board.tsx`, `components/board-effect.tsx`, `lib/motion.ts`, `lib/game-audio.ts`, `app/globals.css`: board, motion, effects, sound.
+- `worker/`: `game-api.ts` rooms; `identity.ts` the cookie; `google.ts` OAuth (pure); `accounts.ts` accounts, sessions and seat moves in D1; `auth.ts` the routes. Schema in `db/schema.ts`, migrations in `drizzle/` via `npm run db:generate`.
 
-## Done (branch `polish-feel`)
-- Sound lands with the piece (`lib/motion.ts` is the single timing source), with two-part move, capture and mate sounds.
-- Lift, slide, hover and drop motion; static flat move dots; selection without the pulsing ring.
+## Current task: M1 step 2, sync 最近对局 to the account
+Goal (ROADMAP M1): sign in on another device and see your game history.
+Today games are archived only in the browser. Accounts exist (`users`, `identities`, `sessions`), and `player(req, db)` in `worker/accounts.ts` returns `{ id, signedIn }`.
+1. A D1 table of archived games per account, keyed by account and game id, holding the compact `ArchivedGame` JSON. One migration.
+2. API, signed-in only, with the same-origin check `logout` uses: list (newest first, paged), upload (idempotent by game id, validated with `parseArchive`, size-capped), delete one.
+3. Client, when signed in: upload local games the server lacks, then each game once as it ends; merge the server list into 最近对局. A game only the server has opens in the review like a local one.
+4. Deleting the account deletes its games. Update `public/privacy.html` in both languages: signed-in players' games are now stored on the server.
+5. Tests: the API rules in `tests/accounts.test.ts` (local D1), the merge in `tests/archive.test.ts`.
 
-## Current task: next batch (in order, one commit each)
-Lint baseline: `components/ui/*`, `captured-tray.tsx` and others already have oxlint errors. Do not fix unrelated files, but add no new errors in the files you touch.
-
-0. **Wire up the audio test.** `tests/game-audio.test.ts` is not run by any script. Add it to an npm script (for example, extend `test:ui`) and make sure the test job in `.github/workflows/deploy.yml` runs it.
-1. **Centered ink stamp** for 吃 / 将 / 绝杀 and results (`components/board-effect.tsx`, `lib/presentation.ts`, CSS):
-   - Add a pure `capture` effect kind in `lib/presentation.ts` (with tests), so a capture triggers the stamp as well as the sound.
-   - One stamp component: a brushed ink ring in our own SVG, a large character and a few ink dots.
-     Timing is relative to the start of the move: it appears at +250 ms with scale and blur converging by ~+400 ms (when the piece lands), holds, then fades over ~400 ms.
-     Capture is about 1.4 s in total; check is similar; mate is about 1.6 s.
-   - **No dark veil** over the board; pieces stay visible. Keep the result text for draws, wins and timeouts readable.
-   - Fonts: use the existing font stack, or an open-licensed font that is self-hosted. No external font CDN, because `/ai/` runs under COEP.
-2. **Effect settings** (friend room and AI page): toggles for 音效 (already exists as `chuhan-sound`), 走子提示 (move dots), 吃子/将军动画 and 绝杀/结算动画.
-   Store them in localStorage (wrap reads and writes in try/catch, so the game must work without storage). Honor `prefers-reduced-motion` by default. Keep the UI small: a compact panel, the same on both pages.
-3. **Local game archive** (the start of the review feature):
-   - A pure module (for example `lib/archive.ts`) that serializes a finished game: engine-notation moves (`squareToEngine` in `lib/ai-game.ts`), sides, names, result, reason, mode (AI level or friend), and date. Include round-trip tests that replay the moves with `lib/xiangqi.ts` and reach the same final board and result.
-   - Storage adapter: IndexedDB, falling back to localStorage. Keep the newest 200 games. Save automatically when an AI game or a friend game ends, once per game.
-   - A "最近对局" list reachable from the lobby: date, opponent, result, move count. Opening a game loads it into the `/ai/` page **review mode** (it already has step-through, try-a-branch and live engine analysis) with something like `/ai/?game=<id>`. Do not build a second replay UI.
-
-Done means all checks pass (`typecheck`, `test`, `test:ui`, `test:mobile`, `test:ai`, `test:identity`, `build`), plus a short Chinese summary per step of what changed and what you could not verify. The real-device feel is checked by the user.
+Done when every check passes, two browsers signed into one account list the same 最近对局, anonymous play behaves as before, and the user gets a short Chinese summary of what changed and what was not verified. D1's free tier allows 100k writes a day, so each game is uploaded once.
