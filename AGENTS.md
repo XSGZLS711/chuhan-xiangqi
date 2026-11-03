@@ -16,9 +16,9 @@ Plan: `ROADMAP.md`. Competitor study notes live only on the owner's machine in `
 - Lint baseline: several files already carry oxlint errors; files you touch end with no more than they started with.
 
 ## Commands
-- `npm run dev`: local dev server on :5173, applying local D1 migrations first. Google sign-in needs `.dev.vars` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, owner's machine only); without it the login button stays hidden.
+- `npm run dev`: local dev server on :5173, applying local D1 migrations first; it runs the Durable Objects too. Google sign-in needs `.dev.vars` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, owner's machine only); without it the login button stays hidden.
 - Checks before you report done, the same list CI runs: `typecheck`, `test`, `test:ui`, `test:mobile`, `test:ai`, `test:identity`, `test:archive`, `test:analysis`, `test:audio`, `test:i18n`, `build`.
-- `node tests/online.test.mjs <base-url>` against a dev server or staging (it leaves a test room behind, so keep it off production).
+- `node tests/online.test.mjs <base-url>` against a dev server, a local production build (`npm run build && npm run preview`, :4173) or staging (it leaves test rooms behind, so keep it off production). Only a local server takes test clocks under a minute, makes D1 rooms on request and answers `GET /api/game?usage` (`worker/usage.ts`), so on staging the alarm and D1-room checks are skipped (`--legacy=<D1 room id>` opens a D1 room made before the switch). `--game [--poll|--d1] [--minutes=30] [--every=12]` then plays one timed game through `lib/room-sync.ts` and prints what it cost.
 
 ## Map
 - `app/page.tsx`: lobby and friend rooms. `components/ai-game.tsx`: AI games, and the review of any archived game at `/ai/?game=<id>`.
@@ -26,7 +26,8 @@ Plan: `ROADMAP.md`. Competitor study notes live only on the owner's machine in `
 - `lib/archive.ts`, `lib/archive-storage.ts`, `lib/use-auto-archive.ts`, `components/recent-games.tsx`: the local archive (IndexedDB, newest 200), saved when a game ends, listed as 最近对局.
 - `components/chess-board.tsx`, `components/board-effect.tsx`, `lib/motion.ts`, `lib/game-audio.ts`, `app/globals.css`: board, motion, effects, sound.
 - `lib/i18n.ts`, `lib/locales/`, `lib/use-locale.ts`, `lib/notation.ts`, `lib/errors.ts`, `lib/room-note.ts`, `components/language-switch.tsx`: the interface languages (see "i18n" below).
-- `worker/`: `game-api.ts` rooms; `identity.ts` the cookie; `google.ts` OAuth (pure); `accounts.ts` accounts, sessions and seat moves in D1; `auth.ts` the routes. Schema in `db/schema.ts`, migrations in `drizzle/` via `npm run db:generate`.
+- `worker/`: `game-api.ts` the room API, sending 24-character room ids to a Durable Object and the older 20-character ones to D1 (`rooms`, `presence`, `room-poll.ts`); `room-object.ts` the Durable Objects: `GameRoom` (one per room: SQLite state, hibernating WebSockets, the clock on an alarm, held polls for the fallback and older tabs) and `PlayerSeats` (the rooms each player sits in, so signing in moves those seats); `identity.ts` the cookie; `google.ts` OAuth (pure); `accounts.ts` accounts, sessions and seat moves in D1; `auth.ts` the routes. Schema in `db/schema.ts`, migrations in `drizzle/` via `npm run db:generate`; Durable Object classes are added under `migrations` in `wrangler.jsonc`, top level and `env.staging`.
+- `lib/room-sync.ts`: how a page follows a room (`startRoomSync`): the room's WebSocket with versioned catch-up and request ids, held polls when the socket cannot connect and for D1 rooms. `lib/room-wire.ts` (pure): the room without its boards, as the Durable Object stores and sends it; replaying the moves gives them back.
 
 ## i18n
 The interface speaks Chinese (`zh`, the default of every pure function) and English (`en`). The browser picks from `navigator.languages`; the choice is saved under `localStorage` `chuhan-locale` and switches live (no reload, no request) from the lobby and review headers, the board's settings menu in a game on a wide screen (the side-column header has no room for another button), and the phone's game menu. Both entry points (`/`, `/ai/`) share it through `LocaleProvider` (`lib/use-locale.ts`); there is no module-level "current language".
