@@ -2,6 +2,8 @@
 import { useRef, useState, type CSSProperties, type SubmitEvent } from 'react';
 import { flushSync } from 'react-dom';
 import { useLocale } from '@/lib/use-locale';
+import { EffectMenuItems } from '@/components/effect-settings';
+import type { EffectSettings, SettingKey } from '@/lib/effect-settings';
 import {
   Menu,
   ScrollText,
@@ -48,6 +50,8 @@ export default function MobileDock({
   onAnalysis,
   onSend,
   sound,
+  settings,
+  onSetting,
   onFlip,
   onToggleSound,
 }: {
@@ -67,6 +71,8 @@ export default function MobileDock({
   onAnalysis: () => void;
   onSend: () => Promise<boolean>;
   sound: boolean;
+  settings: EffectSettings;
+  onSetting: (key: SettingKey, value: boolean) => void;
   onFlip: () => void;
   onToggleSound: () => void;
 }) {
@@ -123,6 +129,7 @@ export default function MobileDock({
               {sound ? <Volume2 /> : <VolumeX />}
               <span>{t(sound ? 'room.sound.off' : 'room.sound.on')}</span>
             </DropdownMenuItem>
+            <EffectMenuItems settings={settings} onChange={onSetting} />
             <DropdownMenuItem onClick={() => window.location.assign('./')}>
               <LogOut />
               <span>{t('dock.leave')}</span>

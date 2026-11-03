@@ -68,7 +68,7 @@ import {
 } from '@/lib/archive';
 import AccountMenu from '@/components/account-menu';
 import { useAccount } from '@/lib/use-account';
-import EffectSettings from '@/components/effect-settings';
+import EffectSettings, { EffectMenuItems } from '@/components/effect-settings';
 import { useEffectSettings } from '@/lib/use-effect-settings';
 import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
 import { GameAudio, soundDelay } from '@/lib/game-audio';
@@ -1001,6 +1001,7 @@ export default function AiGame() {
               {sound ? <Volume2 /> : <VolumeX />}
               <span>{t(sound ? 'room.sound.off' : 'room.sound.on')}</span>
             </DropdownMenuItem>
+            <EffectMenuItems settings={settings} onChange={changeSetting} />
             <DropdownMenuItem onClick={() => location.assign('../')}>
               <ArrowLeft />
               <span>{t('ai.back')}</span>

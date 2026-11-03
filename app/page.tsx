@@ -1233,6 +1233,8 @@ export default function Home() {
             onAnalysis={analysis ? exitAnalysis : startAnalysis}
             onSend={sendChat}
             sound={sound}
+            settings={settings}
+            onSetting={changeSetting}
             onFlip={() => {
               setFlipped(!flipped);
               setSelected(null);
