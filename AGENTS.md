@@ -6,18 +6,18 @@ Plan: `ROADMAP.md`. Competitor study notes live only on the owner's machine in `
 
 ## Rules
 - Reply to the user in Chinese. Report test results honestly; say what was not verified.
-- Work on a branch; `main` auto-deploys staging. Push and open a PR when the user asks.
+- Work on a branch; `main` auto-deploys staging. Push and open a PR when the user asks. Cloud sessions may push their own branch and open PRs, never merge.
 - Deploys, secrets and remote migrations belong to the owner (`npm run deploy`, `deploy:staging`, `wrangler deploy`, `wrangler secret put`, `db:migrate:staging`, `db:migrate:production`): hand the user the command to run. The D1 ids in `wrangler.jsonc` stay as they are.
 - Keep `lib/xiangqi.ts`, `lib/game.ts` and `lib/presentation.ts` pure (no DOM, no React): the long-term goal is a WeChat mini program on the same core.
 - Run `npm run format` (oxfmt) only on files you changed.
 - Sound is Web Audio synthesis plus one CC0 move recording (`public/sounds/SOURCE.md`). Art is our own SVG/CSS; fonts are open-licensed and self-hosted (`/ai/` runs under COEP, so no font CDN).
-- UI copy is deliberate, wordplay included (「再蒸一下」 is intended): ask before rewording.
+- UI copy is deliberate, wordplay included (「再蒸一下」 is intended): ask before rewording. This holds for the English copy too, and the Chinese dictionary (`lib/locales/zh.ts`) is never reworded without the owner.
 - Match the surrounding code style: comment density, naming and idiom.
 - Lint baseline: several files already carry oxlint errors; files you touch end with no more than they started with.
 
 ## Commands
 - `npm run dev`: local dev server on :5173, applying local D1 migrations first. Google sign-in needs `.dev.vars` (`GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, owner's machine only); without it the login button stays hidden.
-- Checks before you report done, the same list CI runs: `typecheck`, `test`, `test:ui`, `test:mobile`, `test:ai`, `test:identity`, `test:archive`, `test:analysis`, `test:audio`, `build`.
+- Checks before you report done, the same list CI runs: `typecheck`, `test`, `test:ui`, `test:mobile`, `test:ai`, `test:identity`, `test:archive`, `test:analysis`, `test:audio`, `test:i18n`, `build`.
 - `node tests/online.test.mjs <base-url>` against a dev server or staging (it leaves a test room behind, so keep it off production).
 
 ## Map
@@ -25,15 +25,15 @@ Plan: `ROADMAP.md`. Competitor study notes live only on the owner's machine in `
 - `components/review-screen.tsx`, `lib/review.ts`, `lib/explain.ts`: the review (chart, analysis, report, practice) and its rule-based commentary.
 - `lib/archive.ts`, `lib/archive-storage.ts`, `lib/use-auto-archive.ts`, `components/recent-games.tsx`: the local archive (IndexedDB, newest 200), saved when a game ends, listed as 最近对局.
 - `components/chess-board.tsx`, `components/board-effect.tsx`, `lib/motion.ts`, `lib/game-audio.ts`, `app/globals.css`: board, motion, effects, sound.
+- `lib/i18n.ts`, `lib/locales/`, `lib/use-locale.ts`, `lib/notation.ts`, `lib/errors.ts`, `lib/room-note.ts`, `components/language-switch.tsx`: the interface languages (see "i18n" below).
 - `worker/`: `game-api.ts` rooms; `identity.ts` the cookie; `google.ts` OAuth (pure); `accounts.ts` accounts, sessions and seat moves in D1; `auth.ts` the routes. Schema in `db/schema.ts`, migrations in `drizzle/` via `npm run db:generate`.
 
-## Current task: M1 step 2, sync 最近对局 to the account
-Goal (ROADMAP M1): sign in on another device and see your game history.
-Today games are archived only in the browser. Accounts exist (`users`, `identities`, `sessions`), and `player(req, db)` in `worker/accounts.ts` returns `{ id, signedIn }`.
-1. A D1 table of archived games per account, keyed by account and game id, holding the compact `ArchivedGame` JSON. One migration.
-2. API, signed-in only, with the same-origin check `logout` uses: list (newest first, paged), upload (idempotent by game id, validated with `parseArchive`, size-capped), delete one.
-3. Client, when signed in: upload local games the server lacks, then each game once as it ends; merge the server list into 最近对局. A game only the server has opens in the review like a local one.
-4. Deleting the account deletes its games. Update `public/privacy.html` in both languages: signed-in players' games are now stored on the server.
-5. Tests: the API rules in `tests/accounts.test.ts` (local D1), the merge in `tests/archive.test.ts`.
-
-Done when every check passes, two browsers signed into one account list the same 最近对局, anonymous play behaves as before, and the user gets a short Chinese summary of what changed and what was not verified. D1's free tier allows 100k writes a day, so each game is uploaded once.
+## i18n
+The interface speaks Chinese (`zh`, the default of every pure function) and English (`en`). The browser picks from `navigator.languages`; the choice is saved under `localStorage` `chuhan-locale` and switches live (no reload, no request) from a menu in each header and in the phone's game menu. Both entry points (`/`, `/ai/`) share it through `LocaleProvider` (`lib/use-locale.ts`); there is no module-level "current language".
+- **Dictionaries**: `lib/locales/zh.ts` holds the key set, `lib/locales/en.ts` is typed against it, so a missing key fails `typecheck`. `{name}` placeholders must match between languages, plurals come as `<key>.one` / `<key>.other` (`tn()`). `lib/i18n.ts` is the pure core: `t(locale, key, params)`, `reasonText`, `playerName`, `formatDateTime`.
+- **Add a string**: add the key to `zh.ts` (the owner's wording, byte for byte), then `en.ts`; use `t('key')` from `useLocale()` in components, or take an optional `locale` argument (default `'zh'`) in a pure function. No CJK literals in `components/`, `app/`, `lib/` or `worker/`: `npm run test:i18n` scans for them (its allowlist holds the graphics, a spoken word and internal guard errors).
+- **Add a language**: one file `lib/locales/<code>.ts` typed like `en.ts` (its `meta` also names the notation), then list it in `LOCALES` and `BUNDLES` in `lib/i18n.ts`.
+- **State holds keys, never sentences**: banners and errors are stored as a dictionary key or an error code and rendered when drawn, so a language switch rewrites them in place. Errors a person can see are `AppError`/`GameError` with a code (`err.<code>` in the dictionary); API responses carry the Chinese `error` text (old tabs read it) plus `code`; the client shows the code in the current language and falls back to `error`.
+- **Storage tokens stay Chinese forever**: `Result.reason` (将死, 困毙, 超时, 长将判负, 双方同意和棋, 红方认输, 黑方认输, 连续 60 回合未吃子, 三次重复局面) and the default names (棋友, 我方, 象棋 AI) live in `lib/tokens.ts`. `ArchivedGame`, the D1 archive and `Move.text` keep their shape, and room JSON keeps it except `Room.note`, which is data now (`RoomNote`, rendered by `noteText`; an old plain string is shown as written). Translate only when displaying, and show an unknown token as it is.
+- **Notation** is its own choice (`lib/notation.ts`): Chinese for `zh`, WXF for `en`, recomputed from the position (`historyMoveText`), never translated from `Move.text`.
+- Out of scope so far: the board's Chinese piece glyphs and river text, `public/privacy.html` (already bilingual), the spoken 吃/将军 (a Chinese system voice, if the device has one).

@@ -32,6 +32,7 @@ jobs:
       - run: npm run test:audio
       - run: npm run test:archive
       - run: npm run test:analysis
+      - run: npm run test:i18n
       - run: npm run test:mobile
       - run: npm run test:ai
       - run: npm run build
