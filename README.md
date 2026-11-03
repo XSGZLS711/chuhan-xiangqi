@@ -27,6 +27,10 @@
 - 定期同步和服务器版本比较，避免并发操作覆盖。
 - 三次重复局面时：单方持续将军者判负，否则判和；60 回合未吃子判和。
 
+## 账号（Google 登录）
+
+不登录照样能下棋。页头的「登录」用 Google 账号登录，只请求基本资料（openid、email、profile），在 Worker 内完成授权码 + PKCE 流程，不保存 Google 的令牌。登录后会换一个新的会话 Cookie（HttpOnly，180 天），最近 30 天内以匿名身份坐过的棋室座位转到账号名下，换设备登录同一账号也能认出你。账号菜单里可以退出登录、查看[隐私说明](public/privacy.html)、删除账号（账号、登录方式与所有会话立即删除）。服务器没有配置 Google 客户端时，登录按钮不显示。
+
 复杂长捉等完整赛事裁判细则不在当前好友局裁决范围内，页面规则中有明确说明。当前版本不包含排位或付费模块。
 
 ## 人机练习与局势分析
@@ -58,7 +62,7 @@ npm run preview      # 本地预览构建结果
 - `npm run test:mobile`：再战邀请、终局悔棋、静默点击、聊天气泡与旧棋谱兼容。
 - `npm run test:ui`：吃子分组、走棋过渡、音效去重与终局提示判断。
 - `npm run test:ai`：坐标/FEN、红黑悔棋、评分视角、串行取消及真实 WASM 六步合法走棋与分析。
-- `npm run test:identity`：同源与 Cookie 身份规则、`/ai` 隔离响应头、Worker 只在 `/api/*` 运行的部署配置检查。
+- `npm run test:identity`：同源与 Cookie 身份规则、`/ai` 隔离响应头、Worker 只在 `/api/*` 运行的部署配置检查；Google 登录的 PKCE、回跳地址与令牌校验；在临时本地 D1 上验证建号、会话、座位转移、换号、过期、退出与删除账号。
 - `npm run test:online -- http://localhost:5173`：通过两个独立身份及观战者验证 API 对局流程。
 - `npm run typecheck`：类型检查。
 
@@ -72,6 +76,18 @@ npm run preview      # 本地预览构建结果
 2. 先上预发：`npm run db:migrate:staging && npm run deploy:staging`，用 Cloudflare 给的 `*.workers.dev` 地址验证。
 3. 再上线：`npm run db:migrate:production && npm run deploy`。正式环境在 https://chuhanxiangqi.com ，预发在 https://staging.chuhanxiangqi.com （见 `wrangler.jsonc` 的 `routes`）。
 4. 自动部署：在 GitHub 仓库的 Settings → Secrets 中添加 `CLOUDFLARE_API_TOKEN`（建议基于 “Edit Cloudflare Workers” 模板，并确认含 D1 编辑权限）与 `CLOUDFLARE_ACCOUNT_ID`。之后推送到 `main` 会先跑测试，再自动更新预发；上线则在 Actions 里手动运行 “Test and deploy” 并选择 `production`。未配置密钥时只跑测试，不部署。
+
+### 开启 Google 登录
+
+1. 在 Google Cloud Console 的 Google Auth Platform 里配置应用信息（应用名、支持邮箱、授权域名 `chuhanxiangqi.com`、隐私政策 `https://chuhanxiangqi.com/privacy`），再创建一个「Web 应用」OAuth 客户端，已获授权的重定向 URI 填：`https://chuhanxiangqi.com/api/auth/google/callback`、`https://staging.chuhanxiangqi.com/api/auth/google/callback`、`http://localhost:5173/api/auth/google/callback`。
+2. 把客户端 ID 与密钥写进 Worker：正式环境 `npx wrangler secret put GOOGLE_CLIENT_ID` 和 `npx wrangler secret put GOOGLE_CLIENT_SECRET`，预发环境同样两条命令再加 `--env staging`。本地开发写在项目根目录的 `.dev.vars`（已被 Git 忽略）：
+
+   ```
+   GOOGLE_CLIENT_ID=…
+   GOOGLE_CLIENT_SECRET=…
+   ```
+
+3. 账号表由 `drizzle/0001_accounts.sql` 建立：GitHub Actions 部署前会自动迁移；手动部署时先运行对应的 `db:migrate:*`。迁移之前即使先部署了新代码，下棋也不受影响，只是不显示登录。
 
 旧的 GitHub Pages 前端与旧后端互相独立：本版本不再向 Pages 发布，旧站停留在最后一次发布的状态；新旧站点使用各自的数据库，棋局不会迁移。
 

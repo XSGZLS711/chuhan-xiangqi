@@ -21,7 +21,7 @@ Plan: `ROADMAP.md`. Detailed notes for the current track are local-only in `rese
 - `app/page.tsx`: friend rooms. `components/ai-game.tsx`: the AI game with live analysis. `components/chess-board.tsx`: the board.
 - `components/board-effect.tsx`: check/mate/result overlays. `lib/presentation.ts`: which sounds and effects a move triggers.
 - `app/globals.css`: board motion (`piece-hop`, `.move-dot`, `.capture-target`, `.piece-position.selected`, capture ghost).
-- `worker/`: the API (`/api/game`) and same-origin cookie identity.
+- `worker/`: the API (`/api/game`) and same-origin cookie identity. Google sign-in: `worker/google.ts` (OAuth, pure), `worker/accounts.ts` (D1: accounts, sessions, seat moves), `worker/auth.ts` (routes).
 
 ## Done (branch `polish-feel`)
 - Sound lands with the piece (`lib/motion.ts` is the single timing source), with two-part move, capture and mate sounds.

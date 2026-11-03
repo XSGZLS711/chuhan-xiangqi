@@ -4259,6 +4259,82 @@ html {
   height: 18px;
   accent-color: var(--emphasis);
 }
+/* Signed in: the name's first character in a seal; the panel holds sign-out. */
+.account-menu {
+  position: relative;
+}
+.account-menu summary {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  margin-left: 6px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff5df;
+  font-family: 'Songti SC', 'STSong', serif;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.account-menu summary::-webkit-details-marker {
+  display: none;
+}
+.account-menu summary:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.account-panel {
+  position: absolute;
+  right: 0;
+  top: 40px;
+  z-index: 30;
+  display: grid;
+  gap: 4px;
+  min-width: 200px;
+  max-width: min(280px, calc(100vw - 32px));
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card);
+  box-shadow: 0 6px 22px #30251722;
+}
+.account-panel strong {
+  font-size: 14px;
+}
+.account-panel small {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  overflow-wrap: anywhere;
+}
+.account-panel > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.account-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-size: 12px;
+}
+.account-links a,
+.account-links button {
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.account-links a:hover {
+  color: var(--primary);
+}
+.account-links button:not(:disabled):hover {
+  color: var(--emphasis);
+}
 .tactics-off .piece.checked {
   animation: none;
 }
