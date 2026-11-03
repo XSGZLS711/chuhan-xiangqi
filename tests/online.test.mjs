@@ -151,7 +151,7 @@ const syncs=[];
 
 const [r3,b3]=await players(client(),client());
 let dropAck=false;const bt=transport(b3,{onSend:(ws,message)=>{if(dropAck&&message.includes('"t":"act"')){dropAck=false;ws.close();}}});
-const created=await lib.createRoom('红方',0,transport(r3));
+const created=await lib.createRoom('红方',0,'red',transport(r3));
 const red3=page(created.id,transport(r3)),black3=page(created.id,bt);syncs.push(red3,black3);
 await until(()=>black3.room);await black3.sync.send('join',{name:'黑方'});await until(()=>red3.room?.players.black);
 ok('页面端同步（lib/room-sync.ts）走 WebSocket，入座成功',red3.sync.mode==='socket'&&black3.sync.mode==='socket'&&black3.room.you==='black');
@@ -164,7 +164,7 @@ ok('发出落子后连接断开、回执丢失：自动重连重发，这一步�
 await until(()=>red3.room.version===after.version);ok('对手照常收到这一步',red3.room.history.length===2);
 
 const [r4,b4]=await players(client(),client());
-const room4=await lib.createRoom('红方',0,transport(r4));
+const room4=await lib.createRoom('红方',0,'red',transport(r4));
 const blocked=transport(b4,{socketPath:()=>'/api/game/ws?room=blocked'});
 const red4=page(room4.id,transport(r4)),black4=page(room4.id,blocked);syncs.push(red4,black4);
 await until(()=>black4.room);ok('WebSocket 连不上时（公司网络、代理）退回挂起轮询',black4.sync.mode==='poll'&&blocked.counts.sockets===1);
@@ -189,6 +189,51 @@ if(local){
  viewed=await r1.request('GET',option('legacy'));
  ok('上线前留下的 D1 棋室仍能打开',viewed.status===200&&/^[a-f0-9]{20}$/.test(viewed.data.id)&&Array.isArray(viewed.data.history));
 }else skip('旧的 D1 棋室','线上不能新建 D1 棋室；用 --legacy=<上线前的房间号> 检查');
+// ── The maker of a room may sit on black; the friend then takes red and moves first ──
+const [r6,b6]=await players(client(),client());
+ok('选边不是红也不是黑时拒绝建房',(await b6.request('POST',{action:'create',name:'黑方',clockMinutes:0,side:'green'})).status===400);
+made=await b6.request('POST',{action:'create',name:'执黑的房主',clockMinutes:0,side:'black'});const sided=made.data.id;
+ok('建房时选执黑：房主坐黑方，红方空着等好友',made.status===200&&made.data.you==='black'&&made.data.players.red===null&&made.data.players.black.name==='执黑的房主');
+const hostSocket=socket(b6,sided),guestSocket=socket(r6,sided);await hostSocket.opened;await guestSocket.opened;
+m=await guestSocket.next(roomAt(0));ok('好友打开链接看到红方空位',m.room.players.red===null&&m.room.you===null);
+request=act(hostSocket,'move',0,{from:27,to:36});ok('好友入座前房主不能走',(await hostSocket.next(ackOf(request))).code==='waiting-for-friend');
+request=act(guestSocket,'join',0,{name:'执红的好友'});m=await guestSocket.next(roomAt(1));await guestSocket.next(ackOf(request));
+ok('好友入座执红，房主仍执黑',m.room.you==='red'&&m.room.players.red.name==='执红的好友'&&(await hostSocket.next(roomAt(1))).room.you==='black');
+request=act(hostSocket,'move',1,{from:27,to:36});ok('执黑的房主不能抢先落子',(await hostSocket.next(ackOf(request))).code==='not-your-turn');
+request=act(guestSocket,'move',1,{from:70,to:67});await guestSocket.next(ackOf(request));
+request=act(hostSocket,'move',2,{from:19,to:22});ok('红方先走，黑方应着',(await hostSocket.next(ackOf(request))).status===200);
+hostSocket.close();
+const hostBack=socket(b6,sided,{v:2});await hostBack.opened;m=await hostBack.next();
+ok('执黑的房主断线重连，补发其间的着法，座位还是黑方',m.t==='room'&&m.room.version===3&&m.room.moves.length===2&&m.room.you==='black');
+viewed=await b6.request('GET',sided);ok('刷新（HTTP）也认得执黑的房主',viewed.data.you==='black'&&viewed.data.players.red.name==='执红的好友');
+request=act(hostBack,'offer-rematch',3);await hostBack.next(ackOf(request));
+request=act(guestSocket,'respond',4,{accept:true});const guestRound=await guestSocket.next(roomAt(5));await guestSocket.next(ackOf(request));
+m=await hostBack.next(roomAt(5));
+ok('再来一局换边：房主改执红，好友改执黑',m.room.round===2&&m.room.you==='red'&&m.room.players.red.name==='执黑的房主'&&guestRound.room.you==='black');
+hostBack.close();guestSocket.close();
+const [r7,b7]=await players(client(),client());
+const blackRoom=await lib.createRoom('执黑的房主',0,'black',transport(b7));
+const host7=page(blackRoom.id,transport(b7)),guest7=page(blackRoom.id,transport(r7));syncs.push(host7,guest7);
+await until(()=>guest7.room);await guest7.sync.send('join',{name:'执红的好友'});await until(()=>host7.room?.players.red);
+await guest7.sync.send('move',{from:70,to:67});await until(()=>host7.room.history.length===1);
+await host7.sync.send('move',{from:19,to:22});await until(()=>guest7.room.history.length===2);
+ok('页面端 createRoom 带上 side：执黑的房主和执红的好友照常对局',blackRoom.you==='black'&&host7.room.you==='black'&&guest7.room.you==='red'&&guest7.room.turn==='red');
+if(local){
+ const [r8,b8]=await players(client(),client());
+ made=await b8.request('POST',{action:'create',name:'执黑的房主',clockMinutes:0.05,side:'black'});const timedBlack=made.data.id;
+ const watchBlack=socket(b8,timedBlack);await watchBlack.opened;await watchBlack.next(roomAt(0));
+ const joinedRed=await r8.request('POST',{action:'join',room:timedBlack,version:0,name:'执红的好友'});
+ m=await watchBlack.next((x)=>x.t==='room'&&x.room.result,8000);
+ ok('执黑开房、好友执红不走：红方超时，执黑的房主获胜',joinedRed.data.you==='red'&&m.room.result.reason==='超时'&&m.room.result.winner==='black'&&m.room.you==='black');
+ watchBlack.close();
+ const [r9,b9]=await players(client(),client());
+ made=await b9.request('POST',{action:'create',name:'执黑的房主',clockMinutes:0,side:'black',store:'d1'});const oldBlack=made.data.id;
+ const host9=page(oldBlack,transport(b9)),guest9=page(oldBlack,transport(r9));syncs.push(host9,guest9);
+ await until(()=>guest9.room);await guest9.sync.send('join',{name:'执红的好友'});await until(()=>host9.room?.players.red);
+ await guest9.sync.send('move',{from:70,to:67});await until(()=>host9.room.history.length===1);
+ await host9.sync.send('offer-rematch');await until(()=>guest9.room.offer);await guest9.sync.send('respond',{accept:true});await until(()=>host9.room.round===2);
+ ok('（本地）D1 棋室也能执黑开房：好友执红先走，再来一局换边',/^[a-f0-9]{20}$/.test(oldBlack)&&made.data.you==='black'&&host9.room.you==='red'&&guest9.room.you==='black');
+}else skip('执黑开房的超时、D1 棋室','只在本地有短时钟和 D1 新房间');
 for(const p of syncs)p.sync.stop();
 
 // One timed game, for the free-plan numbers in the PR: two players, a move every 12 s.
@@ -201,7 +246,7 @@ if(option('game')!==undefined){
  const tr=transport(rg,kind==='poll'?blockedPath:{}),tb=transport(bg,kind==='poll'?blockedPath:{});
  const start=local?await usageNow():null;
  await lib.openSession(tr);await lib.openSession(tb);
- const id=kind==='d1'?(await (await tr.fetch('/api/game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',name:'红方',clockMinutes:20,store:'d1'})})).json()).id:(await lib.createRoom('红方',20,tr)).id;
+ const id=kind==='d1'?(await (await tr.fetch('/api/game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'create',name:'红方',clockMinutes:20,store:'d1'})})).json()).id:(await lib.createRoom('红方',20,'red',tr)).id;
  const redG=page(id,tr),blackG=page(id,tb);
  await until(()=>blackG.room);await blackG.sync.send('join',{name:'黑方'});await until(()=>redG.room?.players.black);
  const pick=(room)=>{

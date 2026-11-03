@@ -10,20 +10,23 @@ export type RoomNote=
  |{key:'declined';side:Side;offer:'draw'|'rematch'}
  |{key:'undone';side:Side;from:number;to:number;text:string}
  |{key:'move';from:number;to:number;text:string;check:boolean};
-export type Room={id:string;board:Board;turn:Side;players:{red:Player;black:Player|null};history:Move[];result:Result|null;offer:{kind:'draw'|'rematch';side:Side}|null;clockMinutes:number;clocks:{red:number;black:number};turnAt:number;quiet:number;round:number;note:string|RoomNote;chat:{side:Side;text:string;at:number}[];createdAt:number};
-export type PublicRoom=Omit<Room,'players'> & {players:{red:{name:string;online:boolean};black:{name:string;online:boolean}|null};you:Side|null;version:number;serverNow:number};
+/** A seat is null until someone sits there; the one who made the room took the other. */
+export type Room={id:string;board:Board;turn:Side;players:{red:Player|null;black:Player|null};history:Move[];result:Result|null;offer:{kind:'draw'|'rematch';side:Side}|null;clockMinutes:number;clocks:{red:number;black:number};turnAt:number;quiet:number;round:number;note:string|RoomNote;chat:{side:Side;text:string;at:number}[];createdAt:number};
+export type PublicRoom=Omit<Room,'players'> & {players:{red:{name:string;online:boolean}|null;black:{name:string;online:boolean}|null};you:Side|null;version:number;serverNow:number};
 export class GameError extends AppError{constructor(code:ErrorCode,public status=400){super(code)}}
-export function newRoom(id:string,player:Player,clockMinutes:number,now:number):Room{return {id,board:initialBoard(),turn:'red',players:{red:player,black:null},history:[],result:null,offer:null,clockMinutes,clocks:{red:clockMinutes*60000,black:clockMinutes*60000},turnAt:now,quiet:0,round:1,note:{key:'table-ready'},chat:[],createdAt:now};}
-export function playerSide(r:Room,id:string):Side|null{return r.players.red.id===id?'red':r.players.black?.id===id?'black':null;}
-export function clockDeadline(r:Room):number{return r.clockMinutes&&r.players.black&&!r.result?r.turnAt+r.clocks[r.turn]:Infinity;}
+export function newRoom(id:string,player:Player,clockMinutes:number,now:number,side:Side='red'):Room{return {id,board:initialBoard(),turn:'red',players:side==='red'?{red:player,black:null}:{red:null,black:player},history:[],result:null,offer:null,clockMinutes,clocks:{red:clockMinutes*60000,black:clockMinutes*60000},turnAt:now,quiet:0,round:1,note:{key:'table-ready'},chat:[],createdAt:now};}
+/** Both seats are taken, so the game is on. */
+export function seated(r:{players:{red:unknown;black:unknown}}):boolean{return !!r.players.red&&!!r.players.black;}
+export function playerSide(r:Room,id:string):Side|null{return r.players.red?.id===id?'red':r.players.black?.id===id?'black':null;}
+export function clockDeadline(r:Room):number{return r.clockMinutes&&seated(r)&&!r.result?r.turnAt+r.clocks[r.turn]:Infinity;}
 export function expireClock(r:Room,now:number):boolean{if(now>=clockDeadline(r)){r.clocks[r.turn]=0;r.result={winner:opposite(r.turn),reason:REASON.timeout};r.offer=null;return true;}return false;}
 export function applyAction(r:Room,id:string,a:Record<string,unknown>,now:number):void{
  const side=playerSide(r,id);const type=a.action;
- if(type==='join'){if(side)return;if(r.players.black)throw new GameError('room-full',409);r.players.black={id,name:cleanName(a.name)};r.turnAt=now;r.note={key:'friend-joined'};return;}
+ if(type==='join'){if(side)return;const open:Side|null=!r.players.red?'red':!r.players.black?'black':null;if(!open)throw new GameError('room-full',409);r.players[open]={id,name:cleanName(a.name)};r.turnAt=now;r.note={key:'friend-joined'};return;}
  if(!side)throw new GameError('spectator',403);
  if(type==='name'){r.players[side]!.name=cleanName(a.name);return;}
  if(type==='chat'){const text=String(a.text??'').trim().slice(0,120);if(!text)throw new GameError('chat-empty');const last=r.chat.filter(m=>m.side===side).at(-1);if(last&&now-last.at<1000)throw new GameError('chat-too-fast',429);r.chat=[...r.chat,{side,text,at:now}].slice(-60);return;}
- if(!r.players.black)throw new GameError('waiting-for-friend');
+ if(!seated(r))throw new GameError('waiting-for-friend');
  if(type==='undo'){
   if(!r.history.length){if(r.result){r.result=null;r.offer=null;r.turnAt=now;r.clocks={red:r.clockMinutes*60000,black:r.clockMinutes*60000};r.note={key:'undo-ended',side};return;}throw new GameError('nothing-to-undo');}
   const m=r.history.pop()!;r.board=m.before;r.turn=m.side;r.clocks=m.clocks;r.quiet=m.quietBefore;r.result=null;r.offer=null;r.turnAt=now;r.note={key:'undone',side,from:m.from,to:m.to,text:m.text};return;

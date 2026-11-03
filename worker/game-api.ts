@@ -49,21 +49,19 @@ async function publicState(
     now = Date.now();
   if (side)
     usage.d1RowsWritten += await touchPresence(db, room.id + ':' + id, now);
-  const [red, black = false] = await present(
+  // Either seat may still be open: the one who made the room can sit on either side.
+  const seats = [room.players.red, room.players.black];
+  const online = await present(
     db,
-    [room.players.red, room.players.black].flatMap((seat) =>
-      seat ? [room.id + ':' + seat.id] : [],
-    ),
+    seats.flatMap((seat) => (seat ? [room.id + ':' + seat.id] : [])),
     now,
+  );
+  const [red, black] = seats.map(
+    (seat) => seat && { name: seat.name, online: online.shift() ?? false },
   );
   return {
     ...room,
-    players: {
-      red: { name: room.players.red.name, online: red },
-      black: room.players.black
-        ? { name: room.players.black.name, online: black }
-        : null,
-    },
+    players: { red, black },
     you: side,
     version,
     serverNow: now,
@@ -142,15 +140,19 @@ async function handlePost(req: Request) {
       const testClock = isLocal(req) && clock > 0 && clock <= 1;
       if (![0, 10, 20, 30].includes(clock) && !testClock)
         throw new GameError('bad-clock');
+      // The one who makes the room picks a side; pages from before the choice send none.
+      const side = a.side ?? 'red';
+      if (side !== 'red' && side !== 'black')
+        throw new GameError('bad-request');
       const seat = { id: me.id, name: cleanName(a.name) };
       // New rooms live in a Durable Object. A local test can still make a D1 room.
       if (!(a.store === 'd1' && isLocal(req))) {
         const id = randomHex(12);
-        const out = await liveRoom(id).create(id, seat, clock);
+        const out = await liveRoom(id).create(id, seat, clock, side);
         return reply(out.body, cookie, out.status);
       }
       const id = randomHex(10);
-      const room = newRoom(id, seat, clock, now);
+      const room = newRoom(id, seat, clock, now, side);
       const saved = await database()
         .prepare(
           'INSERT INTO rooms (id,state,version,updated_at) VALUES (?,?,0,?)',

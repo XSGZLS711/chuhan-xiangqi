@@ -116,7 +116,7 @@ async function readRoom(id: string) {
     .first<{ state: string; version: number }>();
   const room = JSON.parse(row!.state) as Room;
   return {
-    red: room.players.red.id,
+    red: room.players.red?.id,
     black: room.players.black?.id,
     version: row!.version,
   };

@@ -1,11 +1,11 @@
-import type { PublicRoom } from './game';
+import { seated, type PublicRoom } from './game';
 import { t, type Locale } from './i18n';
 import type { Side } from './xiangqi';
 
 export function canPlayLive(room: PublicRoom | null, busy: boolean): boolean {
   return (
     !!room?.you &&
-    !!room.players.black &&
+    seated(room) &&
     !room.result &&
     room.you === room.turn &&
     !busy
@@ -34,7 +34,7 @@ export function rematchControl(
     disabled:
       busy ||
       !room.you ||
-      !room.players.black ||
+      !seated(room) ||
       waiting ||
       room.offer?.kind === 'draw',
   };
