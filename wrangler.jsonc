@@ -3,7 +3,10 @@
   "name": "chuhan-xiangqi",
   "main": "worker/index.ts",
   "compatibility_date": "2026-05-15",
-  "observability": { "enabled": true },
+  // Workers Logs keeps what the code logs (visits, client errors, onError). Invocation
+  // logs stay off: they record request headers and the IP, which public/privacy.html
+  // says we do not keep.
+  "observability": { "enabled": true, "logs": { "invocation_logs": false } },
   // The domain is the public address. Wrangler turns workers.dev off once routes
   // exist unless asked, and older invitation links still point there.
   "workers_dev": true,
@@ -36,7 +39,10 @@
   "env": {
     "staging": {
       "name": "chuhan-xiangqi-staging",
-      "observability": { "enabled": true },
+      "observability": {
+        "enabled": true,
+        "logs": { "invocation_logs": false }
+      },
       "workers_dev": true,
       "routes": [
         { "pattern": "staging.chuhanxiangqi.com", "custom_domain": true }

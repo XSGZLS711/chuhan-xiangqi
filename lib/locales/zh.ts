@@ -156,6 +156,7 @@ export const zhMessages = {
   'account.wait': '请稍候…',
   'account.signOut': '退出登录',
   'account.privacy': '隐私说明',
+  'account.feedback': '反馈',
   'account.delete': '删除账号',
   'account.signIn.label': '使用 Google 账号登录',
   'account.signIn': '登录',

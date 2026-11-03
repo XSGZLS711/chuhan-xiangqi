@@ -1,6 +1,7 @@
 'use client';
 /* oxlint-disable next/no-html-link-for-pages -- The AI entry is a separate document with its own browser isolation. */
 import RecentGames from './recent-games';
+import SiteLinks from './site-links';
 import { useLocale } from '@/lib/use-locale';
 import { ArrowRight, Bot, GitBranch, Users } from 'lucide-react';
 
@@ -61,6 +62,7 @@ export default function GameLobby({
         </button>
       </div>
       <RecentGames signedIn={signedIn} />
+      <SiteLinks />
     </section>
   );
 }

@@ -10,3 +10,10 @@
 # Hashed build output never changes.
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
+
+# Only https://chuhanxiangqi.com is for search engines. Staging and the workers.dev
+# addresses serve the same pages, so they ask not to be indexed.
+https://staging.chuhanxiangqi.com/*
+  X-Robots-Tag: noindex
+https://:worker.:account.workers.dev/*
+  X-Robots-Tag: noindex
