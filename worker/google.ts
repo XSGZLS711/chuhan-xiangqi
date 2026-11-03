@@ -1,5 +1,3 @@
-import { cleanName } from '../lib/game';
-
 /** Google sign-in by the authorization-code flow with PKCE, done entirely in this
  * Worker. We keep no Google tokens: the ID token is read once for who signed in. */
 export const GOOGLE_AUTHORIZE = 'https://accounts.google.com/o/oauth2/v2/auth';
@@ -22,6 +20,21 @@ export const base64url = (bytes: Uint8Array) =>
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=+$/, '');
+const ACCOUNT_NAME = 32;
+/** The Google name as the account menu shows it. Longer than a room name, since only
+ * the account holder sees it; a cut drops an unclosed bracket rather than leave half
+ * a nickname such as "Lushan Zhang (Lu". */
+export function accountName(value: unknown): string {
+  const name = (typeof value === 'string' ? value : '')
+    .replace(/\p{Cc}/gu, '')
+    .trim();
+  const chars = Array.from(name);
+  if (chars.length <= ACCOUNT_NAME) return name || '棋友';
+  let cut = chars.slice(0, ACCOUNT_NAME).join('');
+  const open = Math.max(cut.lastIndexOf('('), cut.lastIndexOf('（'));
+  if (open > 0 && !/[)）]/.test(cut.slice(open))) cut = cut.slice(0, open);
+  return cut.trim() || '棋友';
+}
 const fromBase64url = (value: string) =>
   Uint8Array.from(atob(value.replace(/-/g, '+').replace(/_/g, '/')), (c) =>
     c.charCodeAt(0),
@@ -167,6 +180,6 @@ export function googleAccount(
       claims.email_verified === true && typeof claims.email === 'string'
         ? claims.email.slice(0, 254)
         : '',
-    name: cleanName(claims.name ?? claims.given_name),
+    name: accountName(claims.name ?? claims.given_name),
   };
 }

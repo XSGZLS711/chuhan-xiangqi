@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   authorizationUrl,
   base64url,
+  accountName,
   googleAccount,
   pendingCookie,
   pkceChallenge,
@@ -120,7 +121,7 @@ await test('登录途中的 Cookie 往返不变，被改动或缺项时作废', 
   );
   assert.equal(readPending(evil.split(';')[0])?.back, '/');
 });
-await test('读取 Google 账号：编号、已验证的邮箱和截短的名字', () => {
+await test('读取 Google 账号：编号、已验证的邮箱和名字', () => {
   const account = googleAccount(idToken(valid), expected);
   assert.equal(account.subject, valid.sub);
   assert.equal(account.email, 'player@example.com');
@@ -130,7 +131,7 @@ await test('读取 Google 账号：编号、已验证的邮箱和截短的名字
       idToken({ ...valid, iss: 'accounts.google.com', name: 'x'.repeat(40) }),
       expected,
     ).name.length,
-    16,
+    32,
   );
   assert.equal(
     googleAccount(idToken({ ...valid, email_verified: false }), expected).email,
@@ -140,6 +141,28 @@ await test('读取 Google 账号：编号、已验证的邮箱和截短的名字
     googleAccount(idToken({ ...valid, name: undefined }), expected).name,
     '棋友',
   );
+});
+await test('账号名最多 32 字，截断时不留下半个括号', () => {
+  assert.equal(accountName('Lushan Zhang (Lucian)'), 'Lushan Zhang (Lucian)');
+  assert.equal(
+    accountName('Alexandra Catherine Montgomery (Alex)'),
+    'Alexandra Catherine Montgomery',
+  );
+  assert.equal(
+    accountName('欧阳'.repeat(14) + '（小名字很长）'),
+    '欧阳'.repeat(14),
+  );
+  assert.equal(
+    accountName('a'.repeat(20) + ' (Bo) ' + 'b'.repeat(20)).length,
+    32,
+  );
+  assert.equal(
+    accountName('😀'.repeat(40)),
+    '😀'.repeat(32),
+    '按字符而不是按 UTF-16 截',
+  );
+  assert.equal(accountName('  \u0007 '), '棋友');
+  assert.equal(accountName(undefined), '棋友');
 });
 await test('签发方、受众、过期、nonce 或编号不对的令牌一律拒绝', () => {
   for (const claims of [

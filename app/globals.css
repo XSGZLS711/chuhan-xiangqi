@@ -4302,6 +4302,7 @@ html {
 }
 .account-panel strong {
   font-size: 14px;
+  overflow-wrap: anywhere;
 }
 .account-panel small {
   font-size: 12px;

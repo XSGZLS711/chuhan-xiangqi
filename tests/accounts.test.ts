@@ -135,11 +135,12 @@ await test('另一台设备用同一个 Google 账号登录，是同一个账号
   await addRoom('self', userA, anonB);
   const token = await signIn(
     db,
-    google('g-1'),
+    google('g-1', '小楚 (Chu)'),
     await player(request(tokenB), db),
     now,
   );
   const second = await player(request(token), db);
+  const first = await player(request(sessionA), db);
   assert.equal(second.id, userA);
   assert(
     await player(request(sessionA), db).then((p) => p.signedIn),
@@ -151,9 +152,9 @@ await test('另一台设备用同一个 Google 账号登录，是同一个账号
     '不把两个座位并成一人',
   );
   assert.equal(
-    (await account(db, second.device))?.name,
-    '小楚',
-    '再次登录不改名字',
+    (await account(db, first.device))?.name,
+    '小楚 (Chu)',
+    '再次登录时名字跟着 Google 更新，两台设备一致',
   );
 });
 await test('已登录时换另一个 Google 账号：旧会话作废，座位不跟过去', async () => {
