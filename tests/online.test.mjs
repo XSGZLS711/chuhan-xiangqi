@@ -45,4 +45,9 @@ viewed=await red.request('GET',id);ok('原红方收到换边状态',viewed.data.
 result=await send(red,'name',{name:'更名后的棋友'});ok('称呼修改同步',result.status===200&&state.players.black.name==='更名后的棋友');
 const attack=await fetch(base+'/api/game',{method:'POST',headers:{'Content-Type':'application/json',cookie:red.cookie,origin:'https://unrelated.example'},body:JSON.stringify({action:'resign',room:id,version:state.version})});ok('跨站操作被拒绝',attack.status===403);
 const bad=await red.request('GET','invalid');ok('错误邀请链接给出明确错误',bad.status===404&&bad.data.error.includes('链接'));
+const account=await fetch(base+'/api/me',{headers:{cookie:red.cookie}});const status=await account.json();ok('匿名棋友没有账号，账号接口不缓存',account.status===200&&status.user===null&&typeof status.google==='boolean'&&account.headers.get('cache-control')?.includes('no-store'));
+const forcedOut=await fetch(base+'/api/auth/logout',{method:'POST',headers:{cookie:red.cookie,origin:'https://unrelated.example'}});ok('跨站请求不能让人退出登录',forcedOut.status===403);
+const forcedDelete=await fetch(base+'/api/me',{method:'DELETE',headers:{cookie:red.cookie,origin:base,'Sec-Fetch-Site':'same-origin'}});ok('未登录不能删除账号',forcedDelete.status===401);
+const away=await fetch(base+'/api/auth/google?return='+encodeURIComponent('//unrelated.example/'),{redirect:'manual'});const back=await fetch(base+'/api/auth/google/callback?state=forged&code=x',{redirect:'manual',headers:{cookie:(away.headers.get('set-cookie')??'').split(';')[0]}});ok('登录回跳只回本站，伪造的 state 被拒绝',away.status===302&&back.status===302&&back.headers.get('location')==='/?login=failed');
+viewed=await red.request('GET',id);ok('账号接口不影响原有座位',viewed.data.you==='black');
 console.log(`\n${passed} online checks passed. Room ${id}`);

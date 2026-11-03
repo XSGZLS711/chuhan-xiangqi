@@ -18,6 +18,8 @@ import {
 } from '@/lib/mobile-game';
 import { useGameViewport } from '@/lib/use-game-viewport';
 import { useAutoArchive } from '@/lib/use-auto-archive';
+import AccountMenu from '@/components/account-menu';
+import { useAccount } from '@/lib/use-account';
 import EffectSettings from '@/components/effect-settings';
 import { useEffectSettings } from '@/lib/use-effect-settings';
 import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
@@ -104,6 +106,7 @@ const timeOptions = [
 ];
 export default function Home() {
   const { settings, setSetting } = useEffectSettings();
+  const account = useAccount();
   const sound = settings.sound;
   const [room, setRoom] = useState<PublicRoom | null>(null),
     [roomId, setRoomId] = useState(''),
@@ -760,6 +763,7 @@ export default function Home() {
           >
             <BookOpen size={17} /> <span className="tool-label">对局规则</span>
           </button>
+          <AccountMenu account={account} />
         </div>
       </header>
       {room && (
@@ -839,6 +843,14 @@ export default function Home() {
         <p className="notice" role="alert">
           {archiveError}
         </p>
+      )}
+      {account.notice && (
+        <output className="notice">
+          <span>{account.notice}</span>
+          <button aria-label="关闭提示" onClick={account.clearNotice}>
+            <X size={15} />
+          </button>
+        </output>
       )}
       {message && (
         <div className="notice" role="status">

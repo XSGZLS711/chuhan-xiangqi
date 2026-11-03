@@ -36,3 +36,6 @@ yarn-error.log*
 
 # local study material (screenshots/recordings of other apps), never published
 /research/
+
+# local Worker secrets (Google sign-in)
+.dev.vars*

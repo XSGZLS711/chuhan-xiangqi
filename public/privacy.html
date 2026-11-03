@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>隐私说明 · 楚汉棋社</title>
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <style>
+      :root {
+        --background: #f4f0e9;
+        --foreground: #342b25;
+        --primary: #913b31;
+        --border: #dfd5c6;
+        --muted: #7a6a57;
+        color-scheme: light dark;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #191c1b;
+          --foreground: #e9dfcd;
+          --primary: #d77a6b;
+          --border: #454a3f;
+          --muted: #b8ad98;
+        }
+      }
+      body {
+        margin: 0;
+        background: var(--background);
+        color: var(--foreground);
+        font: 16px/1.75 -apple-system, BlinkMacSystemFont, 'PingFang SC',
+          'Noto Sans SC', 'Segoe UI', sans-serif;
+      }
+      main {
+        max-width: 680px;
+        margin: 0 auto;
+        padding: 40px 16px 64px;
+      }
+      h1 {
+        font-family: 'Songti SC', 'STSong', serif;
+        font-size: 28px;
+        letter-spacing: 2px;
+        margin: 24px 0 4px;
+      }
+      h2 {
+        font-size: 17px;
+        margin: 28px 0 6px;
+      }
+      p,
+      li {
+        margin: 6px 0;
+      }
+      a {
+        color: var(--primary);
+      }
+      small,
+      .muted {
+        color: var(--muted);
+      }
+      hr {
+        border: 0;
+        border-top: 1px solid var(--border);
+        margin: 48px 0 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <a href="/">← 楚汉棋社</a>
+      <h1>隐私说明</h1>
+      <small>更新于 2026 年 11 月 3 日</small>
+
+      <h2>不登录也能下棋</h2>
+      <p>
+        浏览器里会存一个随机的匿名 Cookie，用来在棋室里认出你。服务器只保存它的哈希值，不知道你是谁。
+      </p>
+
+      <h2>用 Google 登录时保存什么</h2>
+      <ul>
+        <li>只向 Google 请求最基本的资料（openid、email、profile）。</li>
+        <li>
+          保存：Google 账号编号、Google 上的名字（最多 16 个字）、经 Google
+          验证的邮箱。邮箱只显示给你本人。
+        </li>
+        <li>不保存 Google 的访问令牌，也不读取你的通讯录、云盘等任何其他数据。</li>
+        <li>登录状态保存在一个 HttpOnly Cookie 里，有效期 180 天，退出登录即作废。</li>
+      </ul>
+
+      <h2>棋局数据</h2>
+      <ul>
+        <li>好友棋室的棋盘、着法、聊天和你填写的称呼保存在服务器上，供对局双方使用。</li>
+        <li>本机的「最近对局」和引擎分析结果只保存在你的浏览器里，不会上传。</li>
+        <li>不投放广告，不使用第三方统计或追踪 Cookie。</li>
+        <li>网站托管在 Cloudflare，Cloudflare 会按它自己的政策处理访问日志。</li>
+      </ul>
+
+      <h2>删除账号</h2>
+      <p>
+        登录后点右上角的账号，选「删除账号」。账号、登录方式和所有设备上的登录状态会立即删除；棋室记录里只剩一个不再对应任何人的随机编号。
+      </p>
+
+      <h2>其他</h2>
+      <p>本站不面向 13 岁以下的儿童。</p>
+      <p>
+        有问题请在
+        <a href="https://github.com/XSGZLS711/chuhan-xiangqi/issues">GitHub</a>
+        上留言。
+      </p>
+
+      <hr />
+      <div lang="en">
+        <h1>Privacy</h1>
+        <small>Updated 3 November 2026</small>
+        <p>
+          <strong>Without an account</strong>, your browser keeps a random anonymous cookie so a
+          game room can recognise you. The server stores only its hash.
+        </p>
+        <p>
+          <strong>With Google sign-in</strong>, we ask Google only for basic profile scopes
+          (openid, email, profile) and store your Google account ID, your Google name (up to 16
+          characters) and your verified email, which is shown only to you. We keep no Google
+          access tokens and read no other Google data. The sign-in cookie is HttpOnly and lasts
+          180 days, or until you sign out.
+        </p>
+        <p>
+          <strong>Games</strong>: friend rooms (board, moves, chat, the name you chose) are stored
+          on the server for both players. Your recent-games list and engine analysis stay in your
+          browser. No ads, no third-party analytics or tracking cookies. The site is hosted on
+          Cloudflare, which handles access logs under its own policy.
+        </p>
+        <p>
+          <strong>Deleting your account</strong>: open the account menu (top right) and choose
+          删除账号 (Delete account). The account, its sign-in method and all sessions are removed
+          at once.
+        </p>
+        <p>
+          Not intended for children under 13. Questions:
+          <a href="https://github.com/XSGZLS711/chuhan-xiangqi/issues">GitHub issues</a>.
+        </p>
+      </div>
+    </main>
+  </body>
+</html>
