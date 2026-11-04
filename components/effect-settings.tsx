@@ -1,4 +1,5 @@
 import { SlidersHorizontal } from 'lucide-react';
+import { DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import type { MessageKey } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 import type {
@@ -43,4 +44,26 @@ export default function EffectSettings({
       </fieldset>
     </details>
   );
+}
+
+/** The same switches as menu items, for the phone's game menu: the board has no button there. */
+export function EffectMenuItems({
+  settings,
+  onChange,
+}: {
+  settings: Settings;
+  onChange: (key: SettingKey, value: boolean) => void;
+}) {
+  const { t } = useLocale();
+  return labels
+    .filter(([key]) => key !== 'sound')
+    .map(([key, text]) => (
+      <DropdownMenuCheckboxItem
+        key={key}
+        checked={settings[key]}
+        onCheckedChange={(value) => onChange(key, value)}
+      >
+        {t(text)}
+      </DropdownMenuCheckboxItem>
+    ));
 }

@@ -4296,6 +4296,12 @@ html {
   height: 18px;
   accent-color: var(--emphasis);
 }
+/* The phone's game menu carries these switches, so the board has no button on a phone. */
+@media (max-width: 660px), (max-height: 500px) and (pointer: coarse), (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
+  .effect-settings {
+    display: none;
+  }
+}
 /* Signed in: the name's first character in a seal; the panel holds sign-out. */
 .account-menu {
   position: relative;
