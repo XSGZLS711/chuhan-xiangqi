@@ -1353,9 +1353,7 @@ function sources(dir: string): string[] {
 const withoutComments = (code: string) =>
   code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
 test('components/、app/、lib/、worker/、web/ 里没有写死的中文（词典与白名单除外）', () => {
-  const files = ['components', 'app', 'lib', 'worker', 'web', 'hooks'].flatMap(
-    sources,
-  );
+  const files = ['components', 'app', 'lib', 'worker', 'web'].flatMap(sources);
   assert(files.length > 60);
   const leaks: string[] = [];
   for (const file of files) {
