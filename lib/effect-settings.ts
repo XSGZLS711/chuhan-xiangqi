@@ -7,6 +7,10 @@ export type EffectSettings = {
   resultEffects: boolean;
 };
 export type SettingKey = keyof EffectSettings;
+/** The switches people are shown. The rest run on their defaults for now: neither their stored
+ * values nor the system's reduced-motion setting are read until a settings page brings them back. */
+export const EFFECT_SWITCHES: readonly SettingKey[] = ['sound'];
+const READ_PREFERENCES = false;
 export const EFFECT_SETTINGS_KEY = 'chuhan-effects';
 type SettingsStorage = Pick<Storage, 'getItem' | 'setItem'>;
 const defaults = (reduced: boolean): EffectSettings => ({
@@ -33,17 +37,19 @@ function overrides(raw: string | null): Partial<EffectSettings> {
 export function loadEffectSettings(
   storage: SettingsStorage | null,
   reduced: boolean,
+  readPreferences = READ_PREFERENCES,
 ): EffectSettings {
-  const settings = defaults(reduced);
+  const settings = defaults(readPreferences && reduced);
   try {
     settings.sound = storage?.getItem('chuhan-sound') !== 'off';
   } catch {}
-  try {
-    Object.assign(
-      settings,
-      overrides(storage?.getItem(EFFECT_SETTINGS_KEY) ?? null),
-    );
-  } catch {}
+  if (readPreferences)
+    try {
+      Object.assign(
+        settings,
+        overrides(storage?.getItem(EFFECT_SETTINGS_KEY) ?? null),
+      );
+    } catch {}
   return settings;
 }
 export function saveEffectSetting(
