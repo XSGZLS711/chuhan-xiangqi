@@ -91,3 +91,18 @@ npm run preview      # 本地预览构建结果
 
 旧的 GitHub Pages 前端与旧后端互相独立：本版本不再向 Pages 发布，旧站停留在最后一次发布的状态；新旧站点使用各自的数据库，棋局不会迁移。
 
+
+## 许可
+
+本项目的代码和我们自己画的美术（SVG、CSS）以 GNU Affero General Public License 第 3 版或（由你选择）任何更新的版本授权，全文见 `LICENSE`。简单说：可以用、改、自己架站；但把改过的版本提供给别人用，包括只是架成网站让人访问，就要按同一许可向这些用户提供完整源码。
+
+下面这些各有自己的许可，不在上面的范围内：
+
+- 象棋引擎 Fairy-Stockfish（`public/ai/engine/`）：GPL-3.0，见该目录的 `SOURCE.md`、`Copying.txt` 与 `AUTHORS`。
+- 棋子字体 `assets/chuhan-pieces.woff2` 是 Ma Shan Zheng 的子集：SIL Open Font License 1.1，见 `public/fonts/OFL-MaShanZheng.txt`。
+- 落子声 `public/sounds/move.mp3`：CC0，见 `public/sounds/SOURCE.md`。
+- 打包进页面的 npm 依赖：各自的许可，构建时汇总到 `dist/client/third-party-licenses.md`。
+
+名字和标志不随代码授权（AGPL 第 7 条第 e 款）：「楚汉棋社」「Chuhan Xiangqi」两个名字、印章标志（`public/icon.svg` 与页头的「楚」字印章）和分享图（`assets/og-image.svg`、`public/og-image.png`）。发布改过的版本请换上自己的名字和标志；如实写明「基于楚汉棋社」不受限制。
+
+**License (English).** The code and our own artwork are licensed under the GNU AGPL, version 3 or (at your option) any later version; see `LICENSE`. If you run a modified version for other people, including as a website, you must offer them its complete source under the same license. The engine (GPL-3.0), the piece font (OFL-1.1), the move sound (CC0) and the bundled npm packages keep their own licenses, listed above. The names 楚汉棋社 and Chuhan Xiangqi, the seal logo and the share card are not licensed (AGPL section 7(e)): a modified version must carry its own name and logo; saying that it is based on Chuhan Xiangqi is fine.

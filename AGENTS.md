@@ -12,6 +12,7 @@ Plan: `ROADMAP.md`. Competitor study notes live only on the owner's machine in `
 - Keep `lib/xiangqi.ts`, `lib/game.ts` and `lib/presentation.ts` pure (no DOM, no React): the long-term goal is a WeChat mini program on the same core.
 - Run `npm run format` (oxfmt) only on files you changed.
 - Sound is Web Audio synthesis plus one CC0 move recording (`public/sounds/SOURCE.md`). Art is our own SVG/CSS; fonts are open-licensed and self-hosted (`/ai/` runs under COEP, so no font CDN).
+- License: our code and art are AGPL-3.0-or-later (`LICENSE`); the engine, the piece font, the move sound and the npm packages keep their own, listed in the README section 许可. The names 楚汉棋社 / Chuhan Xiangqi, the seal and the share card are not licensed. A new dependency or asset needs a license compatible with the AGPL (MIT, BSD, ISC, Apache-2.0, GPL-3.0; OFL for fonts, CC0 for media), and one that is not an npm package gets a line in that README section.
 - UI copy is deliberate, wordplay included (「再蒸一下」 is intended): ask before rewording. This holds for the English copy too, and the Chinese dictionary (`lib/locales/zh.ts`) is never reworded without the owner.
 - Match the surrounding code style: comment density, naming and idiom.
 - Lint baseline: several files already carry oxlint errors; files you touch end with no more than they started with.
