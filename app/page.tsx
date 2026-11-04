@@ -391,26 +391,8 @@ export default function Home() {
       if (!canPlayLive(room, busy)) return;
     }
     if (selected !== null && legalMove(board, selected, n, turn)) {
-      if (analysis) {
-        const next = moveBoard(board, selected, n);
-        setAnalysis({
-          ...analysis,
-          boards: [...analysis.boards, next],
-          turns: [...analysis.turns, opposite(turn)],
-          moves: [...analysis.moves, [selected, n]],
-        });
-        const feedback = branchFeedback(
-          board,
-          selected,
-          n,
-          turn,
-          `analysis:${Date.now()}`,
-        );
-        setBoardEffect(feedback.effect);
-        feedback.sounds.forEach((kind, index) =>
-          playSound(kind, soundDelay(feedback.sounds, index)),
-        );
-      } else void action('move', { from: selected, to: n });
+      if (analysis) branch(analysis, selected, n);
+      else void action('move', { from: selected, to: n });
       setSelected(null);
     } else if (board[n]?.side === turn) {
       setSelected(n === selected ? null : n);
@@ -462,6 +444,40 @@ export default function Home() {
     });
     setSelected(null);
     setMessage(null);
+  }
+  /** Plays one exploring move on top of `base`, with its sound and board effect. */
+  function branch(base: Analysis, from: number, to: number) {
+    const at = base.boards[base.boards.length - 1],
+      side = base.turns[base.turns.length - 1];
+    setAnalysis({
+      ...base,
+      boards: [...base.boards, moveBoard(at, from, to)],
+      turns: [...base.turns, opposite(side)],
+      moves: [...base.moves, [from, to]],
+    });
+    const feedback = branchFeedback(
+      at,
+      from,
+      to,
+      side,
+      `analysis:${Date.now()}`,
+    );
+    setBoardEffect(feedback.effect);
+    feedback.sounds.forEach((kind, index) =>
+      playSound(kind, soundDelay(feedback.sounds, index)),
+    );
+  }
+  /** A first move made on the lobby's board: the analysis board opens on the
+   * starting position, then the move is played on it, so the piece is seen to go. */
+  function exploreFrom(from: number, to: number) {
+    startAnalysis();
+    const base = {
+      boards: [board],
+      turns: [turn],
+      moves: [],
+      base: reviewIndex,
+    };
+    setTimeout(() => branch(base, from, to));
   }
   function exitAnalysis() {
     setBoardEffect(null);
@@ -942,6 +958,7 @@ export default function Home() {
           friendDisabled={busy}
           onCreate={() => setModal('create')}
           onExplore={startAnalysis}
+          onFirstMove={exploreFrom}
         />
       ) : (
         <div className="workspace">
