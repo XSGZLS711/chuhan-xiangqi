@@ -1500,10 +1500,9 @@ p {
   display: block;
   flex: 1;
   min-width: 0;
-  overflow: hidden;
   text-align: left;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.3;
+  white-space: normal;
 }
 .chess-dialog {
   padding: 28px !important;
@@ -1612,7 +1611,9 @@ p {
   outline-offset: 2px;
 }
 .clock-select {
-  height: 46px !important;
+  height: auto !important;
+  min-height: 46px;
+  padding-block: 8px !important;
   width: 100% !important;
   background: var(--field);
   border-color: var(--border);
@@ -2089,9 +2090,18 @@ p {
   min-width: 0;
 }
 .player-name-block > strong {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+/* A long name gives way by itself; the "you" tag and the rename link keep their words. */
+.player-name-block > strong .player-name {
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
+}
+.player-name-block > strong :is(.player-tag, .inline-link, .presence-dot) {
+  flex: none;
 }
 .player-clock {
   flex-shrink: 0;
@@ -3847,6 +3857,7 @@ html {
     white-space: nowrap;
   }
   .table-view .player-tag {
+    margin-left: 0;
     flex-shrink: 0;
     font-style: normal;
     font-size: 11px;
@@ -4713,9 +4724,9 @@ html:not(:lang(zh)) .report-table td {
   }
 }
 
-/* "Player You Edit" is longer than 棋友 我方 改名; the name keeps a few letters when the bar is tight. */
+/* "Player You Edit" is longer than 棋友 我方 改名; the name keeps a few letters when the bar is tight (the tag and the rename link keep all of theirs). */
 html:not(:lang(zh)) .table-view .player-name {
-  min-width: 6ch;
+  min-width: 4ch;
 }
 
 /* In the narrow table-view column the Latin brand and "New game" would otherwise wrap. */

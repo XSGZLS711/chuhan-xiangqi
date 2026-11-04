@@ -456,8 +456,16 @@
     color: var(--emphasis);
     background: var(--accent);
   }
+  .ai-analysis-toggle {
+    padding-block: 3px;
+  }
+  /* "Đang phân tích" is wider than the button at 320px: the words wrap instead of being cut. */
   .ai-analysis-toggle > span {
     font-size: 12px;
+    line-height: 1.15;
+    overflow: visible;
+    text-overflow: clip;
+    white-space: normal;
   }
   .ai-room.in-room .ai-error {
     margin: 2px 0;

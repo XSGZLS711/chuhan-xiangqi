@@ -44,17 +44,14 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - run: npx playwright install --only-shell chromium
-      # Reports without failing the job until the dialog fixes are merged; then drop
-      # continue-on-error so it must pass.
       - name: npm run test:layout
         id: layout
-        continue-on-error: true
         timeout-minutes: 10
         run: npm run test:layout
       - name: Layout report
         if: always() && hashFiles('work/layout/report.md') != ''
         run: cat work/layout/report.md >> "$GITHUB_STEP_SUMMARY"
-      - if: steps.layout.outcome == 'failure'
+      - if: always() && steps.layout.outcome == 'failure'
         uses: actions/upload-artifact@v4
         with:
           name: layout-report
