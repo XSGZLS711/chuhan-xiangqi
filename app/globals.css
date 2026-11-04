@@ -1489,6 +1489,22 @@ p {
     0 30px 80px -10px #3e281550,
     0 8px 24px -8px #3e281533 !important;
 }
+/* A dialog is one column that may be narrower than its content. Left as the grid's automatic
+ * column, a long unbreakable line (the clock select's "Không giới hạn thời gian · cứ thong thả")
+ * widened the column past the dialog, and the form, its fields and its buttons ran out of it. */
+.chess-dialog,
+.ai-setup {
+  grid-template-columns: minmax(0, 1fr);
+}
+.clock-select [data-slot='select-value'] {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .chess-dialog {
   padding: 28px !important;
   max-height: 85dvh;
@@ -4600,7 +4616,8 @@ html {
 @media (max-width: 660px) {
   /* "Rules" and "Luật chơi" are wider than the seal-script name and take the room the Latin
    * brand needs: the button keeps its icon, and its name for screen readers. */
-  html:not(:lang(zh)) .header-tools .rules-button .tool-label {
+  html:not(:lang(zh)) .header-tools .rules-button .tool-label,
+  html:not(:lang(zh)) .ai-room .header-tools .tool-label {
     display: none;
   }
 }

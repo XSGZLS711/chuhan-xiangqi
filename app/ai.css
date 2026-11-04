@@ -223,7 +223,11 @@
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--card);
-  white-space: nowrap;
+  /* The labels may wrap: three nowrap labels and the sound button were wider than a phone in
+     Vietnamese and pushed the page's width past the screen, which moved the fixed dialogs. */
+  min-width: 0;
+  line-height: 1.25;
+  text-align: center;
   box-shadow: var(--shadow-sm);
 }
 .ai-desktop-actions button:not(:disabled):hover {
@@ -277,6 +281,7 @@
 }
 .ai-choice-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 9px;
 }
 .ai-choice-row button {

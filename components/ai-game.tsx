@@ -717,9 +717,13 @@ export default function AiGame() {
           <span>{t('brand.name')}</span>
         </a>
         <div className="header-tools">
-          <button className="text-button" onClick={() => setSetup(true)}>
+          <button
+            className="text-button"
+            aria-label={t('ai.newGame.label')}
+            onClick={() => setSetup(true)}
+          >
             <Settings2 size={17} />
-            {t('ai.newGame')}
+            <span className="tool-label">{t('ai.newGame')}</span>
           </button>
           <AccountMenu account={account} />
         </div>
