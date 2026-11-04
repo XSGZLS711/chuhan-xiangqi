@@ -687,6 +687,13 @@ async function session(task, base, rooms, states) {
         await page.locator('.ai-room.in-room').waitFor();
         await check('AI 对局页');
       });
+      // Phones and the portrait tablet open the analysis from the bar under the board.
+      if (DEVICES[widths[0]].phone)
+        await dialog(
+          '局势与推荐',
+          () => tap(page.locator('.ai-mobile-evaluation')),
+          '[data-slot="sheet-content"]',
+        );
       await dialog('AI 认输确认', () =>
         press(page, 'lucide-flag', ['.ai-dock .dock-menu']),
       );

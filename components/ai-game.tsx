@@ -39,12 +39,14 @@ import {
 } from './ui/dropdown-menu';
 import {
   AI_LEVELS,
+  aiMovePause,
   createAiMatch,
   describeLine,
   engineMove,
   evaluationLabel,
   historyPosition,
   levelName,
+  pauseLeft,
   playAiMove,
   resignAiMatch,
   squareToEngine,
@@ -223,7 +225,7 @@ export default function AiGame() {
     : historyPosition(room, index);
   const evaluationKey = `${match.revision}:${position}`;
   const info = evaluation?.key === evaluationKey ? evaluation.info : null;
-  const line = info ? describeLine(board, turn, info.pv, 5, notation) : [];
+  const best = info ? describeLine(board, turn, info.pv, 1, notation)[0] : null;
   const live = review === null && !branch && !archived;
   const aiTurn = started && live && !room.result && room.turn !== match.human;
   const canMove =
@@ -357,6 +359,10 @@ export default function AiGame() {
     const config = aiTurn
       ? AI_LEVELS[match.level]
       : { time: 900, depth: 14, skill: 20 };
+    // The AI's move waits for a human pace; the analysis of our own turn does not.
+    const since = performance.now();
+    const pause = aiTurn ? aiMovePause(match.room.history.length) : 0;
+    let reply: ReturnType<typeof setTimeout> | undefined;
     setSearching(true);
     setError(null);
     void engine
@@ -369,19 +375,31 @@ export default function AiGame() {
       })
       .then((token) => {
         if (controller.signal.aborted) return;
-        setSearching(false);
-        if (!aiTurn) return;
+        if (!aiTurn) {
+          setSearching(false);
+          return;
+        }
         const move = token && engineMove(token);
         if (!move || !legalMove(board, move.from, move.to, turn)) {
+          setSearching(false);
           setEngineState('error');
           setError(errorInfo(null, 'engine-no-move'));
           return;
         }
-        // A result belongs to this exact match object, never a later undo/restart.
-        setMatch((current) =>
-          current === match ? playAiMove(current, move.from, move.to) : current,
+        reply = setTimeout(
+          () => {
+            if (controller.signal.aborted) return;
+            setSearching(false);
+            // A result belongs to this exact match object, never a later undo/restart.
+            setMatch((current) =>
+              current === match
+                ? playAiMove(current, move.from, move.to)
+                : current,
+            );
+            setSelected(null);
+          },
+          pauseLeft(pause, performance.now() - since),
         );
-        setSelected(null);
       })
       .catch((e) => {
         if (controller.signal.aborted) return;
@@ -389,7 +407,10 @@ export default function AiGame() {
         setEngineState('error');
         setError(errorInfo(e, 'search-failed'));
       });
-    return () => controller.abort();
+    return () => {
+      controller.abort();
+      clearTimeout(reply);
+    };
   }, [
     match,
     started,
@@ -494,12 +515,6 @@ export default function AiGame() {
       setSelected(null);
     } else if (board[n]?.side === turn) setSelected(n === selected ? null : n);
   }
-  const scoreText =
-    info?.mate !== undefined
-      ? t('ai.mate', { n: Math.abs(info.mate) })
-      : info?.cp !== undefined
-        ? `${info.cp > 0 ? '+' : ''}${(info.cp / 100).toFixed(2)}`
-        : '—';
   const redShare =
     info?.mate !== undefined
       ? info.mate > 0
@@ -528,73 +543,83 @@ export default function AiGame() {
             ? t('room.status.checkYou')
             : t('room.status.yourTurn');
 
-  function analysisPanel() {
+  // One title (the sheet's, or the card's on wide screens), the verdict in words over the bar,
+  // and the move to play. During the AI's own turn its search is not advice for us.
+  function analysisPanel(inSheet = false) {
+    const advice = ended
+      ? t('ai.best.ended')
+      : aiTurn
+        ? t('ai.thinking')
+        : best
+          ? t('ai.best.recommended', { move: best })
+          : searching
+            ? t('ai.best.searching')
+            : t('ai.best.idle');
     return (
       <div className="ai-analysis-panel">
-        <div className="ai-analysis-title">
-          <Sparkles size={18} />
-          <strong>{t('ai.panel.title')}</strong>
-          <button
-            className="ai-toggle"
-            aria-pressed={analysisOn}
-            onClick={() => setAnalysisOn(!analysisOn)}
-          >
-            {t(analysisOn ? 'ai.panel.on' : 'ai.panel.off')}
-          </button>
-        </div>
+        {!inSheet && (
+          <div className="ai-analysis-title">
+            <Sparkles size={18} />
+            <strong>{t('ai.panel.title')}</strong>
+          </div>
+        )}
         {analysisOn ? (
           <>
-            <div className="ai-score">
-              <strong>{ended ? status : evaluationLabel(info, locale)}</strong>
-              <span>{ended ? '' : scoreText}</span>
-            </div>
-            <div
-              className="ai-score-track"
-              aria-label={t('ai.eval.label', {
-                label: evaluationLabel(info, locale),
-              })}
-            >
-              <span style={{ width: `${redShare}%` }} />
-            </div>
-            <div className="ai-score-labels">
-              <span>{t('side.red')}</span>
-              <span>{t('side.black')}</span>
-            </div>
-            <p className="ai-best-move">
-              {ended
-                ? t('ai.best.ended')
-                : line.length
-                  ? t('ai.best.recommended', { move: line[0] })
-                  : searching
-                    ? t('ai.best.searching')
-                    : t('ai.best.idle')}
-            </p>
-            {!ended && line.length > 1 && (
-              <ol className="ai-variation">
-                {line.map((text, i) => (
-                  <li key={i}>
-                    <span>{i + 1}</span>
-                    {text}
-                  </li>
-                ))}
-              </ol>
+            <strong className="ai-verdict">
+              {ended ? status : evaluationLabel(info, locale)}
+            </strong>
+            {!ended && (
+              <>
+                <div
+                  className="ai-score-track"
+                  aria-label={t('ai.eval.label', {
+                    label: evaluationLabel(info, locale),
+                  })}
+                  title={t('ai.disclaimer')}
+                >
+                  <span style={{ width: `${redShare}%` }} />
+                </div>
+                <div className="ai-score-labels" aria-hidden="true">
+                  <span>{t('side.red')}</span>
+                  <span>{t('side.black')}</span>
+                </div>
+              </>
             )}
-            <small>
-              {!ended && info
-                ? t('ai.depth', {
-                    depth: info.depth,
-                    busy: searching ? t('ai.depth.busy') : '',
-                  })
-                : ''}
-              {t('ai.disclaimer')}
-            </small>
+            <p
+              className={`ai-best-move ${best && !ended && !aiTurn ? '' : 'pending'}`}
+            >
+              {advice}
+            </p>
           </>
         ) : (
           <p className="ai-muted">{t('ai.panel.hint')}</p>
         )}
+        <button
+          className="ai-toggle"
+          aria-pressed={analysisOn}
+          onClick={() => setAnalysisOn(!analysisOn)}
+        >
+          {t(analysisOn ? 'ai.dock.analysisOn' : 'ai.dock.analysisOff')}
+        </button>
       </div>
     );
   }
+  const engineCredit = (
+    <p className="ai-engine-credit">
+      {t('ai.engineCredit')}{' '}
+      <a
+        href="https://github.com/fairy-stockfish/fairy-stockfish.wasm"
+        target="_blank"
+        rel="noreferrer"
+      >
+        Fairy-Stockfish
+      </a>{' '}
+      ·{' '}
+      <a href={`${assetBase}engine/SOURCE.md`} target="_blank" rel="noreferrer">
+        {t('ai.license')}
+      </a>
+    </p>
+  );
   const statusLine = (
     <>
       {engineState === 'loading' ? t('ai.engineLoading') : status}
@@ -940,24 +965,7 @@ export default function AiGame() {
               onLive={backToLive}
             />
           </section>
-          <p className="ai-engine-credit">
-            {t('ai.engineCredit')}{' '}
-            <a
-              href="https://github.com/fairy-stockfish/fairy-stockfish.wasm"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Fairy-Stockfish
-            </a>{' '}
-            ·{' '}
-            <a
-              href={`${assetBase}engine/SOURCE.md`}
-              target="_blank"
-              rel="noreferrer"
-            >
-              {t('ai.license')}
-            </a>
-          </p>
+          {engineCredit}
         </aside>
       </div>
       <button
@@ -975,11 +983,13 @@ export default function AiGame() {
         </strong>
         <span>
           {analysisOn && !ended
-            ? line[0]
-              ? t('ai.mobile.best', { move: line[0] })
-              : searching
-                ? t('ai.mobile.analyzing')
-                : '—'
+            ? aiTurn
+              ? t('ai.thinking')
+              : best
+                ? t('ai.mobile.best', { move: best })
+                : searching
+                  ? t('ai.mobile.analyzing')
+                  : '—'
             : t('ai.mobile.details')}
         </span>
         <ChevronRight size={16} />
@@ -1071,6 +1081,7 @@ export default function AiGame() {
         open={sheet === 'analysis'}
         onOpenChange={(open) => setSheet(open ? 'analysis' : null)}
         title={t('ai.sheet.eval.title')}
+        hideDescription
         description={t(
           branch
             ? 'ai.sheet.eval.branch'
@@ -1079,17 +1090,7 @@ export default function AiGame() {
               : 'ai.sheet.eval.live',
         )}
       >
-        {analysisPanel()}
-        <p className="ai-engine-credit">
-          Fairy-Stockfish ·{' '}
-          <a
-            href={`${assetBase}engine/SOURCE.md`}
-            target="_blank"
-            rel="noreferrer"
-          >
-            {t('ai.license')}
-          </a>
-        </p>
+        {analysisPanel(true)}
       </GameSheet>
       <Dialog
         open={setup}
@@ -1167,6 +1168,7 @@ export default function AiGame() {
               {t('ai.setup.continue')}
             </button>
           )}
+          {engineCredit}
         </DialogContent>
       </Dialog>
       <Dialog open={confirmResign} onOpenChange={setConfirmResign}>
