@@ -15,7 +15,7 @@ import {
 import { initialBoard } from '../lib/xiangqi';
 import { BrowserEngine } from '../lib/ai-engine';
 
-test('Fairy coordinates round-trip all squares, including rank 10', () => {
+void test('Fairy coordinates round-trip all squares, including rank 10', () => {
   for (let i = 0; i < 90; i++)
     assert.deepEqual(engineMove(squareToEngine(i) + squareToEngine(89 - i)), {
       from: i,
@@ -26,7 +26,7 @@ test('Fairy coordinates round-trip all squares, including rank 10', () => {
   for (const token of ['a0a1', 'a11a1', 'j1a1', '0000', '(none)', 'a1a2q'])
     assert.equal(engineMove(token), null);
 });
-test('FEN and full move history preserve engine position and side', () => {
+void test('FEN and full move history preserve engine position and side', () => {
   let match = createAiMatch('black', 'hard');
   assert.equal(
     boardFen(match.room.board, 'red'),
@@ -41,7 +41,7 @@ test('FEN and full move history preserve engine position and side', () => {
   assert.equal(historyPosition(match.room, 0), 'position startpos');
   assert.match(boardFen(match.room.board, 'black'), / b - - 0 1$/);
 });
-test('Red undo restores a human decision with or without a completed AI reply', () => {
+void test('Red undo restores a human decision with or without a completed AI reply', () => {
   const start = createAiMatch('red', 'medium');
   const pending = playAiMove(start, 54, 45);
   for (const match of [pending, playAiMove(pending, 27, 36)]) {
@@ -54,7 +54,7 @@ test('Red undo restores a human decision with or without a completed AI reply', 
   assert.equal(start.room.history.length, 0);
   assert.equal(pending.room.history.length, 1);
 });
-test('Black undo keeps the initial AI move and returns control to black', () => {
+void test('Black undo keeps the initial AI move and returns control to black', () => {
   const opening = playAiMove(createAiMatch('black', 'easy'), 54, 45);
   const pending = playAiMove(opening, 27, 36);
   for (const match of [pending, playAiMove(pending, 56, 47)]) {
@@ -64,14 +64,14 @@ test('Black undo keeps the initial AI move and returns control to black', () => 
     assert.deepEqual(undo.room.board, opening.room.board);
   }
 });
-test('Undo reopens a resigned game, including resignation before the first move', () => {
+void test('Undo reopens a resigned game, including resignation before the first move', () => {
   for (const human of ['red', 'black'] as const) {
     const match = resignAiMatch(createAiMatch(human, 'medium'));
     assert(match.room.result);
     assert.equal(undoAiTurn(match).room.result, null);
   }
 });
-test('Evaluation always uses red perspective, discards bounds, and validates the PV', () => {
+void test('Evaluation always uses red perspective, discards bounds, and validates the PV', () => {
   const line = 'info depth 8 multipv 1 score cp 120 nodes 500 pv a4a5 a7a6';
   assert.equal(parseEngineInfo(line, 'red')?.cp, 120);
   assert.equal(parseEngineInfo(line, 'black')?.cp, -120);
@@ -113,7 +113,7 @@ class FakeWorker {
   }
 }
 const tick = () => new Promise<void>((resolve) => setImmediate(resolve));
-test('Cancelled search drains bestmove before starting next position and suppresses stale analysis', async () => {
+void test('Cancelled search drains bestmove before starting next position and suppresses stale analysis', async () => {
   const oldWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   const oldWorker = Object.getOwnPropertyDescriptor(globalThis, 'Worker');
   Object.defineProperty(globalThis, 'window', {
