@@ -1292,7 +1292,7 @@ test('讲解：同样的局面在每种语言里各个模板都填满了参数',
 });
 
 // ---- Nothing Chinese is left in the code that builds the English interface ----
-/** Chinese that stays: the graphics (seals, river, avatars), words spoken by a
+/** Chinese that stays: the graphics (seals, river, avatars, lobby art), words spoken by a
  * Chinese voice, and guard errors that are never shown (anything shown has a code). */
 const ALLOWED: Record<string, string[]> = {
   'lib/tokens.ts': ['*'],
@@ -1301,6 +1301,7 @@ const ALLOWED: Record<string, string[]> = {
   'app/page.tsx': ['楚', '帅', '将'],
   'components/ai-game.tsx': ['楚', '帅', '将'],
   'components/chess-board.tsx': ['楚 河', '漢 界'],
+  'components/game-lobby.tsx': ['楚 河', '汉 界', '馬', '将', '帅'],
   'lib/game-audio.ts': ['吃', '将军'],
   // Full-width parentheses: trimming a long Google display name, not interface text.
   'worker/google.ts': ['（', '）'],

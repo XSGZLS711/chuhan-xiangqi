@@ -141,8 +141,6 @@ const messages: Record<MessageKey, string> = {
 
   // Lobby
   'lobby.title': 'Hôm nay, chơi cờ với ai?',
-  'lobby.lead':
-    'Chơi cờ tướng trực tuyến miễn phí, với bạn bè hoặc với máy. Không cần tải về, không cần đăng ký, không quảng cáo. Đánh xong, AI xem lại ván cờ và chỉ ra bạn sai ở nước nào.',
   'lobby.friend': 'Chơi với bạn',
   'lobby.ai': 'Chơi với máy',
   'lobby.explore': 'Thử vài nước trước',

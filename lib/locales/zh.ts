@@ -134,8 +134,6 @@ export const zhMessages = {
 
   // Lobby
   'lobby.title': '今天，和谁下盘棋？',
-  'lobby.lead':
-    '免费在线下象棋，约朋友或者跟电脑下。不用下载，不用注册，没有广告；下完还能让 AI 复盘，讲清错在哪一步。',
   'lobby.friend': '好友对弈',
   'lobby.ai': '人机对弈',
   'lobby.explore': '先随手推演',
