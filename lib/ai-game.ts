@@ -16,6 +16,22 @@ export const AI_LEVELS = {
   hard: { skill: 20, depth: 16, time: 1500 },
 } as const;
 export type AiLevel = keyof typeof AI_LEVELS;
+// A reply lands 1.2–1.8 s after the human's move, like a person's; the opening move as red,
+// right after the setup closes, waits less. The search counts towards the pause.
+export const AI_PAUSE = {
+  opening: { min: 800, max: 1200 },
+  reply: { min: 1200, max: 1800 },
+} as const;
+/** When the AI's move may appear, in ms after its turn began: `ply` is the number of moves
+ * already played, `random` a draw in [0, 1). */
+export function aiMovePause(ply: number, random = Math.random()): number {
+  const { min, max } = ply === 0 ? AI_PAUSE.opening : AI_PAUSE.reply;
+  return Math.round(min + (max - min) * Math.min(1, Math.max(0, random)));
+}
+/** What is left of the pause once the search took `elapsed` ms: a slower search waits no more. */
+export function pauseLeft(pause: number, elapsed: number): number {
+  return Math.max(0, pause - elapsed);
+}
 export const levelName = (locale: Locale, level: AiLevel) =>
   t(locale, `ai.level.${level}` as MessageKey);
 export type AiMatch = {

@@ -14,12 +14,15 @@ export default function GameSheet({
   onOpenChange,
   title,
   description,
+  hideDescription = false,
   children,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   description: string;
+  /** Kept for screen readers only, where the title says enough on screen. */
+  hideDescription?: boolean;
   children: ReactNode;
 }) {
   const { t } = useLocale();
@@ -34,7 +37,11 @@ export default function GameSheet({
         <div className="game-sheet-heading">
           <div>
             <SheetTitle>{title}</SheetTitle>
-            <SheetDescription>{description}</SheetDescription>
+            <SheetDescription
+              className={hideDescription ? 'sr-only' : undefined}
+            >
+              {description}
+            </SheetDescription>
           </div>
           <SheetClose
             className="sheet-close-button"

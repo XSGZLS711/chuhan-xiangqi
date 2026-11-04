@@ -11,6 +11,10 @@ import {
   historyPosition,
   parseEngineInfo,
   describeLine,
+  aiMovePause,
+  pauseLeft,
+  AI_PAUSE,
+  AI_LEVELS,
 } from '../lib/ai-game';
 import { initialBoard } from '../lib/xiangqi';
 import { BrowserEngine } from '../lib/ai-engine';
@@ -91,6 +95,38 @@ test('Evaluation always uses red perspective, discards bounds, and validates the
     describeLine(initialBoard(), 'red', ['a4a5', 'a7a6', 'a5a10']).length,
     2,
   );
+});
+
+void test('The AI replies 1.2-1.8 s after the human, sooner on its opening move', () => {
+  for (const [ply, { min, max }] of [
+    [0, AI_PAUSE.opening],
+    [1, AI_PAUSE.reply],
+    [2, AI_PAUSE.reply],
+    [57, AI_PAUSE.reply],
+  ] as const) {
+    assert.equal(aiMovePause(ply, 0), min);
+    assert.equal(aiMovePause(ply, 0.5), (min + max) / 2);
+    assert.equal(aiMovePause(ply, 0.999999), max);
+    // Out-of-range draws stay inside the window.
+    assert.equal(aiMovePause(ply, -1), min);
+    assert.equal(aiMovePause(ply, 2), max);
+  }
+  assert.deepEqual(AI_PAUSE.reply, { min: 1200, max: 1800 });
+  assert(AI_PAUSE.opening.max <= AI_PAUSE.reply.min);
+  // Math.random is the default: every pause is inside the window, and they are not all the same.
+  const pauses = Array.from({ length: 200 }, () => aiMovePause(3));
+  assert(pauses.every((ms) => ms >= 1200 && ms <= 1800));
+  assert(new Set(pauses).size > 20);
+});
+void test('The search counts towards the pause, and a slower search waits no longer', () => {
+  assert.equal(pauseLeft(1500, 0), 1500);
+  assert.equal(pauseLeft(1500, 650), 850);
+  assert.equal(pauseLeft(1500, 1500), 0);
+  assert.equal(pauseLeft(1500, 2400), 0);
+  // 进阶 waits out the rest; 挑战's search can outlast a short pause.
+  assert.equal(pauseLeft(aiMovePause(1, 0), AI_LEVELS.medium.time), 550);
+  assert.equal(pauseLeft(aiMovePause(1, 0), AI_LEVELS.hard.time), 0);
+  assert.equal(pauseLeft(aiMovePause(1, 0.999999), AI_LEVELS.hard.time), 300);
 });
 
 class FakeWorker {
