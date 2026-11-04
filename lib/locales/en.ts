@@ -143,8 +143,6 @@ const messages: Record<MessageKey, string> = {
 
   // Lobby
   'lobby.title': 'Who are you playing today?',
-  'lobby.lead':
-    'Free xiangqi (Chinese chess) online, against a friend or the computer. No download, no sign-up, no ads. After each game, an AI review shows where it went wrong.',
   'lobby.friend': 'Play a friend',
   'lobby.ai': 'Play the computer',
   'lobby.explore': 'Try a few moves first',
