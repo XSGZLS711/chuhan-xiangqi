@@ -36,6 +36,30 @@ jobs:
       - run: npm run test:mobile
       - run: npm run test:ai
       - run: npm run build
+      # The layout check drives Chromium; the browser is cached per Playwright version.
+      - id: playwright
+        run: echo "version=$(node -p "require('playwright/package.json').version")" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      - run: npx playwright install --only-shell chromium
+      # Reports without failing the job until the dialog fixes are merged; then drop
+      # continue-on-error so it must pass.
+      - name: npm run test:layout
+        id: layout
+        continue-on-error: true
+        timeout-minutes: 10
+        run: npm run test:layout
+      - name: Layout report
+        if: always() && hashFiles('work/layout/report.md') != ''
+        run: cat work/layout/report.md >> "$GITHUB_STEP_SUMMARY"
+      - if: steps.layout.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: layout-report
+          path: work/layout/
+          retention-days: 14
   # A push to main refreshes staging. Production is promoted by hand:
   # Actions → "Test and deploy" → Run workflow → production.
   deploy:
