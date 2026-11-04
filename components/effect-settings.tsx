@@ -2,9 +2,10 @@ import { SlidersHorizontal } from 'lucide-react';
 import { DropdownMenuCheckboxItem } from '@/components/ui/dropdown-menu';
 import type { MessageKey } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
-import type {
-  EffectSettings as Settings,
-  SettingKey,
+import {
+  EFFECT_SWITCHES,
+  type EffectSettings as Settings,
+  type SettingKey,
 } from '@/lib/effect-settings';
 
 const labels: [SettingKey, MessageKey][] = [
@@ -31,16 +32,18 @@ export default function EffectSettings({
         <p className="effect-settings-title" aria-hidden="true">
           {t('fx.title')}
         </p>
-        {labels.map(([key, text]) => (
-          <label key={key}>
-            <span>{t(text)}</span>
-            <input
-              type="checkbox"
-              checked={settings[key]}
-              onChange={(event) => onChange(key, event.target.checked)}
-            />
-          </label>
-        ))}
+        {labels
+          .filter(([key]) => EFFECT_SWITCHES.includes(key))
+          .map(([key, text]) => (
+            <label key={key}>
+              <span>{t(text)}</span>
+              <input
+                type="checkbox"
+                checked={settings[key]}
+                onChange={(event) => onChange(key, event.target.checked)}
+              />
+            </label>
+          ))}
       </fieldset>
     </details>
   );
@@ -56,7 +59,7 @@ export function EffectMenuItems({
 }) {
   const { t } = useLocale();
   return labels
-    .filter(([key]) => key !== 'sound')
+    .filter(([key]) => key !== 'sound' && EFFECT_SWITCHES.includes(key))
     .map(([key, text]) => (
       <DropdownMenuCheckboxItem
         key={key}

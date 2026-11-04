@@ -4722,3 +4722,28 @@ html:not(:lang(zh)) .header-tools .text-button {
     margin-left: auto;
   }
 }
+
+/* Phone portrait: the wooden frame runs to the screen's edges and the grid keeps inside it, as
+ * large as the height allows. The outermost files then sit a frame-width away from the edge,
+ * clear of the phone's edge-swipe gestures (never less than 12px of wood on each side). The
+ * frame is never taller than the room the board has (100cqh), so the players' bars and the
+ * dock keep their places. */
+@media (max-width: 660px) and (orientation: portrait) {
+  .app-shell.table-view .board-stage {
+    width: 100vw;
+    margin-inline: calc(50% - 50vw);
+  }
+  .app-shell.table-view .board-stage .board-frame {
+    --frame-h: min(100cqh, calc(100cqw * 10 / 9));
+    display: grid;
+    place-items: center;
+    width: 100%;
+    height: var(--frame-h);
+    padding: 6px;
+    border-inline-width: 0;
+    border-radius: 0;
+  }
+  .app-shell.table-view .board-stage .chess-board {
+    width: min(calc(100% - 12px), calc((var(--frame-h) - 14px) * 0.9));
+  }
+}
