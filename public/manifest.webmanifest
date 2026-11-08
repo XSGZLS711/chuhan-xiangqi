@@ -1,0 +1,28 @@
+{
+  "id": "/",
+  "name": "楚汉棋社 Chuhan Xiangqi",
+  "short_name": "楚汉棋社",
+  "description": "Free xiangqi (Chinese chess) in your browser: send a friend a link to play, practice against the computer and review your games move by move.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f4f0e9",
+  "theme_color": "#f4f0e9",
+  "categories": ["games"],
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    {
+      "src": "/icons/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
