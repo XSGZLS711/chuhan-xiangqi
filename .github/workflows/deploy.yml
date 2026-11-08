@@ -44,6 +44,10 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
       - run: npx playwright install --only-shell chromium
+      # The service worker: /ai/ offline, still cross-origin isolated; /api/ never cached.
+      - name: npm run test:offline
+        timeout-minutes: 5
+        run: npm run test:offline
       - name: npm run test:layout
         id: layout
         timeout-minutes: 10

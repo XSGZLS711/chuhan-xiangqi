@@ -26,6 +26,7 @@
 - 自动跟随系统深浅色，适配手机安全区域，并尊重系统减少动态效果设置。
 - 长轮询同步：页面带上已有的版本号来问，没有变化时服务器最多等 8 秒再答，对方落子约半秒内送到；在线状态最多每 4 秒写一次。配合服务器版本比较，避免并发操作覆盖。
 - 三次重复局面时：单方持续将军者判负，否则判和；60 回合未吃子判和。
+- 可安装为应用（PWA，桌面与安卓 Chrome）：断网也能打开大厅与 `/ai/` 人机对局，引擎在第一次打开 `/ai/` 时存到设备上；好友房间需要联网，断网时提示打不开，不显示旧棋局。
 
 ## 账号（Google 登录）
 
@@ -41,7 +42,7 @@
 
 Fairy-Stockfish 以 WebAssembly 在独立 Worker 内计算，选择象棋规则、经典评估器（不加载 NNUE）、单搜索线程与 16 MiB 哈希。难度是搜索预算与引擎技能档位，不对应已测定的等级分。对战和分析串行执行；悔棋、换局、复盘或页面转入后台会取消当前任务，旧结果不能落入新局面。裁决仍以本项目棋规为准，复杂赛事规则未完整覆盖。
 
-`/ai/` 需要 SharedArrayBuffer，因此页面必须“跨源隔离”。Worker 通过 `public/_headers` 为 `/ai` 与 `/ai/*`（含引擎文件）下发 COOP/COEP，不再需要 Service Worker；开发服务器在 `vite.config.ts` 里用中间件下发相同的头。需要支持 WebAssembly SIMD 与 SharedArrayBuffer 的现代浏览器，加载失败会提示重试；不支持的内置浏览器请改用系统浏览器。
+`/ai/` 需要 SharedArrayBuffer，因此页面必须“跨源隔离”。Worker 通过 `public/_headers` 为 `/ai` 与 `/ai/*`（含引擎文件）下发 COOP/COEP，隔离不靠 Service Worker；开发服务器在 `vite.config.ts` 里用中间件下发相同的头。装成应用后的 Service Worker（`web/sw.js`）只在设备上存页面和引擎，存下的响应带着同样的头，所以断网时 `/ai/` 仍然隔离、引擎照常启动。需要支持 WebAssembly SIMD 与 SharedArrayBuffer 的现代浏览器，加载失败会提示重试；不支持的内置浏览器请改用系统浏览器。
 
 引擎版本、对应源码、构建说明及 GPL-3.0 许可见 `public/ai/engine/SOURCE.md`、`Copying.txt` 与 `AUTHORS`。打包进页面的其他依赖及其许可由构建生成到 `dist/client/third-party-licenses.md`，随网站发布。
 
@@ -64,6 +65,7 @@ npm run preview      # 本地预览构建结果
 - `npm run test:ai`：坐标/FEN、红黑悔棋、评分视角、串行取消及真实 WASM 六步合法走棋与分析。
 - `npm run test:identity`：同源与 Cookie 身份规则、`/ai` 隔离响应头、Worker 只在 `/api/*` 运行的部署配置检查；Google 登录的 PKCE、回跳地址与令牌校验；在临时本地 D1 上验证建号、会话、座位转移、换号、过期、退出与删除账号。
 - `npm run test:online -- http://localhost:5173`：通过两个独立身份及观战者验证 API 对局流程。
+- `npm run test:offline`：构建后在 Chromium 里检查应用清单与图标；打开一次 `/ai/` 后断网重载，验证页面仍跨源隔离、引擎能启动并搜索、大厅能打开、好友房间提示打不开，任何 `/api/` 响应都不进缓存；最后验证 Service Worker 的关闭开关。
 - `npm run typecheck`：类型检查。
 
 棋局没有公开列表；持有棋室链接者可以进入或观战。保留原浏览器数据（Cookie）可恢复座位。重开前可导出棋谱；重开会替换当前棋谱。
@@ -103,6 +105,6 @@ npm run preview      # 本地预览构建结果
 - 落子声 `public/sounds/move.mp3`：CC0，见 `public/sounds/SOURCE.md`。
 - 打包进页面的 npm 依赖：各自的许可，构建时汇总到 `dist/client/third-party-licenses.md`。
 
-名字和标志不随代码授权（AGPL 第 7 条第 e 款）：「楚汉棋社」「Chuhan Xiangqi」两个名字、印章标志（`public/icon.svg` 与页头的「楚」字印章）和分享图（`assets/og-image.svg`、`public/og-image.png`）。发布改过的版本请换上自己的名字和标志；如实写明「基于楚汉棋社」不受限制。
+名字和标志不随代码授权（AGPL 第 7 条第 e 款）：「楚汉棋社」「Chuhan Xiangqi」两个名字、印章标志（`public/icon.svg`、由它导出的应用图标 `public/icons/` 与页头的「楚」字印章）和分享图（`assets/og-image.svg`、`public/og-image.png`）。发布改过的版本请换上自己的名字和标志；如实写明「基于楚汉棋社」不受限制。
 
 **License (English).** The code and our own artwork are licensed under the GNU AGPL, version 3 or (at your option) any later version; see `LICENSE`. If you run a modified version for other people, including as a website, you must offer them its complete source under the same license. The engine (GPL-3.0), the piece font (OFL-1.1), the move sound (CC0) and the bundled npm packages keep their own licenses, listed above. The names 楚汉棋社 and Chuhan Xiangqi, the seal logo and the share card are not licensed (AGPL section 7(e)): a modified version must carry its own name and logo; saying that it is based on Chuhan Xiangqi is fine.
