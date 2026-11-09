@@ -48,7 +48,7 @@ Fairy-Stockfish 以 WebAssembly 在独立 Worker 内计算，选择象棋规则�
 
 ## 开发与验证
 
-技术栈：Vite + React 前端；一个 Cloudflare Worker（Hono）同时提供静态页面与 `/api/*`；D1 存棋局。页面是静态资源，只有 `/api/*` 会唤醒 Worker。
+技术栈：Vite + React 前端；一个 Cloudflare Worker（Hono）同时提供静态页面与 `/api/*`；D1 存棋局。页面是静态资源，只有 `/api/*`（和安卓 App 用的 `/.well-known/assetlinks.json`）会唤醒 Worker。
 
 ```bash
 npm install
@@ -63,7 +63,7 @@ npm run preview      # 本地预览构建结果
 - `npm run test:mobile`：再战邀请、终局悔棋、静默点击、聊天气泡与旧棋谱兼容。
 - `npm run test:ui`：吃子分组、走棋过渡、音效去重与终局提示判断。
 - `npm run test:ai`：坐标/FEN、红黑悔棋、评分视角、串行取消及真实 WASM 六步合法走棋与分析。
-- `npm run test:identity`：同源与 Cookie 身份规则、`/ai` 隔离响应头、Worker 只在 `/api/*` 运行的部署配置检查；Google 登录的 PKCE、回跳地址与令牌校验；在临时本地 D1 上验证建号、会话、座位转移、换号、过期、退出与删除账号。
+- `npm run test:identity`：同源与 Cookie 身份规则、`/ai` 隔离响应头、Worker 只在 `/api/*` 和 `assetlinks.json` 上运行的部署配置检查；`assetlinks.json` 只在正式域名给出，并与 `android/twa-manifest.json` 一致；Google 登录的 PKCE、回跳地址与令牌校验；在临时本地 D1 上验证建号、会话、座位转移、换号、过期、退出与删除账号。
 - `npm run test:online -- http://localhost:5173`：通过两个独立身份及观战者验证 API 对局流程。
 - `npm run test:offline`：构建后在 Chromium 里检查应用清单与图标；打开一次 `/ai/` 后断网重载，验证页面仍跨源隔离、引擎能启动并搜索、大厅能打开、好友房间提示打不开，任何 `/api/` 响应都不进缓存；最后验证 Service Worker 的关闭开关。
 - `npm run typecheck`：类型检查。
@@ -91,6 +91,10 @@ npm run preview      # 本地预览构建结果
 
 3. 账号表由 `drizzle/0001_accounts.sql` 建立：GitHub Actions 部署前会自动迁移；手动部署时先运行对应的 `db:migrate:*`。迁移之前即使先部署了新代码，下棋也不受影响，只是不显示登录。
 
+### 安卓 App（Google Play）
+
+安卓 App 是 Trusted Web Activity：Bubblewrap 照 `android/twa-manifest.json` 生成的外壳，用手机上的 Chrome 全屏打开正式站，所以网站一部署，App 里就是新版。注册 Play 开发者账号、生成上传密钥、打包、封闭测试、Digital Asset Links 和 Data safety 表的步骤见 [docs/google-play.md](docs/google-play.md)；密钥和打出的包都不进 Git。
+
 旧的 GitHub Pages 前端与旧后端互相独立：本版本不再向 Pages 发布，旧站停留在最后一次发布的状态；新旧站点使用各自的数据库，棋局不会迁移。
 
 
@@ -104,7 +108,8 @@ npm run preview      # 本地预览构建结果
 - 棋子字体 `assets/chuhan-pieces.woff2` 是 Ma Shan Zheng 的子集：SIL Open Font License 1.1，见 `public/fonts/OFL-MaShanZheng.txt`。
 - 落子声 `public/sounds/move.mp3`：CC0，见 `public/sounds/SOURCE.md`。
 - 打包进页面的 npm 依赖：各自的许可，构建时汇总到 `dist/client/third-party-licenses.md`。
+- 安卓 App 的外壳：由 Bubblewrap 照 `android/twa-manifest.json`（我们的配置）在打包时生成，生成的工程不进仓库。Bubblewrap 的模板代码和打进 App 的 android-browser-helper、AndroidX 都是 Apache-2.0，可以和 AGPL 第 3 版的作品一起分发。
 
 名字和标志不随代码授权（AGPL 第 7 条第 e 款）：「楚汉棋社」「Chuhan Xiangqi」两个名字、印章标志（`public/icon.svg`、由它导出的应用图标 `public/icons/` 与页头的「楚」字印章）和分享图（`assets/og-image.svg`、`public/og-image.png`）。发布改过的版本请换上自己的名字和标志；如实写明「基于楚汉棋社」不受限制。
 
-**License (English).** The code and our own artwork are licensed under the GNU AGPL, version 3 or (at your option) any later version; see `LICENSE`. If you run a modified version for other people, including as a website, you must offer them its complete source under the same license. The engine (GPL-3.0), the piece font (OFL-1.1), the move sound (CC0) and the bundled npm packages keep their own licenses, listed above. The names 楚汉棋社 and Chuhan Xiangqi, the seal logo and the share card are not licensed (AGPL section 7(e)): a modified version must carry its own name and logo; saying that it is based on Chuhan Xiangqi is fine.
+**License (English).** The code and our own artwork are licensed under the GNU AGPL, version 3 or (at your option) any later version; see `LICENSE`. If you run a modified version for other people, including as a website, you must offer them its complete source under the same license. The engine (GPL-3.0), the piece font (OFL-1.1), the move sound (CC0), the Android wrapper Bubblewrap generates (Apache-2.0) and the bundled npm packages keep their own licenses, listed above. The names 楚汉棋社 and Chuhan Xiangqi, the seal logo and the share card are not licensed (AGPL section 7(e)): a modified version must carry its own name and logo; saying that it is based on Chuhan Xiangqi is fine.

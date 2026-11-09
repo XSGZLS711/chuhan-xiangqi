@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
+import { assetLinks } from '../worker/asset-links';
 import { identity, validateRequestOrigin } from '../worker/identity';
 import { invitationUrl } from '../lib/client-api';
 
@@ -90,15 +91,77 @@ await test('AI 页及引擎文件下发隔离响应头', () => {
     assert(block.includes('Cross-Origin-Embedder-Policy: require-corp'));
   }
 });
-await test('只有 /api/* 唤醒 Worker，页面访问走静态资源', () => {
+await test('只有 /api/* 和 assetlinks.json 唤醒 Worker，页面访问走静态资源', () => {
   const config = readFileSync('wrangler.jsonc', 'utf8').replace(
     /^\s*\/\/.*$/gm,
     '',
   );
   const parsed = JSON.parse(config);
-  assert.deepEqual(parsed.assets.run_worker_first, ['/api/*']);
+  assert.deepEqual(parsed.assets.run_worker_first, [
+    '/api/*',
+    '/.well-known/assetlinks.json',
+  ]);
+  assert.equal(parsed.assets.binding, 'ASSETS');
+  assert.equal(parsed.env.staging.assets, undefined);
   assert.equal(parsed.assets.html_handling, 'auto-trailing-slash');
   assert.equal(parsed.d1_databases[0].binding, 'DB');
   assert.equal(parsed.env.staging.d1_databases[0].binding, 'DB');
+});
+await test('assetlinks.json 只在正式域名（和本机）给出，预发与 workers.dev 一律 404', async () => {
+  const assets = {
+    fetch: async () =>
+      new Response('[]', { headers: { 'Content-Type': 'application/json' } }),
+  } as unknown as Fetcher;
+  const path = '/.well-known/assetlinks.json';
+  for (const base of [
+    'https://chuhanxiangqi.com',
+    'http://localhost:4173',
+    'http://127.0.0.1:5173',
+  ]) {
+    const response = await assetLinks(new Request(base + path), assets);
+    assert.equal(response.status, 200, base);
+  }
+  for (const base of [
+    'https://staging.chuhanxiangqi.com',
+    'https://chuhan-xiangqi.lucian-xiangqi.workers.dev',
+    'https://chuhan-xiangqi-staging.lucian-xiangqi.workers.dev',
+    'https://www.chuhanxiangqi.com',
+  ]) {
+    const response = await assetLinks(new Request(base + path), assets);
+    assert.equal(response.status, 404, base);
+  }
+});
+await test('Android 应用的配置指向正式域名，assetlinks.json 与它一致', () => {
+  const twa = JSON.parse(readFileSync('android/twa-manifest.json', 'utf8'));
+  // Google Play never lets an app change its package name once uploaded.
+  assert.equal(twa.packageId, 'chuhanxiangqi.app');
+  assert.equal(twa.host, 'chuhanxiangqi.com');
+  assert.equal(twa.startUrl, '/');
+  assert.equal(
+    twa.webManifestUrl,
+    'https://chuhanxiangqi.com/manifest.webmanifest',
+  );
+  assert.deepEqual(twa.additionalTrustedOrigins, []);
+  assert.equal(twa.signingKey.path, './android.keystore');
+  // Bubblewrap 1.27 defaults to 21, but its android-browser-helper 2.7.4 needs 24: with less
+  // the build stops at the manifest merge.
+  assert(twa.minSdkVersion >= 24);
+  // Written by `bubblewrap fingerprint add` once Play Console shows the signing key.
+  const file = 'public/.well-known/assetlinks.json';
+  if (!existsSync(file)) return;
+  const statements = JSON.parse(readFileSync(file, 'utf8'));
+  assert.deepEqual(statements, [
+    {
+      relation: ['delegate_permission/common.handle_all_urls'],
+      target: {
+        namespace: 'android_app',
+        package_name: twa.packageId,
+        sha256_cert_fingerprints: twa.fingerprints.map(
+          (f: { value: string }) => f.value,
+        ),
+      },
+    },
+  ]);
+  assert(twa.fingerprints.length > 0);
 });
 console.log(`\n${checks} identity & deployment checks passed`);
