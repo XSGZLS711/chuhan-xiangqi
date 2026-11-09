@@ -12,13 +12,14 @@
 
 `twa-manifest.json` 是用 Bubblewrap 1.27.0 的 `TwaManifest.fromWebManifestJson`（就是 `bubblewrap init` 读 `https://chuhanxiangqi.com/manifest.webmanifest` 用的那段代码）从仓库里的 manifest 生成的。名字、图标、颜色、`start_url`、`scope`、`display` 都照 manifest，和 Bubblewrap 默认值不同的只有：
 
-| 字段                                                                          | 值                      | 为什么                                                                                           |
-| ----------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------ |
-| `packageId`                                                                   | `com.chuhanxiangqi.app` | 提议，由你定。**第一次上传到 Play 之后永远不能改。** Bubblewrap 默认会起 `com.chuhanxiangqi.twa` |
-| `enableNotifications`                                                         | `false`                 | 网站不发通知；关掉后 App 不申请通知权限                                                          |
-| `themeColorDark`、`navigationColor`、`navigationColorDark`、两个 divider 颜色 | `#F4F0E9` / `#191C1B`   | 状态栏和导航栏跟网站的浅色、深色底色一致（`index.html` 的两条 `theme-color`）；默认是黑色        |
+| 字段                                                                          | 值                      | 为什么                                                                                            |
+| ----------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------- |
+| `packageId`                                                                   | `com.chuhanxiangqi.app` | 提议，由你定。**第一次上传到 Play 之后永远不能改。** Bubblewrap 默认会起 `com.chuhanxiangqi.twa`  |
+| `enableNotifications`                                                         | `false`                 | 网站不发通知；关掉后 App 不申请通知权限                                                           |
+| `minSdkVersion`                                                               | `24`（Android 7.0）     | Bubblewrap 默认 21，但它用的 androidbrowserhelper 2.7.4 要求至少 24，否则打包时 Manifest 合并失败 |
+| `themeColorDark`、`navigationColor`、`navigationColorDark`、两个 divider 颜色 | `#F4F0E9` / `#191C1B`   | 状态栏和导航栏跟网站的浅色、深色底色一致（`index.html` 的两条 `theme-color`）；默认是黑色         |
 
-Bubblewrap 1.27.0 生成的工程：`targetSdkVersion 36`（Google 规定 2026-08-31 起新 App 必须 targetSdk 36）、`minSdkVersion 21`、`androidbrowserhelper 2.7.4`、Android Gradle Plugin 8.9.1、Gradle 8.11.1，需要 JDK 17。生成的 `AndroidManifest.xml` 不申请任何权限（依赖库合并进来的部分要打包后才看得到，还没核对），只认 `https://chuhanxiangqi.com` 一个网站。
+Bubblewrap 1.27.0 生成的工程：`targetSdkVersion 36`（Google 规定 2026-08-31 起新 App 必须 targetSdk 36）、`androidbrowserhelper 2.7.4`、Android Gradle Plugin 8.9.1、Gradle 8.11.1、build-tools 36.1.0，需要 JDK 17。2026-11-09 在云端照下面的步骤打过一次包（用一把用完即删的测试密钥）：`.aab` 约 1.3 MB；合并后的 Manifest 只有 AndroidX 自带的内部权限 `com.chuhanxiangqi.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`（签名级，只有本 App 能用），不申请网络、通知、位置等任何面向用户的权限；只认 `https://chuhanxiangqi.com` 一个网站。
 
 ## 1. 一次性：装工具
 
@@ -27,7 +28,7 @@ cd android
 npx @bubblewrap/cli@1.27.0 doctor
 ```
 
-第一次运行会问要不要替你装 JDK 17 和 Android SDK，都答 `Y`（装在 `~/.bubblewrap/`，中途要接受 Android SDK 的许可）。最后 `doctor` 说一切正常即可。
+第一次运行时 `npx` 先问要不要下载 Bubblewrap（`Ok to proceed? (y)`，回车）。接着 Bubblewrap 依次问：要不要替你装 JDK（`Y`）、要不要替你装 Android SDK（`Y`）、同不同意 Android SDK 的条款（`y`）。都装在 `~/.bubblewrap/`（JDK 连源码约 1 GB，下载约 360 MB）。最后打出 `Your jdkpath and androidSdkPath are valid.` 就好了。
 
 ## 2. 一次性：生成上传密钥
 
@@ -55,7 +56,7 @@ cd android
 npx @bubblewrap/cli@1.27.0 build
 ```
 
-`update` 会从正式站下载图标和 manifest，所以正式站要已经是带这些图标的版本。`build` 问两次密钥密码。产出在 `android/` 里：
+`update` 会从正式站下载图标和 manifest，所以正式站要已经是带这些图标的版本。第一次 `build` 会先装 build-tools，要再接受一次 Android SDK 许可（一长段条款后面的 `Accept? (y/N)`，答 `y`），然后 Gradle 下载依赖、编译（第一次几分钟），最后问两次密钥密码。产出在 `android/` 里：
 
 - `app-release-bundle.aab`：上传到 Play Console 的就是它。
 - `app-release-signed.apk`：用上传密钥签名，可以 `adb install app-release-signed.apk` 装到自己手机上先试。

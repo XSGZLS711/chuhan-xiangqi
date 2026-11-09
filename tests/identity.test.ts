@@ -141,6 +141,9 @@ await test('Android 应用的配置指向正式域名，assetlinks.json 与它�
   );
   assert.deepEqual(twa.additionalTrustedOrigins, []);
   assert.equal(twa.signingKey.path, './android.keystore');
+  // Bubblewrap 1.27 defaults to 21, but its android-browser-helper 2.7.4 needs 24: with less
+  // the build stops at the manifest merge.
+  assert(twa.minSdkVersion >= 24);
   // Written by `bubblewrap fingerprint add` once Play Console shows the signing key.
   const file = 'public/.well-known/assetlinks.json';
   if (!existsSync(file)) return;
