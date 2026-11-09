@@ -1,13 +1,16 @@
+import { env } from 'cloudflare:workers';
 import { Hono } from 'hono';
 import { errorBody } from '../lib/errors';
 import { deleteGame, listGames, saveGame } from './archive-api';
+import { assetLinks } from './asset-links';
 import { googleCallback, logout, me, removeAccount, startGoogle } from './auth';
 import { clientError } from './client-error';
 import { database } from './db';
 import { GET, POST, SOCKET } from './game-api';
 import { visit } from './visit';
 
-// Static pages are served by the assets binding; only /api/* reaches this Worker.
+// Static pages are served by the assets binding; only /api/* and the Android app's
+// assetlinks.json reach this Worker.
 const app = new Hono();
 
 app.use('/api/*', async (c, next) => {
@@ -29,6 +32,9 @@ app.delete('/api/games', (c) => deleteGame(c.req.raw, database()));
 app.post('/api/client-error', (c) => clientError(c.req.raw));
 app.post('/api/visit', (c) => visit(c.req.raw));
 app.all('/api/*', (c) => c.json(errorBody('no-such-endpoint'), 404));
+app.get('/.well-known/assetlinks.json', (c) =>
+  assetLinks(c.req.raw, env.ASSETS),
+);
 app.onError((error, c) => {
   console.error(
     'Unhandled error',

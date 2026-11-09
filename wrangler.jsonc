@@ -12,9 +12,12 @@
   "workers_dev": true,
   "routes": [{ "pattern": "chuhanxiangqi.com", "custom_domain": true }],
   "assets": {
-    // Pages are static; only /api/* wakes the Worker, so page views cost nothing.
+    // Pages are static; only /api/* wakes the Worker, so page views cost nothing. The
+    // Android app's assetlinks.json goes through it too, to be served on the domain only
+    // (worker/asset-links.ts); Android and Chrome fetch it now and then, not per page view.
+    "binding": "ASSETS",
     "html_handling": "auto-trailing-slash",
-    "run_worker_first": ["/api/*"]
+    "run_worker_first": ["/api/*", "/.well-known/assetlinks.json"]
   },
   "d1_databases": [
     {

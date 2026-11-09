@@ -39,3 +39,15 @@ yarn-error.log*
 
 # local Worker secrets (Google sign-in)
 .dev.vars*
+
+# The Android app (docs/google-play.md). Only android/twa-manifest.json is ours: Bubblewrap
+# makes the Android project from it, and the build writes the packages next to it. The
+# upload key stays on the owner's machine, wherever it is kept.
+/android/*
+!/android/twa-manifest.json
+*.keystore
+*.jks
+*.p12
+*.aab
+*.apk
+*.idsig
