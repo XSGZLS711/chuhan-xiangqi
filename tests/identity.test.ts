@@ -133,6 +133,8 @@ await test('assetlinks.json 只在正式域名（和本机）给出，预发与 
 });
 await test('Android 应用的配置指向正式域名，assetlinks.json 与它一致', () => {
   const twa = JSON.parse(readFileSync('android/twa-manifest.json', 'utf8'));
+  // Google Play never lets an app change its package name once uploaded.
+  assert.equal(twa.packageId, 'chuhanxiangqi.app');
   assert.equal(twa.host, 'chuhanxiangqi.com');
   assert.equal(twa.startUrl, '/');
   assert.equal(

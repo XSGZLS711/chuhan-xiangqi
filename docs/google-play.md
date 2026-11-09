@@ -12,14 +12,14 @@
 
 `twa-manifest.json` 是用 Bubblewrap 1.27.0 的 `TwaManifest.fromWebManifestJson`（就是 `bubblewrap init` 读 `https://chuhanxiangqi.com/manifest.webmanifest` 用的那段代码）从仓库里的 manifest 生成的。名字、图标、颜色、`start_url`、`scope`、`display` 都照 manifest，和 Bubblewrap 默认值不同的只有：
 
-| 字段                                                                          | 值                      | 为什么                                                                                            |
-| ----------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------- |
-| `packageId`                                                                   | `com.chuhanxiangqi.app` | 提议，由你定。**第一次上传到 Play 之后永远不能改。** Bubblewrap 默认会起 `com.chuhanxiangqi.twa`  |
-| `enableNotifications`                                                         | `false`                 | 网站不发通知；关掉后 App 不申请通知权限                                                           |
-| `minSdkVersion`                                                               | `24`（Android 7.0）     | Bubblewrap 默认 21，但它用的 androidbrowserhelper 2.7.4 要求至少 24，否则打包时 Manifest 合并失败 |
-| `themeColorDark`、`navigationColor`、`navigationColorDark`、两个 divider 颜色 | `#F4F0E9` / `#191C1B`   | 状态栏和导航栏跟网站的浅色、深色底色一致（`index.html` 的两条 `theme-color`）；默认是黑色         |
+| 字段                                                                          | 值                    | 为什么                                                                                                                                |
+| ----------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `packageId`                                                                   | `chuhanxiangqi.app`   | 站长定的（2026-11-09）。**第一次上传到 Play 之后永远不能改**，`test:identity` 也钉住了它。Bubblewrap 默认会起 `com.chuhanxiangqi.twa` |
+| `enableNotifications`                                                         | `false`               | 网站不发通知；关掉后 App 不申请通知权限                                                                                               |
+| `minSdkVersion`                                                               | `24`（Android 7.0）   | Bubblewrap 默认 21，但它用的 androidbrowserhelper 2.7.4 要求至少 24，否则打包时 Manifest 合并失败                                     |
+| `themeColorDark`、`navigationColor`、`navigationColorDark`、两个 divider 颜色 | `#F4F0E9` / `#191C1B` | 状态栏和导航栏跟网站的浅色、深色底色一致（`index.html` 的两条 `theme-color`）；默认是黑色                                             |
 
-Bubblewrap 1.27.0 生成的工程：`targetSdkVersion 36`（Google 规定 2026-08-31 起新 App 必须 targetSdk 36）、`androidbrowserhelper 2.7.4`、Android Gradle Plugin 8.9.1、Gradle 8.11.1、build-tools 36.1.0，需要 JDK 17。2026-11-09 在云端照下面的步骤打过一次包（用一把用完即删的测试密钥）：`.aab` 约 1.3 MB；合并后的 Manifest 只有 AndroidX 自带的内部权限 `com.chuhanxiangqi.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`（签名级，只有本 App 能用），不申请网络、通知、位置等任何面向用户的权限；只认 `https://chuhanxiangqi.com` 一个网站。
+Bubblewrap 1.27.0 生成的工程：`targetSdkVersion 36`（Google 规定 2026-08-31 起新 App 必须 targetSdk 36）、`androidbrowserhelper 2.7.4`、Android Gradle Plugin 8.9.1、Gradle 8.11.1、build-tools 36.1.0，需要 JDK 17。2026-11-09 在云端照下面的步骤打过一次包（用一把用完即删的测试密钥）：`.aab` 约 1.3 MB；合并后的 Manifest 只有 AndroidX 自带的内部权限 `chuhanxiangqi.app.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION`（签名级，只有本 App 能用），不申请网络、通知、位置等任何面向用户的权限；只认 `https://chuhanxiangqi.com` 一个网站。
 
 ## 1. 一次性：装工具
 
@@ -80,7 +80,7 @@ npx @bubblewrap/cli@1.27.0 build
 ## 4. Play Console：注册、建应用、内部测试
 
 1. 在 https://play.google.com/console/signup 注册**个人**开发者账号：一次性 25 美元，满 18 岁，按提示做身份验证（证件）；新的个人账号还要在一台 Android 手机上装 Play Console App 验证你能用安卓设备。开发者名字会显示在商店页上。
-2. 创建应用：类型选「游戏」、免费（免费 App 以后不能改成收费）。商店页的标题、简介由你定（见 PR 里的提议）。
+2. 创建应用：类型选「游戏」、免费（免费 App 以后不能改成收费）。商店页的标题、简介照 [play-store-listing.md](play-store-listing.md) 填（英文为默认语言，加中文和越南语）。
 3. 先用**内部测试**（Testing → Internal testing，最多 100 人，上传后很快就能装）：上传 `app-release-bundle.aab`。第一次上传时选用 Google 生成的应用签名密钥（Play App Signing，默认就是）。把自己加进测试者，用测试链接装到手机上。
 
 ## 5. Digital Asset Links：让 App 不显示地址栏
@@ -131,7 +131,7 @@ curl -i https://staging.chuhanxiangqi.com/.well-known/assetlinks.json
 - **目标受众**：13 岁及以上（隐私说明写了不面向 13 岁以下的儿童）。
 - **内容分级问卷**：游戏；用户之间可以交流（好友棋室有聊天）；没有购买、没有分享位置。
 - **删除账号**：用 Google 登录会建账号，Play 要求给一个删除账号的网页地址。可以填 `https://chuhanxiangqi.com/privacy`（「删除账号」一节写了怎么删；页面里没有锚点），也可以写邮箱 `feedback@chuhanxiangqi.com`。
-- **用户生成内容（风险）**：好友棋室的聊天是一对一的用户交流。Play 的 User Generated Content 政策要求这类功能在 App 内能**屏蔽用户**、能**举报**内容和用户，并且用户发内容前要先接受使用条款。现在这三样都还没有（ROADMAP 的 M4 里有「举报按钮 + 屏蔽对手 + 聊天限频」）。审核可能卡在这里，申请正式上架前要先定怎么处理。
+- **用户生成内容（风险）**：好友棋室的聊天是一对一的用户交流。Play 的 User Generated Content 政策要求这类功能在 App 内能**屏蔽用户**、能**举报**内容和用户，并且用户发内容前要先接受使用条款。现在这三样都还没有（ROADMAP 的 M4 里有「举报按钮 + 屏蔽对手 + 聊天限频」）。站长决定（2026-11-09）上架前先不做；审核要是因此退回，再按退回理由补。
 
 ### Data safety 表（按 `public/privacy.html` 起草，提交前请再核对）
 
@@ -147,8 +147,8 @@ curl -i https://staging.chuhanxiangqi.com/.well-known/assetlinks.json
 | 应用活动 · 其他用户生成的内容       | 棋室的棋盘和着法；登录后下完的对局（着法、双方称呼、结果、日期）                                          | 必需（棋室）/ 可选（账号下的对局） | 应用功能           |
 | 应用活动 · 应用互动                 | 访问记录：打开哪一页、从哪个网站点进来（只记网站名）、浏览器和界面语言、是否触屏；不带 Cookie，分不出是谁 | 必需（自动发送）                   | 分析               |
 | 应用信息和性能 · 崩溃日志、诊断信息 | 错误报告：错误信息、调用栈、页面路径（不含房间号）、User-Agent 和语言；不带 Cookie                        | 必需（自动发送）                   | 分析、应用功能     |
-| 位置 · 大致位置（待你定）           | 访问记录里有 Cloudflare 按 IP 判断的国家或地区，只到国家一级、7 天后删除                                  | 必需（自动发送）                   | 分析               |
+| 位置 · 大致位置                     | 访问记录里有 Cloudflare 按 IP 判断的国家或地区，只到国家一级、7 天后删除                                  | 必需（自动发送）                   | 分析               |
 
-最后一行是保守写法：Google 对「由 IP 推断的国家」算不算大致位置没有明确说法，各家 SDK 的申报也不一致；申报了不会出错，不申报要自己有把握。
+「大致位置」按站长的决定（2026-11-09）申报：Google 对「由 IP 推断的国家」算不算大致位置没有明确说法，各家 SDK 的申报也不一致，报了不会错。
 
 不收集：精确位置、通讯录、照片和视频、音频、文件、日历、财务信息、健康信息、网页浏览记录、已安装的应用。引擎分析只在设备上，不上传。
