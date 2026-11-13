@@ -69,6 +69,16 @@ export default function BoardEffect({
           : `${words.title} · ${words.detail}`)
       }
     >
+      {(effect.kind === 'check' || effect.kind === 'mate') && (
+        // Check and mate press on the whole board: it darkens from the edges, flashes red
+        // at the blow, and shock rings run out across it.
+        <>
+          <i className="stamp-pressure" aria-hidden="true" />
+          <i className="stamp-flash" aria-hidden="true" />
+          <i className="stamp-shock" aria-hidden="true" />
+          <i className="stamp-shock late" aria-hidden="true" />
+        </>
+      )}
       <div className="ink-stamp" aria-hidden="true">
         {!tactical && <i className="ink-rays" />}
         <i className="ink-glow" />

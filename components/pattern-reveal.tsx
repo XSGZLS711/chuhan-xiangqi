@@ -1,13 +1,13 @@
 import { useId, type CSSProperties } from 'react';
 import { t as translate, type MessageKey } from '@/lib/i18n';
 import type { PatternHit } from '@/lib/patterns';
-import { useLocale } from '@/lib/use-locale';
 
 const vars = (v: Record<string, string | number>) => v as CSSProperties;
-/** How long a pattern stays on the board (ms): an opening named in passing, the same at
- * length (its first sighting, or the gallery), and a mate's figure, drawn with its stamp. */
-export function revealLife(kind: PatternHit['kind'], full: boolean) {
-  return kind === 'mate' ? 3000 : full ? 2800 : 1400;
+/** How long a pattern stays on the board (ms): an opening is named in passing, under a
+ * second, so it never stands between a player and the next move; a mate's figure is drawn
+ * with its stamp. */
+export function revealLife(kind: PatternHit['kind']) {
+  return kind === 'mate' ? 3000 : 950;
 }
 
 /** A named pattern on the board as it is completed. An opening is written on the wood: its
@@ -22,17 +22,14 @@ export default function PatternReveal({
   hit,
   delay,
   flipped,
-  full,
 }: {
   hit: PatternHit;
   delay: number;
   flipped: boolean;
-  full: boolean;
 }) {
-  const { locale, t } = useLocale();
   const uid = useId().replace(/[^a-z0-9]/gi, '');
   const key = `pattern.${hit.id}` as MessageKey;
-  const life = revealLife(hit.kind, full);
+  const life = revealLife(hit.kind);
   const view = (n: number) => (flipped ? 89 - n : n);
   const point = (n: number) => {
     const v = view(n);
@@ -51,14 +48,14 @@ export default function PatternReveal({
     hit.target === null ? 0 : Math.floor(view(hit.target) / 9) <= 2 ? 0 : 7;
   return (
     <div
-      className={`pattern-reveal reveal-${hit.kind} ${full ? 'reveal-full' : ''}`}
+      className={`pattern-reveal reveal-${hit.kind}`}
       style={vars({
         '--reveal-delay': `${delay}ms`,
         '--reveal-life': `${life}ms`,
-        // The ink is written in the first part and soaks away over the last.
-        '--write': `${full ? 420 : 340}ms`,
-        '--soak-at': `${life - (full ? 650 : 520)}ms`,
-        '--soak': `${full ? 650 : 520}ms`,
+        // The ink is written in a flick and soaks away over the last third.
+        '--write': '200ms',
+        '--soak-at': `${life - 320}ms`,
+        '--soak': '320ms',
       })}
       aria-hidden="true"
     >
@@ -173,12 +170,6 @@ export default function PatternReveal({
             {translate('zh', 'classics.openings')}
           </span>
           <strong className="ink-name">{translate('zh', key)}</strong>
-          {locale !== 'zh' && <span className="ink-caption">{t(key)}</span>}
-          {full && (
-            <span className="ink-gloss">
-              {t(`pattern.${hit.id}.gloss` as MessageKey)}
-            </span>
-          )}
         </div>
       )}
     </div>

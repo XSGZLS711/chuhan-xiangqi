@@ -66,7 +66,7 @@ const ROOM: Record<SoundKind, number> = {
   move: 0.12,
   capture: 0.2,
   undo: 0.18,
-  check: 0.24,
+  check: 0.32,
   mate: 0.5,
   result: 0.42,
 };
@@ -427,55 +427,81 @@ export class GameAudio {
     const rush = (low: number, high: number, volume: number) => {
       if (flight > 0.05) noise(low, high, flight, volume, lead - flight, true);
     };
-    // A steel edge passing through: a quick hiss, then a thin ring that does not quite
-    // agree with itself.
-    const blade = (at: number) => {
-      if (at >= 0.08) noise(1800, 7800, 0.08, 0.2, at - 0.08, true);
-      for (const [frequency, volume] of [
-        [2350, 0.016],
-        [3170, 0.011],
-        [4410, 0.008],
-        [5930, 0.006],
-      ])
-        tone(frequency, 0.5, volume, at, frequency * 0.995, 0.06);
-      noise(7200, 6400, 0.14, 0.2, at, false, 0.05);
-    };
     // The horse's leg touches the board halfway through its 日.
     const hoof = () => {
       const leg = lead - (motion.landMs - motion.slideMs / 2) / 1000;
       if (style === 'gallop' && this.knock && leg >= 0)
         recorded(leg, 0.45, 1.2);
     };
-    // A temple bell: partials that do not sit on one harmonic series, the high ones dying
-    // first, so it rings rather than sings.
-    const bell = (frequency: number, at: number, volume: number, ring = 2.6) =>
-      [
-        [1, 1],
-        [2.01, 0.55],
-        [2.76, 0.42],
-        [4.07, 0.22],
-        [5.43, 0.14],
-      ].forEach(([ratio, level], i) =>
-        tone(
-          frequency * ratio,
-          ring / (1 + i * 0.7),
-          volume * level,
-          at,
-          frequency * ratio * 0.998,
-          0.05,
-        ),
-      );
     // A loaded brush dragged across paper.
     const swish = (at: number, length: number, volume: number) =>
       noise(1100, 5200, length, volume, at, true);
+    // The table under the board: a short, deep thud that gives every move its weight.
+    const thump = (at: number, volume: number, frequency = 72) => {
+      tone(frequency, 0.22, volume, at, frequency * 0.62, 0.06);
+      noise(180, 90, 0.07, volume * 2.2, at, false, 0.03);
+    };
+    // The crack of hard wood on hard wood: a bright transient a few milliseconds long.
+    const crack = (at: number, volume: number) =>
+      noise(6200, 5200, 0.025, volume, at, false, 0.008);
+    // The taken piece knocked off the board, bouncing away on the table.
+    const clatter = (at: number, volume: number) =>
+      [0.11, 0.2, 0.27, 0.32].forEach((step, i) => {
+        const level = volume * (1 - i * 0.22);
+        if (this.knock) recorded(at + step, level * 0.5, 1.45 + i * 0.12);
+        else {
+          tone(760 + i * 90, 0.05, level * 0.05, at + step, 700 + i * 80, 0.02);
+          noise(3400, 3000, 0.03, level * 0.4, at + step, false, 0.015);
+        }
+      });
+    // Opera percussion, the sound of a decisive moment on a Chinese stage. The big gong
+    // (大锣) is struck and its pitch sags as it rings; the small gong (小锣) rises; the
+    // cymbals (铙钹) splash. 仓 is the big gong and the cymbals struck together.
+    const gong = (at: number, volume: number, frequency = 210) => {
+      [
+        [1, 1],
+        [1.52, 0.7],
+        [2.03, 0.55],
+        [2.47, 0.35],
+        [3.01, 0.25],
+        [3.63, 0.16],
+      ].forEach(([ratio, level], i) =>
+        tone(
+          frequency * ratio * 1.04,
+          2.4 / (1 + i * 0.45),
+          volume * level * 0.1,
+          at,
+          frequency * ratio * 0.86,
+          0.08,
+        ),
+      );
+      noise(900, 500, 0.12, volume * 0.5, at, false, 0.05);
+    };
+    const smallGong = (at: number, volume: number) =>
+      [
+        [1, 1],
+        [2.13, 0.45],
+        [3.31, 0.2],
+      ].forEach(([ratio, level]) =>
+        tone(680 * ratio, 0.6, volume * level * 0.06, at, 780 * ratio, 0.05),
+      );
+    const cymbal = (at: number, volume: number, length = 0.9) => {
+      noise(8200, 6800, length, volume * 0.55, at, false, 0.12);
+      noise(4200, 3800, length * 0.6, volume * 0.35, at, false, 0.08);
+    };
+    const cang = (at: number, volume: number) => {
+      gong(at, volume);
+      cymbal(at, volume);
+      crack(at, volume * 0.6);
+    };
     // Levels follow recordings of a wooden set: about half the energy in the
     // body below 300 Hz, a third in the 3–8 kHz click, the rest in the wood.
     switch (kind) {
       case 'pattern':
-        // An opening named: the brush stroke, a bright bell, a high string.
-        swish(0, 0.32, 0.14);
-        bell(523.25, 0.24, 0.03);
-        pluck(1046.5, 0.42, 0.02, 1.4);
+        // An opening named: one stroke of the brush and a bright 台 of the small gong.
+        swish(0, 0.16, 0.1);
+        smallGong(0.08, 0.9);
+        cymbal(0.08, 0.18, 0.35);
         break;
       case 'select':
         // The fingertip lifts a piece: felt brushing wood, a faint high tick.
@@ -498,8 +524,11 @@ export class GameAudio {
       case 'move':
         if (style === 'charge') rush(300, 1900, 0.2);
         hoof();
+        // Every move lands with the table's weight under it and the crack of the wood.
+        thump(lead, style === 'charge' ? 0.3 : 0.2);
+        crack(lead, 0.35);
         if (this.knock) {
-          recorded(lead, 1, style === 'charge' ? 0.92 : 1);
+          recorded(lead, 1, style === 'charge' ? 0.9 : 1);
           break;
         }
         // 咚: the piece meets the board; 嗒: it settles 55 ms later.
@@ -512,7 +541,8 @@ export class GameAudio {
         noise(3900, 3600, 0.04, 0.24, lead + 0.055, false, 0.025);
         break;
       case 'capture':
-        // 呼—啪: air rushes in, the piece slams down, splinters settle; 「吃」.
+        // 呼—啪: air rushes in, the piece is slammed down on the other, the table booms,
+        // and the taken piece is knocked off and clatters away; 「吃」.
         this.say('吃', delay);
         if (style === 'leap') {
           // The cannon's flight: air rising to the top of the arc and falling onto the
@@ -524,10 +554,10 @@ export class GameAudio {
         } else if (style === 'charge') rush(300, 2400, 0.3);
         else if (lead) noise(900, 4000, lead, 0.4, 0, true);
         hoof();
-        blade(lead + 0.01);
         if (this.knock) {
-          // The same wood, struck harder and a little lower, over a short drum.
-          recorded(lead, 0.75, 0.86);
+          // The same wood struck twice as one, harder and lower: a slam, not a tap.
+          recorded(lead, 0.85, 0.84);
+          recorded(lead + 0.008, 0.6, 0.9);
           tone(120, 0.22, 0.12, lead, 80, 0.08);
         } else {
           tone(248, 0.33, 0.15, lead, 110, 0.1);
@@ -535,15 +565,9 @@ export class GameAudio {
           noise(2000, 1700, 0.08, 0.6, lead, false, 0.06);
         }
         noise(4800, 4000, 0.11, this.knock ? 0.45 : 0.65, lead, false, 0.07);
-        for (const [at, volume] of [
-          [0.055, 0.18],
-          [0.1, 0.14],
-          [0.16, 0.13],
-          [0.19, 0.11],
-          [0.22, 0.09],
-          [0.26, 0.07],
-        ])
-          noise(4300, 3600, 0.05, volume, lead + at, false, 0.03);
+        thump(lead, style === 'leap' ? 0.5 : 0.36, 58);
+        crack(lead, 0.6);
+        clatter(lead, 1);
         break;
       case 'undo':
         // Time drawn backwards: a breath sucked in, and the piece lifting off the board.
@@ -551,36 +575,32 @@ export class GameAudio {
         tone(260, 0.1, 0.05, 0.1, 380);
         break;
       case 'check':
-        // 梆梆 and a called 「将军」, as players announce it over a real board.
+        // 冬—仓!: the drum, then the big gong and cymbals as one, and a called 「将军」.
         this.say('将军', delay);
-        taiko(0, 1);
-        for (const at of [0, 0.09]) {
-          tone(1250, 0.12, 0.05, at, 1180, 0.05);
-          noise(2600, 2300, 0.05, 0.4, at, false, 0.03);
-        }
-        tone(118, 0.4, 0.12, 0, 82, 0.2);
+        taiko(0, 1.5);
+        cang(0.03, 1.6);
+        tone(118, 0.5, 0.18, 0.03, 70, 0.22);
         break;
       case 'mate':
-        // Two war drums, a low swell, a big drum, then a gong ring and shimmer that fade
-        // with the stamp, and the strings swept down as the general falls.
+        // 冬冬冬 仓 才 仓——: a drum roll, the gong and cymbals, the cymbals alone, and the
+        // last 仓 struck lower and left to ring over a deep drum as the general falls.
         taiko(0, 0.8);
-        taiko(0.16, 1);
-        sweep(0.5, false, 0.05);
-        noise(140, 90, 0.08, 0.25, 0, true);
-        tone(67, 1.7, 0.24, 0.07, 45, 1.1);
-        tone(93, 1.3, 0.1, 0.07, 50, 0.8);
-        tone(136, 0.8, 0.05, 0.07, 70, 0.4);
-        noise(220, 160, 0.09, 0.3, 0.07, false, 0.06);
-        tone(1090, 1.4, 0.014, 0.09, 1085, 1.2);
-        tone(1520, 1.3, 0.011, 0.09, 1515, 1.1);
-        noise(12000, 10000, 1.3, 0.1, 0.1, false, 1);
-        // An open bass string under the gong, left to ring with the stamp.
-        pluck(98, 0.12, 0.05, 2.4);
+        taiko(0.1, 0.9);
+        taiko(0.18, 1);
+        cang(0.3, 1.4);
+        cymbal(0.6, 0.7, 0.6);
+        cang(0.86, 1.7);
+        gong(0.86, 0.9, 150);
+        noise(140, 90, 0.1, 0.3, 0.76, true);
+        tone(62, 1.9, 0.26, 0.86, 40, 1.2);
+        tone(93, 1.3, 0.1, 0.86, 50, 0.8);
         break;
       case 'result':
-        // The strings swept upwards, then the tonic struck in three octaves over a drum.
+        // The strings swept upwards, then the tonic struck in three octaves over a drum
+        // and the big gong.
         sweep(0, true, 0.05);
         taiko(0.36, 0.7);
+        gong(0.36, 0.6);
         pluck(392, 0.36, 0.07, 2);
         pluck(783.99, 0.36, 0.045, 2);
         pluck(196, 0.36, 0.07, 2.6);

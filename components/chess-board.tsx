@@ -33,7 +33,6 @@ import BoardFx, {
 } from '@/components/board-fx';
 import PatternReveal, { revealLife } from '@/components/pattern-reveal';
 import { movePattern, type PatternHit } from '@/lib/patterns';
-import { firstSighting, markSeen } from '@/lib/patterns-seen';
 import {
   cannonScreen,
   dealDelay,
@@ -70,8 +69,6 @@ type Frame = {
     hit: PatternHit;
     key: string;
     delay: number;
-    /** Shown at length: the first time this device sees it, or in the gallery. */
-    full: boolean;
   } | null;
   /** Restored by an undo; fades back in once the mover has left its square. */
   revived: string | null;
@@ -91,20 +88,22 @@ const OPENING = boardSignature(initialBoard());
 const reducedMotion = () =>
   typeof matchMedia !== 'undefined' &&
   matchMedia('(prefers-reduced-motion: reduce)').matches;
-/** The board jumps under a heavy blow; nothing moves for reduced motion. */
+/** The board takes a heavy blow: it is punched a little towards the viewer and shaken,
+ * harder and longer the heavier the blow. Nothing moves for reduced motion. */
 function jolt(node: HTMLElement | null, strength: number, delay: number) {
   if (!node || typeof node.animate !== 'function' || reducedMotion()) return;
-  const s = strength;
+  const s = strength,
+    punch = 1 + s / 650;
   node.animate(
     [
       { transform: 'none' },
-      { transform: `translate(${-s}px, ${s * 0.7}px)` },
+      { transform: `translate(${-s}px, ${s * 0.7}px) scale(${punch})` },
       { transform: `translate(${s * 0.8}px, ${-s * 0.5}px)` },
-      { transform: `translate(${-s * 0.45}px, ${s * 0.3}px)` },
-      { transform: `translate(${s * 0.2}px, 0)` },
+      { transform: `translate(${-s * 0.5}px, ${s * 0.35}px)` },
+      { transform: `translate(${s * 0.25}px, ${-s * 0.1}px)` },
       { transform: 'none' },
     ],
-    { duration: 340, delay, easing: 'ease-out' },
+    { duration: 300 + s * 18, delay, easing: 'ease-out' },
   );
 }
 /** A piece set down after travelling tips its leading edge into the board first:
@@ -166,7 +165,6 @@ export default function ChessBoard({
   marks = [],
   onDeal,
   onPattern,
-  showcase = false,
 }: {
   board: Board;
   flipped?: boolean;
@@ -185,8 +183,6 @@ export default function ChessBoard({
   onDeal?: () => void;
   /** Called when a move completes a classic opening, with the delay before it is named. */
   onPattern?: (hit: PatternHit, delayMs: number) => void;
-  /** The gallery of classics: every opening is shown at length, and none is marked seen. */
-  showcase?: boolean;
 }) {
   const signature = boardSignature(board);
   const { locale, t } = useLocale();
@@ -242,9 +238,6 @@ export default function ChessBoard({
               hit: named,
               key: `${transition.piece.id}:${transition.from}:${transition.to}`,
               delay: named.kind === 'opening' ? delay + 80 : stampDelay(delay),
-              full:
-                named.kind === 'opening' &&
-                (showcase || firstSighting(named.id)),
             }
           : null,
       move: transition
@@ -296,10 +289,18 @@ export default function ChessBoard({
   const shake = useEffectEvent((strength: number, delay: number) => {
     if (captureEffects) jolt(boardRef.current, strength, delay);
   });
+  // A chariot's rush lands with a thud even when it takes nothing (a capture shakes on its own).
+  const onLand = useEffectEvent((landing: NonNullable<Frame['move']>) => {
+    if (landing.style === 'charge' && !frame.ghost)
+      shake(2.5, landing.timing.landMs);
+  });
+  useEffect(() => {
+    if (move) onLand(move);
+  }, [move]);
   const ghost = frame.ghost;
   useEffect(() => {
     if (!ghost) return;
-    shake(ghost.heavy ? 6 : 3, ghost.delay);
+    shake(ghost.heavy ? 8 : 4, ghost.delay);
     const timer = setTimeout(
       () =>
         setFrame((current) =>
@@ -311,22 +312,18 @@ export default function ChessBoard({
   }, [ghost]);
   const pattern = frame.pattern;
   // A named mate speaks through its stamp; only an opening has a sound of its own.
-  const announcePattern = useEffectEvent(
-    (hit: PatternHit, delay: number, full: boolean) => {
-      if (!captureEffects || hit.kind !== 'opening') return;
-      onPattern?.(hit, delay);
-      if (full && !showcase) markSeen(hit.id);
-    },
-  );
+  const announcePattern = useEffectEvent((hit: PatternHit, delay: number) => {
+    if (captureEffects && hit.kind === 'opening') onPattern?.(hit, delay);
+  });
   useEffect(() => {
     if (!pattern) return;
-    announcePattern(pattern.hit, pattern.delay, pattern.full);
+    announcePattern(pattern.hit, pattern.delay);
     const timer = setTimeout(
       () =>
         setFrame((current) =>
           current.pattern === pattern ? { ...current, pattern: null } : current,
         ),
-      pattern.delay + revealLife(pattern.hit.kind, pattern.full),
+      pattern.delay + revealLife(pattern.hit.kind),
     );
     return () => clearTimeout(timer);
   }, [pattern]);
@@ -351,16 +348,19 @@ export default function ChessBoard({
     [lines, board, checkSide],
   );
   const landMs = frame.move?.timing.landMs ?? 0;
-  // A new check (not a re-sent copy of the same position) jolts the board once.
+  // A new check (not a re-sent copy of the same position) jolts the board once, as its
+  // stamp hits; a mate's stamp shakes it harder below.
   const checkKey = lines ? `${signature}:${checkSide}` : null;
-  const onCheck = useEffectEvent(() => shake(mated ? 4 : 2.5, landMs));
+  const onCheck = useEffectEvent(() => {
+    if (!mated) shake(6, stampDelay(landMs) + STAMP_TIMING.enterMs);
+  });
   useEffect(() => {
     if (checkKey) onCheck();
   }, [checkKey]);
   const effectId = effect?.id;
   const onStamp = useEffectEvent(() => {
     if (effect?.kind === 'mate')
-      shake(8, stampDelay(landMs) + STAMP_TIMING.enterMs);
+      shake(12, stampDelay(landMs) + STAMP_TIMING.enterMs);
   });
   useEffect(() => {
     if (effectId) onStamp();
@@ -534,6 +534,12 @@ export default function ChessBoard({
                       pathLength={1}
                     />
                     <path
+                      className="check-bolt umbra"
+                      d={d}
+                      pathLength={1}
+                      filter={`url(#${glow})`}
+                    />
+                    <path
                       className="check-bolt halo"
                       d={d}
                       pathLength={1}
@@ -544,6 +550,12 @@ export default function ChessBoard({
                 );
               })}
             </svg>
+          )}
+        {lines &&
+          captureEffects &&
+          !mated && (
+            // While the check stands, the edges of the board beat like a heart.
+            <i className="check-heartbeat" aria-hidden="true" />
           )}
         {lines && captureEffects && (
           <i
@@ -775,7 +787,6 @@ export default function ChessBoard({
             key={`pattern:${pattern.key}`}
             hit={pattern.hit}
             delay={pattern.delay}
-            full={pattern.full}
             flipped={flipped}
           />
         )}

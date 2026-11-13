@@ -88,7 +88,7 @@
   stroke-linecap: round;
   stroke-dasharray: 0.05 0.035;
   animation:
-    force-draw 0.4s cubic-bezier(0.3, 0, 0.2, 1)
+    force-draw 0.28s cubic-bezier(0.3, 0, 0.2, 1)
       calc(var(--reveal-delay) + var(--i) * 110ms) backwards,
     force-flow 0.9s linear infinite;
 }
@@ -118,11 +118,8 @@
   stroke: #ffcf6a;
   stroke-width: 6;
   stroke-linecap: round;
-  animation: aim-lock 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)
-    calc(var(--reveal-delay) + 120ms) both;
-}
-.reveal-full .aim {
-  animation-duration: 0.95s;
+  animation: aim-lock 0.42s cubic-bezier(0.2, 0.8, 0.2, 1)
+    calc(var(--reveal-delay) + 40ms) both;
 }
 .aim .aim-outer {
   stroke-width: 3;
@@ -287,10 +284,9 @@
   }
 }
 
-/* An opening, written on the board itself: the name is brushed across the river in ink,
-   left to right as a hand would write it, a small seal is pressed beside it, and then the
-   ink soaks into the wood and is gone. It covers no piece and asks nothing. At length (the
-   first time, or in the gallery) it stays longer and says in a line what the opening is. */
+/* An opening, written on the board itself: the name is flicked across the river in ink,
+   left to right as a hand would write it, a small seal is pressed beside it, and the ink
+   soaks into the wood. Under a second; it covers no piece and asks nothing. */
 .pattern-ink {
   position: absolute;
   z-index: 9;
@@ -327,9 +323,6 @@
     ink-write var(--write) cubic-bezier(0.5, 0, 0.3, 1) var(--reveal-delay) both,
     ink-soak var(--soak) ease-in calc(var(--reveal-delay) + var(--soak-at))
       forwards;
-}
-.reveal-full .ink-name {
-  font-size: 8.6cqw;
 }
 @keyframes ink-write {
   from {
@@ -373,35 +366,6 @@
     transform: scale(1.9) rotate(-14deg);
   }
 }
-.ink-caption,
-.ink-gloss {
-  grid-column: 1 / -1;
-  justify-self: center;
-  text-align: center;
-  animation:
-    caption-rise 0.4s ease-out calc(var(--reveal-delay) + var(--write)) both,
-    ink-soak var(--soak) ease-in calc(var(--reveal-delay) + var(--soak-at))
-      forwards;
-}
-.ink-caption {
-  font-size: max(11px, 2.5cqw);
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  white-space: nowrap;
-}
-.ink-gloss {
-  max-width: 100%;
-  font-size: max(11px, 2.3cqw);
-  line-height: 1.35;
-  opacity: 0.85;
-}
-@keyframes caption-rise {
-  from {
-    opacity: 0;
-    transform: translateY(40%);
-  }
-}
-
 /* A named mate's stamp (components/board-effect.tsx): the name is the word, sized to fit
    the ring, with 绝杀 pressed above it as a small seal at the moment of impact. */
 .effect-mate .ink-word {
@@ -467,6 +431,156 @@ html:not(:lang(zh)) .record-seal {
   font-size: 9px;
   font-weight: 600;
   letter-spacing: 0.02em;
+}
+
+/* ---- Pressure: check and mate bear down on the board (components/board-effect.tsx). ---- */
+/* The world closes in: the edges of the board go dark as the stamp falls, and stay heavy
+   while it stands. */
+.stamp-pressure {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 75% 70% at 50% 50%,
+    transparent 22%,
+    #1c0502a8 70%,
+    #0e0201e6 100%
+  );
+  opacity: 0;
+  animation: press-in 0.5s cubic-bezier(0.3, 0, 0.2, 1) var(--stamp-delay) both;
+}
+.effect-check .stamp-pressure {
+  --press: 0.72;
+}
+.effect-mate .stamp-pressure {
+  --press: 1;
+}
+@keyframes press-in {
+  to {
+    opacity: var(--press);
+  }
+}
+/* The blow itself: one red-white flash. */
+.stamp-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 50%,
+    #fff4e0e6 0,
+    #ff4a2a99 30%,
+    #9c180c33 60%,
+    transparent 80%
+  );
+  opacity: 0;
+  animation: blow-flash 0.38s ease-out var(--impact);
+}
+@keyframes blow-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+/* Shock rings run out from the stamp past the edges of the board. */
+.stamp-shock {
+  position: absolute;
+  width: 34%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1.1cqw solid #ff5a36;
+  box-shadow:
+    0 0 2.4cqw #ff3b1f,
+    inset 0 0 2.4cqw #ff3b1f;
+  opacity: 0;
+  animation: shock-out 0.75s cubic-bezier(0.1, 0.7, 0.3, 1) var(--impact);
+}
+.stamp-shock.late {
+  border-width: 0.5cqw;
+  animation-delay: calc(var(--impact) + 110ms);
+  animation-duration: 0.95s;
+}
+.effect-mate .stamp-shock {
+  border-color: #ffb36a;
+}
+@keyframes shock-out {
+  from {
+    opacity: 1;
+    scale: 0.4;
+  }
+  to {
+    opacity: 0;
+    scale: 4.2;
+  }
+}
+/* The word falls from high above and hits: it accelerates into the board instead of
+   easing onto it, and bounces once. */
+.effect-check .ink-word,
+.effect-mate .ink-word {
+  animation:
+    glyph-slam var(--stamp-enter) cubic-bezier(0.7, 0, 0.9, 0.5)
+      var(--stamp-delay) both,
+    glyph-settle 260ms cubic-bezier(0.3, 1.8, 0.5, 1) var(--impact) both;
+}
+@keyframes glyph-slam {
+  from {
+    opacity: 0;
+    scale: 3.4;
+    filter: blur(1.6cqw);
+  }
+  40% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    scale: 0.95;
+    filter: blur(0);
+  }
+}
+
+/* The check's lightning cuts through a band of dark red, so it reads as a blade drawn across
+   the board rather than a spark, and its white core is heavier. */
+.check-bolt.umbra {
+  stroke: #3a0603b0;
+  stroke-width: 54;
+  opacity: 0;
+}
+.check-bolt.core {
+  stroke-width: 7;
+}
+.check-bolt.halo {
+  stroke-width: 28;
+}
+
+/* In check: the board's edges beat red, two beats and a rest, until the check is answered. */
+.check-heartbeat {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 80% 75% at 50% 50%,
+    transparent 46%,
+    #c4281a73 80%,
+    #9c180cc7 100%
+  );
+  opacity: 0;
+  animation: heartbeat 1.5s ease-out calc(var(--land) + 1.2s) infinite;
+}
+@keyframes heartbeat {
+  0%,
+  42%,
+  100% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  18% {
+    opacity: 0.25;
+  }
+  26% {
+    opacity: 0.85;
+  }
 }
 
 /* The names are a show; anyone who asked for less motion gets the game without them. */

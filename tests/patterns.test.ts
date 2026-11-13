@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { CLASSICS } from '../lib/classics';
 import { t } from '../lib/i18n';
-import { firstSighting, markSeen } from '../lib/patterns-seen';
 import { branchFeedback, stampWords } from '../lib/presentation';
 import {
   MATE_PATTERNS,
@@ -100,25 +99,6 @@ assert.equal(plain.kind, 'mate');
 assert.equal(plain.text.pattern, undefined);
 assert.equal(stampWords('zh', plain).word, t('zh', 'stamp.mate'));
 assert.equal(stampWords('zh', plain).kicker, '');
-// The first sighting of an opening is shown at length, once per device; without storage
-// every opening counts as seen, so nothing is shown at length over and over.
-const store = new Map<string, string>();
-globalThis.localStorage = {
-  getItem: (k: string) => store.get(k) ?? null,
-  setItem: (k: string, v: string) => void store.set(k, v),
-} as Storage;
-assert.equal(firstSighting('central-cannon'), true);
-markSeen('central-cannon');
-markSeen('central-cannon');
-assert.equal(firstSighting('central-cannon'), false);
-assert.equal(firstSighting('screen-horses'), true);
-assert.equal(store.get('chuhan-patterns-seen'), '["central-cannon"]');
-globalThis.localStorage = {
-  getItem: () => {
-    throw new Error('blocked');
-  },
-} as unknown as Storage;
-assert.equal(firstSighting('screen-horses'), false);
 console.log(
-  `✓ ${CLASSICS.length} 个经典着法：演示合法，最后一步被认出，杀法名写进绝杀印章，初见才详写`,
+  `✓ ${CLASSICS.length} 个经典着法：演示合法，最后一步被认出，杀法名写进绝杀印章`,
 );

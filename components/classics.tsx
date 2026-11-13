@@ -159,7 +159,6 @@ export default function Classics({
               board={board}
               last={last ? { from: last[0], to: last[1] } : null}
               onSquare={() => {}}
-              showcase
               checkSide={inCheck(board, turn) ? turn : null}
               effect={effect}
               animationContext={`classic:${id}:${run}`}
