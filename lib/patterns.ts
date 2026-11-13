@@ -1,9 +1,9 @@
-import { checkLines } from './presentation';
 import {
   hasLegalMove,
   inCheck,
   moveBoard,
   opposite,
+  pseudoLegal,
   type Board,
   type Piece,
   type Side,
@@ -51,6 +51,19 @@ export type PatternHit = {
   target: number | null;
   motif: Motif;
 };
+
+/** The general of `side` and the pieces giving it check, for drawing the lines of attack. */
+export function checkLines(
+  board: Board,
+  side: Side,
+): { king: number; from: number[] } | null {
+  const king = board.findIndex((p) => p?.side === side && p.kind === 'k');
+  if (king < 0) return null;
+  const from = board.flatMap((p, i) =>
+    p && p.side !== side && pseudoLegal(board, i, king) ? [i] : [],
+  );
+  return from.length ? { king, from } : null;
+}
 
 const row = (n: number) => Math.floor(n / 9),
   col = (n: number) => n % 9;

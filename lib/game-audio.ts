@@ -57,14 +57,12 @@ const HAPTICS: Partial<Record<SoundKind, number | number[]>> = {
   check: [12, 70, 12],
   mate: [28, 60, 70],
   result: 20,
-  'pattern-mate': [12, 50, 30],
 };
 /** How much of each sound reaches the room: a knock stays close, the end rings out. */
 const ROOM: Record<SoundKind, number> = {
   select: 0.05,
   deal: 0.1,
   pattern: 0.38,
-  'pattern-mate': 0.5,
   move: 0.12,
   capture: 0.2,
   undo: 0.18,
@@ -478,13 +476,6 @@ export class GameAudio {
         swish(0, 0.32, 0.14);
         bell(523.25, 0.24, 0.03);
         pluck(1046.5, 0.42, 0.02, 1.4);
-        break;
-      case 'pattern-mate':
-        // A mate named: a drum, the scroll unrolling, then a deep bell under a high one.
-        taiko(0, 0.6);
-        noise(600, 300, 0.8, 0.08, 0.2, false, 0.6);
-        bell(130.81, 0.9, 0.06, 3.4);
-        bell(392, 1.25, 0.022, 2.2);
         break;
       case 'select':
         // The fingertip lifts a piece: felt brushing wood, a faint high tick.

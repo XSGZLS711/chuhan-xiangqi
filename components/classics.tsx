@@ -159,16 +159,12 @@ export default function Classics({
               board={board}
               last={last ? { from: last[0], to: last[1] } : null}
               onSquare={() => {}}
+              showcase
               checkSide={inCheck(board, turn) ? turn : null}
               effect={effect}
               animationContext={`classic:${id}:${run}`}
               onDeal={() => playSound('deal')}
-              onPattern={(hit, delay) =>
-                playSound(
-                  hit.kind === 'mate' ? 'pattern-mate' : 'pattern',
-                  delay / 1000,
-                )
-              }
+              onPattern={(_, delay) => playSound('pattern', delay / 1000)}
             />
           </div>
           <div className="classics-side">

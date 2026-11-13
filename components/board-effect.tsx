@@ -63,7 +63,10 @@ export default function BoardEffect({
       aria-live="polite"
       aria-label={
         (effect.analysis ? t('effect.analysis.prefix') : '') +
-        `${words.title} · ${words.detail}`
+        // A named mate reads as 绝杀, then its name, then who won.
+        (words.kicker
+          ? `${words.kicker} · ${words.word} · ${words.detail}`
+          : `${words.title} · ${words.detail}`)
       }
     >
       <div className="ink-stamp" aria-hidden="true">
@@ -155,8 +158,14 @@ export default function BoardEffect({
               })}
             />
           ))}
-        {!tactical && effect.analysis && (
-          <span className="ink-stamp-context">{t('effect.context')}</span>
+        {words.kicker ? (
+          // A named mate: 绝杀 is pressed above the name as a small seal.
+          <span className="ink-kicker">{words.kicker}</span>
+        ) : (
+          !tactical &&
+          effect.analysis && (
+            <span className="ink-stamp-context">{t('effect.context')}</span>
+          )
         )}
         <span className="ink-word">
           <span className="ink-outline">{title}</span>

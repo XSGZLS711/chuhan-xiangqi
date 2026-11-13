@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -7,7 +7,9 @@ import {
   ChevronsRight,
 } from 'lucide-react';
 import { ratingLabel, type GameAnalysis } from '@/lib/game-analysis';
+import type { MessageKey } from '@/lib/i18n';
 import { historyMoveText } from '@/lib/notation';
+import { movePattern } from '@/lib/patterns';
 import { useLocale } from '@/lib/use-locale';
 import type { Move } from '@/lib/xiangqi';
 
@@ -30,6 +32,15 @@ export default function GameRecord({
 }) {
   const { locale, t, notation } = useLocale();
   const list = useRef<HTMLDivElement>(null);
+  // Moves that completed a classic opening or mate carry its name as a small seal.
+  const named = useMemo(
+    () =>
+      history.map((move) => {
+        const hit = movePattern(move.before, move.from, move.to);
+        return hit ? (`pattern.${hit.id}` as MessageKey) : null;
+      }),
+    [history],
+  );
   const shown = useRef(0);
   // Keep the move being viewed (or the newest one) inside the scrolling list.
   useEffect(() => {
@@ -74,6 +85,11 @@ export default function GameRecord({
                     entry?.status === 'complete' ? entry.analysis.rating : null;
                   return move ? (
                     <div key={offset} className="record-move-cell">
+                      {named[step] && (
+                        <span className="record-seal" title={t(named[step])}>
+                          {t(named[step])}
+                        </span>
+                      )}
                       <button
                         className={`${move.side} ${index === step + 1 ? 'current-move' : ''}`}
                         onClick={() => onNavigate(step + 1)}

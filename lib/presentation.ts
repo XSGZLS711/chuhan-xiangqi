@@ -6,7 +6,6 @@ import {
   initialBoard,
   moveBoard,
   opposite,
-  pseudoLegal,
   type Board,
   type Kind,
   type Piece,
@@ -14,6 +13,10 @@ import {
   type Side,
 } from './xiangqi';
 import type { PublicRoom } from './game';
+import { movePattern, type PatternId } from './patterns';
+
+/** Shared with the board and the patterns: kept here so existing imports keep working. */
+export { checkLines } from './patterns';
 
 const originalPieces = initialBoard().filter(
   (piece): piece is Piece => !!piece,
@@ -31,19 +34,6 @@ export function capturedBy(board: Board, side: Side): CaptureGroup[] {
     const group = missing.filter((piece) => piece.kind === kind);
     return group.length ? [{ piece: group[0], count: group.length }] : [];
   });
-}
-
-/** The general of `side` and the pieces giving it check, for drawing the lines of attack. */
-export function checkLines(
-  board: Board,
-  side: Side,
-): { king: number; from: number[] } | null {
-  const king = board.findIndex((p) => p?.side === side && p.kind === 'k');
-  if (king < 0) return null;
-  const from = board.flatMap((p, i) =>
-    p && p.side !== side && pseudoLegal(board, i, king) ? [i] : [],
-  );
-  return from.length ? { king, from } : null;
 }
 
 /** Identity of every piece on every square; equal boards compare equal across polls. */
@@ -111,7 +101,6 @@ export type SoundKind =
   | 'select'
   | 'deal'
   | 'pattern'
-  | 'pattern-mate'
   | 'move'
   | 'capture'
   | 'undo'
@@ -125,6 +114,8 @@ export type StampText = {
   detail: MessageKey;
   side?: Side;
   reason?: string;
+  /** A named mate (lib/patterns.ts): its name becomes the stamp's word, under 绝杀. */
+  pattern?: PatternId;
 };
 export type BoardEffect = {
   id: string;
@@ -139,12 +130,18 @@ export type BoardEffect = {
 export function stampWords(
   locale: Locale,
   effect: Pick<BoardEffect, 'text' | 'analysis'>,
-): { title: string; detail: string; word: string } {
+): { title: string; detail: string; word: string; kicker: string } {
   const { text } = effect;
   const title = t(locale, text.title);
   return {
     title,
-    word: text.title === 'stamp.check' ? t(locale, 'stamp.check.word') : title,
+    word: text.pattern
+      ? t(locale, `pattern.${text.pattern}` as MessageKey)
+      : text.title === 'stamp.check'
+        ? t(locale, 'stamp.check.word')
+        : title,
+    // A named mate keeps 绝杀 as a small seal above its name.
+    kicker: text.pattern ? title : '',
     detail:
       (effect.analysis ? t(locale, 'stamp.exploring') : '') +
       t(locale, text.detail, {
@@ -214,6 +211,7 @@ export function resultEffect(
   id: string,
   analysis = false,
   locale: Locale = 'zh',
+  pattern?: PatternId,
 ): BoardEffect {
   const mate = result.reason === REASON.mate;
   // Name how the game ended, not who won: both players and spectators see this stamp.
@@ -229,10 +227,18 @@ export function resultEffect(
           result.winner === 'draw' ? 'result.reasonOnly' : 'result.withReason',
         side: result.winner === 'draw' ? undefined : result.winner,
         reason: result.reason,
+        ...(mate && pattern ? { pattern } : {}),
       },
     },
     locale,
   );
+}
+/** The classic mate the last move gave, if it was one the board knows by name. */
+function mateName(
+  move: { before: Board; from: number; to: number } | undefined,
+): PatternId | undefined {
+  const hit = move && movePattern(move.before, move.from, move.to);
+  return hit?.kind === 'mate' ? hit.id : undefined;
 }
 
 export function updateFeedback<T extends FeedbackRoom>(
@@ -277,6 +283,9 @@ export function updateFeedback<T extends FeedbackRoom>(
     effect = resultEffect(
       next.result,
       `${next.id}:${next.round}:${next.version}`,
+      false,
+      'zh',
+      moved ? mateName(next.history[next.history.length - 1]) : undefined,
     );
     sounds.push(effect.kind === 'mate' ? 'mate' : 'result');
   }
@@ -302,6 +311,8 @@ export function branchFeedback(
       },
       id,
       true,
+      'zh',
+      mateName({ before: board, from, to }),
     );
     sounds.push(effect.kind === 'mate' ? 'mate' : 'result');
     return { sounds, effect };

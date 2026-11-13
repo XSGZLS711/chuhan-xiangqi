@@ -24,7 +24,6 @@ import {
   checkLines,
   STAMP_TIMING,
   stampDelay,
-  stampDuration,
   type BoardEffect as Effect,
 } from '@/lib/presentation';
 import BoardEffect from '@/components/board-effect';
@@ -32,8 +31,9 @@ import BoardFx, {
   type Celebration,
   type InkSplash,
 } from '@/components/board-fx';
-import PatternReveal, { REVEAL_MS } from '@/components/pattern-reveal';
+import PatternReveal, { revealLife } from '@/components/pattern-reveal';
 import { movePattern, type PatternHit } from '@/lib/patterns';
+import { firstSighting, markSeen } from '@/lib/patterns-seen';
 import {
   cannonScreen,
   dealDelay,
@@ -66,7 +66,13 @@ type Frame = {
   /** A fresh set laid out on the opening position: the pieces are dealt onto the board. */
   deal: boolean;
   /** A classic opening or mate the last move completed, named on the board after `delay`. */
-  pattern: { hit: PatternHit; key: string; delay: number } | null;
+  pattern: {
+    hit: PatternHit;
+    key: string;
+    delay: number;
+    /** Shown at length: the first time this device sees it, or in the gallery. */
+    full: boolean;
+  } | null;
   /** Restored by an undo; fades back in once the mover has left its square. */
   revived: string | null;
   ghost: {
@@ -160,6 +166,7 @@ export default function ChessBoard({
   marks = [],
   onDeal,
   onPattern,
+  showcase = false,
 }: {
   board: Board;
   flipped?: boolean;
@@ -176,8 +183,10 @@ export default function ChessBoard({
   marks?: BoardMark[];
   /** Called when a new set is dealt onto the board, to sound the pieces landing. */
   onDeal?: () => void;
-  /** Called when a move completes a classic pattern, with the delay before it is named. */
+  /** Called when a move completes a classic opening, with the delay before it is named. */
   onPattern?: (hit: PatternHit, delayMs: number) => void;
+  /** The gallery of classics: every opening is shown at length, and none is marked seen. */
+  showcase?: boolean;
 }) {
   const signature = boardSignature(board);
   const { locale, t } = useLocale();
@@ -225,16 +234,17 @@ export default function ChessBoard({
       flipped,
       // Only a newly laid-out board is dealt; undoing back to the opening is not.
       deal: animate && fresh && signature === OPENING,
-      // An opening is named as the piece lands; a mate once its stamp has faded.
+      // An opening is written as the piece lands; a mate's figure is drawn with its stamp,
+      // which carries the name.
       pattern:
         named && transition
           ? {
               hit: named,
               key: `${transition.piece.id}:${transition.from}:${transition.to}`,
-              delay:
-                named.kind === 'opening'
-                  ? delay + 120
-                  : stampDelay(delay) + stampDuration('mate') - 150,
+              delay: named.kind === 'opening' ? delay + 80 : stampDelay(delay),
+              full:
+                named.kind === 'opening' &&
+                (showcase || firstSighting(named.id)),
             }
           : null,
       move: transition
@@ -300,18 +310,23 @@ export default function ChessBoard({
     return () => clearTimeout(timer);
   }, [ghost]);
   const pattern = frame.pattern;
-  const announcePattern = useEffectEvent((hit: PatternHit, delay: number) => {
-    if (captureEffects) onPattern?.(hit, delay);
-  });
+  // A named mate speaks through its stamp; only an opening has a sound of its own.
+  const announcePattern = useEffectEvent(
+    (hit: PatternHit, delay: number, full: boolean) => {
+      if (!captureEffects || hit.kind !== 'opening') return;
+      onPattern?.(hit, delay);
+      if (full && !showcase) markSeen(hit.id);
+    },
+  );
   useEffect(() => {
     if (!pattern) return;
-    announcePattern(pattern.hit, pattern.delay);
+    announcePattern(pattern.hit, pattern.delay, pattern.full);
     const timer = setTimeout(
       () =>
         setFrame((current) =>
           current.pattern === pattern ? { ...current, pattern: null } : current,
         ),
-      pattern.delay + REVEAL_MS[pattern.hit.kind],
+      pattern.delay + revealLife(pattern.hit.kind, pattern.full),
     );
     return () => clearTimeout(timer);
   }, [pattern]);
@@ -760,6 +775,7 @@ export default function ChessBoard({
             key={`pattern:${pattern.key}`}
             hit={pattern.hit}
             delay={pattern.delay}
+            full={pattern.full}
             flipped={flipped}
           />
         )}

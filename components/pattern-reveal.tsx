@@ -4,34 +4,35 @@ import type { PatternHit } from '@/lib/patterns';
 import { useLocale } from '@/lib/use-locale';
 
 const vars = (v: Record<string, string | number>) => v as CSSProperties;
-/** How long each kind of reveal stays, from its start (ms). */
-export const REVEAL_MS = { opening: 3000, mate: 5000 };
+/** How long a pattern stays on the board (ms): an opening named in passing, the same at
+ * length (its first sighting, or the gallery), and a mate's figure, drawn with its stamp. */
+export function revealLife(kind: PatternHit['kind'], full: boolean) {
+  return kind === 'mate' ? 3000 : full ? 2800 : 1400;
+}
 
-/** A named pattern, written on the board as it is completed. Openings get a brushed banner
- * across the river; mates a hanging scroll, unrolled once the mate stamp has faded and rolled
- * up again so the finished position can be seen with its figure drawn on it. Under the
- * pieces, the pattern itself is drawn: its lines of force, the pieces that made it, and its
- * figure (the aim of a central cannon, the iron bolt, the sealed palace, the folding screen).
- * The name is always brushed in Chinese, as a picture; other languages get a caption.
+/** A named pattern on the board as it is completed. An opening is written on the wood: its
+ * name brushed across the river in ink that soaks away, with a small seal, and at length a
+ * line on what it is. A mate is named by its stamp (components/board-effect.tsx), so here it
+ * only draws its figure. Both draw under the pieces what the pattern is made of: its lines of
+ * force, the pieces that made it, and its figure (the aim of a central cannon, the iron bolt,
+ * the sealed palace, the folding screen). The name is brushed in Chinese, as a picture; other
+ * languages get a caption.
  */
 export default function PatternReveal({
   hit,
   delay,
   flipped,
+  full,
 }: {
   hit: PatternHit;
   delay: number;
   flipped: boolean;
+  full: boolean;
 }) {
-  const { locale } = useLocale();
+  const { locale, t } = useLocale();
   const uid = useId().replace(/[^a-z0-9]/gi, '');
   const key = `pattern.${hit.id}` as MessageKey;
-  const name = translate('zh', key),
-    caption = locale === 'zh' ? '' : translate(locale, key),
-    kicker = translate(
-      'zh',
-      hit.kind === 'mate' ? 'classics.mates' : 'classics.openings',
-    );
+  const life = revealLife(hit.kind, full);
   const view = (n: number) => (flipped ? 89 - n : n);
   const point = (n: number) => {
     const v = view(n);
@@ -44,16 +45,20 @@ export default function PatternReveal({
       top: `${((Math.floor(v / 9) + 0.5) / 10) * 100}%`,
     };
   };
-  const target = hit.target === null ? null : view(hit.target),
-    aim = hit.target === null ? null : point(hit.target);
+  const aim = hit.target === null ? null : point(hit.target);
   // The palace the mate happened in, as the viewer sees it (rows 0-2 or 7-9).
-  const palaceTop = target === null ? 0 : Math.floor(target / 9) <= 2 ? 0 : 7;
+  const palaceTop =
+    hit.target === null ? 0 : Math.floor(view(hit.target) / 9) <= 2 ? 0 : 7;
   return (
     <div
-      className={`pattern-reveal reveal-${hit.kind} motif-${hit.motif}`}
+      className={`pattern-reveal reveal-${hit.kind} ${full ? 'reveal-full' : ''}`}
       style={vars({
         '--reveal-delay': `${delay}ms`,
-        '--reveal-life': `${REVEAL_MS[hit.kind]}ms`,
+        '--reveal-life': `${life}ms`,
+        // The ink is written in the first part and soaks away over the last.
+        '--write': `${full ? 420 : 340}ms`,
+        '--soak-at': `${life - (full ? 650 : 520)}ms`,
+        '--soak': `${full ? 650 : 520}ms`,
       })}
       aria-hidden="true"
     >
@@ -72,12 +77,8 @@ export default function PatternReveal({
           >
             <feGaussianBlur stdDeviation="7" />
           </filter>
-          <linearGradient id={`force-${uid}`} x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="#ffe7a8" stopOpacity="0.2" />
-            <stop offset="1" stopColor="#ffcf6a" />
-          </linearGradient>
         </defs>
-        {hit.motif === 'seal' && target !== null && (
+        {hit.motif === 'seal' && (
           <g className="palace-seal">
             <rect
               className="palace-wall"
@@ -166,61 +167,18 @@ export default function PatternReveal({
             <b />
           </i>
         )}
-      {hit.kind === 'opening' ? (
-        <div className="pattern-banner">
-          <svg
-            className="banner-swash"
-            viewBox="0 0 600 120"
-            preserveAspectRatio="none"
-          >
-            <defs>
-              <filter
-                id={`dry-${uid}`}
-                x="-5%"
-                y="-20%"
-                width="110%"
-                height="140%"
-              >
-                <feTurbulence
-                  type="fractalNoise"
-                  baseFrequency="0.035 0.6"
-                  numOctaves="2"
-                  seed="11"
-                  result="grain"
-                />
-                <feDisplacementMap
-                  in="SourceGraphic"
-                  in2="grain"
-                  scale="14"
-                  xChannelSelector="R"
-                  yChannelSelector="G"
-                />
-              </filter>
-            </defs>
-            <path
-              filter={`url(#dry-${uid})`}
-              d="M16 58C58 20 150 10 260 14C380 18 470 10 562 24C592 30 598 58 582 78C550 106 440 104 330 106C210 108 110 114 40 110C8 106 2 84 16 58Z"
-            />
-          </svg>
-          <span className="banner-seal">{kicker}</span>
-          <strong className="banner-name">{name}</strong>
-          {caption && <span className="banner-caption">{caption}</span>}
-        </div>
-      ) : (
-        <div className="pattern-scroll">
-          <i className="scroll-roller top" />
-          <div className="scroll-paper">
-            <strong className="scroll-name">
-              {Array.from(name).map((ch, i) => (
-                <span key={i} style={vars({ '--i': i })}>
-                  {ch}
-                </span>
-              ))}
-            </strong>
-            <span className="scroll-seal">{kicker}</span>
-            {caption && <span className="scroll-caption">{caption}</span>}
-          </div>
-          <i className="scroll-roller bottom" />
+      {hit.kind === 'opening' && (
+        <div className="pattern-ink">
+          <span className="ink-seal">
+            {translate('zh', 'classics.openings')}
+          </span>
+          <strong className="ink-name">{translate('zh', key)}</strong>
+          {locale !== 'zh' && <span className="ink-caption">{t(key)}</span>}
+          {full && (
+            <span className="ink-gloss">
+              {t(`pattern.${hit.id}.gloss` as MessageKey)}
+            </span>
+          )}
         </div>
       )}
     </div>

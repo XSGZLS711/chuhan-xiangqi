@@ -843,12 +843,7 @@ export default function AiGame() {
             <ChessBoard
               board={board}
               onDeal={() => playSound('deal')}
-              onPattern={(hit, delay) =>
-                playSound(
-                  hit.kind === 'mate' ? 'pattern-mate' : 'pattern',
-                  delay / 1000,
-                )
-              }
+              onPattern={(_, delay) => playSound('pattern', delay / 1000)}
               flipped={match.human === 'black'}
               selected={selected}
               targets={settings.hints ? targets : []}
