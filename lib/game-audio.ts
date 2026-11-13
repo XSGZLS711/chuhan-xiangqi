@@ -1,5 +1,12 @@
 import type { SoundKind } from './presentation';
-import { pieceMotion } from './motion';
+import {
+  DEAL,
+  dealDelay,
+  moveStyle,
+  pieceMotion,
+  type MoveStyle,
+} from './motion';
+import { initialBoard, type Board } from './xiangqi';
 
 /** Delay to impact, in seconds. Follow-up feedback comes after the landing. */
 export function soundDelay(
@@ -7,12 +14,13 @@ export function soundDelay(
   index: number,
   reducedMotion = typeof matchMedia !== 'undefined' &&
     matchMedia('(prefers-reduced-motion: reduce)').matches,
+  style: MoveStyle = 'glide',
 ): number {
   const moving = sounds[0] === 'move' || sounds[0] === 'capture';
   if (!moving) return 0;
   const landing = reducedMotion
     ? 0
-    : pieceMotion(sounds[0] === 'capture').landMs / 1000;
+    : pieceMotion(sounds[0] === 'capture', style).landMs / 1000;
   return landing + (index ? 0.18 : 0);
 }
 
@@ -23,6 +31,23 @@ export function soundPan(square: number | null | undefined, flipped = false) {
   if (square === null || square === undefined) return 0;
   const file = (flipped ? 89 - square : square) % 9;
   return +(((file - 4) / 4) * 0.45).toFixed(3);
+}
+
+/** A move's feedback, each sound timed to the landing, placed where the piece lands and
+ * carrying how it travelled: [kind, delay, pan, style] for GameAudio.play. */
+export function feedbackSounds(
+  sounds: SoundKind[],
+  move: { before: Board; from: number; to: number } | null | undefined,
+  flipped = false,
+): [SoundKind, number, number, MoveStyle][] {
+  const style = move ? moveStyle(move.before, move.from, move.to) : 'glide',
+    pan = soundPan(move?.to, flipped);
+  return sounds.map((kind, index) => [
+    kind,
+    soundDelay(sounds, index, undefined, style),
+    pan,
+    style,
+  ]);
 }
 
 /** Phones that can buzz feel the same beats the ear hears (Android; iOS has no API). */
@@ -36,6 +61,7 @@ const HAPTICS: Partial<Record<SoundKind, number | number[]>> = {
 /** How much of each sound reaches the room: a knock stays close, the end rings out. */
 const ROOM: Record<SoundKind, number> = {
   select: 0.05,
+  deal: 0.1,
   move: 0.12,
   capture: 0.2,
   undo: 0.18,
@@ -43,6 +69,11 @@ const ROOM: Record<SoundKind, number> = {
   mate: 0.5,
   result: 0.42,
 };
+
+/** The five-note scale on G, two octaves and a step: the strings a glissando sweeps. */
+const PENTATONIC = [
+  196, 220, 246.94, 293.66, 329.63, 392, 440, 493.88, 587.33, 659.25, 783.99,
+];
 
 /** Every voice runs through one small wooden room (a generated impulse, no file) and a
  * gentle limiter, so stacked sounds blend instead of clipping on loud phone speakers.
@@ -241,13 +272,22 @@ export class GameAudio {
       source.disconnect();
     };
   }
-  /** `pan` places the sound from -1 (left) to 1 (right); see soundPan. */
-  play(kind: SoundKind, delay = 0, pan = 0): void {
+  /** `pan` places the sound from -1 (left) to 1 (right); see soundPan. `style` is how
+   * the piece travelled (lib/motion.ts), which adds its flight to the knock. */
+  play(kind: SoundKind, delay = 0, pan = 0, style: MoveStyle = 'glide'): void {
     const c = this.context;
     if (!c || c.state !== 'running') return;
     this.haptic(kind, delay);
+    const motion = pieceMotion(kind === 'capture', style);
+    // Sounds of the flight start this long before the landing, when the move began.
+    const flight = Math.min(delay, motion.landMs / 1000);
     // Capture's air leads into impact; `delay` always denotes the landing.
-    const lead = kind === 'capture' ? Math.min(0.15, delay) : 0;
+    const lead =
+      kind === 'capture'
+        ? Math.min(style === 'glide' ? 0.15 : 0.4, delay)
+        : kind === 'move' && style !== 'glide'
+          ? flight
+          : 0;
     const start = c.currentTime + delay - lead;
     const out = this.voice(c, kind, pan, start + 2.4);
     const tone = (
@@ -371,32 +411,91 @@ export class GameAudio {
       );
       noise(frequency * 6, frequency * 4, 0.04, volume * 2.2, at, false, 0.02);
     };
+    // A war drum: a skin struck hard, its pitch falling as it rings, with the slap on top.
+    const taiko = (at: number, volume: number) => {
+      tone(150, 0.55, 0.26 * volume, at, 50, 0.14);
+      tone(240, 0.14, 0.07 * volume, at, 110, 0.05);
+      noise(220, 90, 0.1, 0.7 * volume, at, false, 0.05);
+    };
+    // A guzheng glissando: a finger sweeping the pentatonic strings in one breath.
+    const sweep = (at: number, up: boolean, volume: number) =>
+      (up ? PENTATONIC : [...PENTATONIC].reverse()).forEach((frequency, i) =>
+        pluck(frequency, at + i * 0.032, volume * (0.7 + 0.03 * i), 1.2),
+      );
+    // The sound of the flight, ending at the landing: a rising rush of air.
+    const rush = (low: number, high: number, volume: number) => {
+      if (flight > 0.05) noise(low, high, flight, volume, lead - flight, true);
+    };
+    // A steel edge passing through: a quick hiss, then a thin ring that does not quite
+    // agree with itself.
+    const blade = (at: number) => {
+      if (at >= 0.08) noise(1800, 7800, 0.08, 0.2, at - 0.08, true);
+      for (const [frequency, volume] of [
+        [2350, 0.016],
+        [3170, 0.011],
+        [4410, 0.008],
+        [5930, 0.006],
+      ])
+        tone(frequency, 0.5, volume, at, frequency * 0.995, 0.06);
+      noise(7200, 6400, 0.14, 0.2, at, false, 0.05);
+    };
+    // The horse's leg touches the board halfway through its 日.
+    const hoof = () => {
+      const leg = lead - (motion.landMs - motion.slideMs / 2) / 1000;
+      if (style === 'gallop' && this.knock && leg >= 0)
+        recorded(leg, 0.45, 1.2);
+    };
     // Levels follow recordings of a wooden set: about half the energy in the
     // body below 300 Hz, a third in the 3–8 kHz click, the rest in the wood.
     switch (kind) {
       case 'select':
         // The fingertip lifts a piece: felt brushing wood, a faint high tick.
-        noise(5200, 4600, 0.035, 0.16, 0, false, 0.018);
-        tone(1320, 0.05, 0.012, 0, 1480, 0.02);
+        noise(5200, 4600, 0.035, 0.26, 0, false, 0.018);
+        tone(1320, 0.05, 0.02, 0, 1480, 0.02);
+        break;
+      case 'deal':
+        // The set laid out: one light knock for each piece as it lies down.
+        initialBoard().forEach((piece, square) => {
+          if (!piece) return;
+          const at =
+            (dealDelay(square) + DEAL.durationMs * DEAL.knockAt) / 1000;
+          if (this.knock) recorded(at, 0.1, 1.18 + (square % 9) * 0.015);
+          else {
+            tone(560 + (square % 9) * 12, 0.06, 0.018, at, 520, 0.03);
+            noise(3600, 3300, 0.03, 0.18, at, false, 0.02);
+          }
+        });
         break;
       case 'move':
+        if (style === 'charge') rush(300, 1900, 0.2);
+        hoof();
         if (this.knock) {
-          recorded(0, 1, 1);
+          recorded(lead, 1, style === 'charge' ? 0.92 : 1);
           break;
         }
         // 咚: the piece meets the board; 嗒: it settles 55 ms later.
-        tone(221, 0.25, 0.08, 0, 205, 0.1);
-        tone(63, 0.12, 0.06, 0, 55, 0.05);
-        tone(582, 0.14, 0.05, 0, 540, 0.08);
-        noise(1700, 1500, 0.08, 0.8, 0, false, 0.055);
-        noise(3700, 3400, 0.05, 0.7, 0, false, 0.035);
-        tone(225, 0.19, 0.04, 0.055, 210, 0.08);
-        noise(3900, 3600, 0.04, 0.24, 0.055, false, 0.025);
+        tone(221, 0.25, 0.08, lead, 205, 0.1);
+        tone(63, 0.12, 0.06, lead, 55, 0.05);
+        tone(582, 0.14, 0.05, lead, 540, 0.08);
+        noise(1700, 1500, 0.08, 0.8, lead, false, 0.055);
+        noise(3700, 3400, 0.05, 0.7, lead, false, 0.035);
+        tone(225, 0.19, 0.04, lead + 0.055, 210, 0.08);
+        noise(3900, 3600, 0.04, 0.24, lead + 0.055, false, 0.025);
         break;
       case 'capture':
         // 呼—啪: air rushes in, the piece slams down, splinters settle; 「吃」.
         this.say('吃', delay);
-        if (lead) noise(900, 4000, lead, 0.4, 0, true);
+        if (style === 'leap') {
+          // The cannon's flight: air rising to the top of the arc and falling onto the
+          // target, then the blast of its landing.
+          noise(500, 2600, lead * 0.55, 0.22, 0, true);
+          noise(2600, 700, lead * 0.45, 0.26, lead * 0.55, true);
+          tone(58, 0.7, 0.24, lead, 34, 0.2);
+          noise(260, 80, 0.4, 0.55, lead, false, 0.12);
+        } else if (style === 'charge') rush(300, 2400, 0.3);
+        else if (lead) noise(900, 4000, lead, 0.4, 0, true);
+        hoof();
+        blade(lead + 0.01);
         if (this.knock) {
           // The same wood, struck harder and a little lower, over a short drum.
           recorded(lead, 0.75, 0.86);
@@ -425,6 +524,7 @@ export class GameAudio {
       case 'check':
         // 梆梆 and a called 「将军」, as players announce it over a real board.
         this.say('将军', delay);
+        taiko(0, 1);
         for (const at of [0, 0.09]) {
           tone(1250, 0.12, 0.05, at, 1180, 0.05);
           noise(2600, 2300, 0.05, 0.4, at, false, 0.03);
@@ -432,7 +532,11 @@ export class GameAudio {
         tone(118, 0.4, 0.12, 0, 82, 0.2);
         break;
       case 'mate':
-        // A low swell, a big drum, then a gong ring and shimmer that fade with the stamp.
+        // Two war drums, a low swell, a big drum, then a gong ring and shimmer that fade
+        // with the stamp, and the strings swept down as the general falls.
+        taiko(0, 0.8);
+        taiko(0.16, 1);
+        sweep(0.5, false, 0.05);
         noise(140, 90, 0.08, 0.25, 0, true);
         tone(67, 1.7, 0.24, 0.07, 45, 1.1);
         tone(93, 1.3, 0.1, 0.07, 50, 0.8);
@@ -445,11 +549,13 @@ export class GameAudio {
         pluck(98, 0.12, 0.05, 2.4);
         break;
       case 'result':
-        // Three rising notes of the pentatonic scale that come to rest on the low tonic.
-        pluck(392, 0, 0.065);
-        pluck(440, 0.13, 0.058);
-        pluck(587.33, 0.26, 0.065, 1.9);
-        pluck(196, 0.26, 0.07, 2.4);
+        // The strings swept upwards, then the tonic struck in three octaves over a drum.
+        sweep(0, true, 0.05);
+        taiko(0.36, 0.7);
+        pluck(392, 0.36, 0.07, 2);
+        pluck(783.99, 0.36, 0.045, 2);
+        pluck(196, 0.36, 0.07, 2.6);
+        pluck(98, 0.36, 0.05, 2.6);
         break;
     }
   }

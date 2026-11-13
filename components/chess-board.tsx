@@ -1,15 +1,45 @@
 'use client';
-import { useEffect, useId, useState, type CSSProperties } from 'react';
-import { Board, initialBoard, label, Side, type Piece } from '@/lib/xiangqi';
+import {
+  useEffect,
+  useEffectEvent,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from 'react';
+import {
+  Board,
+  hasLegalMove,
+  initialBoard,
+  label,
+  Side,
+  type Piece,
+} from '@/lib/xiangqi';
 import { sidePieceName } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 import {
   boardSignature,
   boardTransition,
+  checkLines,
+  STAMP_TIMING,
+  stampDelay,
   type BoardEffect as Effect,
 } from '@/lib/presentation';
 import BoardEffect from '@/components/board-effect';
-import { PIECE_MOTION, pieceMotion } from '@/lib/motion';
+import BoardFx, {
+  type Celebration,
+  type InkSplash,
+} from '@/components/board-fx';
+import {
+  cannonScreen,
+  dealDelay,
+  gallopLeg,
+  moveStyle,
+  PIECE_MOTION,
+  pieceMotion,
+  type MoveStyle,
+} from '@/lib/motion';
 
 type Frame = {
   sig: string;
@@ -22,6 +52,10 @@ type Frame = {
     key: string;
     from: number;
     to: number;
+    style: MoveStyle;
+    /** The horse's leg point, or the piece a capturing cannon vaults. */
+    leg: number | null;
+    screen: number | null;
     timing: ReturnType<typeof pieceMotion>;
     /** Axis the piece tips about as it is set down, leading edge first. */
     lean: { x: number; y: number };
@@ -36,17 +70,31 @@ type Frame = {
     key: string;
     delay: number;
     life: number;
+    /** Angle of the cut through the taken piece, across the line of attack. */
+    cut: number;
+    heavy: boolean;
   } | null;
 };
 const SHARDS = [0, 1, 2, 3, 4, 5, 6, 7];
 const OPENING = boardSignature(initialBoard());
-/** The deal runs from the river outwards, soldiers first and the back rank last, each rank
- * from the middle file to the edges: the order a player sets up a real board.
- */
-function dealDelay(view: number) {
-  const row = Math.floor(view / 9),
-    rank = row < 5 ? 4 - row : row - 5;
-  return rank * 55 + Math.abs((view % 9) - 4) * 24;
+const reducedMotion = () =>
+  typeof matchMedia !== 'undefined' &&
+  matchMedia('(prefers-reduced-motion: reduce)').matches;
+/** The board jumps under a heavy blow; nothing moves for reduced motion. */
+function jolt(node: HTMLElement | null, strength: number, delay: number) {
+  if (!node || typeof node.animate !== 'function' || reducedMotion()) return;
+  const s = strength;
+  node.animate(
+    [
+      { transform: 'none' },
+      { transform: `translate(${-s}px, ${s * 0.7}px)` },
+      { transform: `translate(${s * 0.8}px, ${-s * 0.5}px)` },
+      { transform: `translate(${-s * 0.45}px, ${s * 0.3}px)` },
+      { transform: `translate(${s * 0.2}px, 0)` },
+      { transform: 'none' },
+    ],
+    { duration: 340, delay, easing: 'ease-out' },
+  );
 }
 /** A piece set down after travelling tips its leading edge into the board first:
  * rotating about (−dy, dx) on screen sends that edge away from the viewer.
@@ -57,6 +105,33 @@ function leanAxis(from: number, to: number, flipped: boolean) {
     dy = Math.floor(at(to) / 9) - Math.floor(at(from) / 9),
     length = Math.hypot(dx, dy) || 1;
   return { x: +(-dy / length).toFixed(3), y: +(dx / length).toFixed(3) };
+}
+/** The blade falls across the line of attack, a little off square, as a cut would. */
+function cutAngle(from: number, to: number, flipped: boolean) {
+  const at = (n: number) => (flipped ? 89 - n : n);
+  const dx = (at(to) % 9) - (at(from) % 9),
+    dy = Math.floor(at(to) / 9) - Math.floor(at(from) / 9);
+  return Math.round((Math.atan2(dy, dx) * 180) / Math.PI + 90 + 28);
+}
+/** A jagged line of light between two points, the same every time for the same pair. */
+function bolt(x1: number, y1: number, x2: number, y2: number) {
+  const length = Math.hypot(x2 - x1, y2 - y1) || 1,
+    nx = -(y2 - y1) / length,
+    ny = (x2 - x1) / length,
+    steps = Math.max(4, Math.round(length / 55)),
+    points = [`${x1} ${y1}`];
+  for (let i = 1; i < steps; i++) {
+    const t = i / steps,
+      swing =
+        (i % 2 ? 1 : -1) *
+        (9 + ((x1 * 7 + y2 * 3 + i * 13) % 13)) *
+        Math.sqrt(Math.sin(Math.PI * t));
+    points.push(
+      `${(x1 + (x2 - x1) * t + nx * swing).toFixed(1)} ${(y1 + (y2 - y1) * t + ny * swing).toFixed(1)}`,
+    );
+  }
+  points.push(`${x2} ${y2}`);
+  return `M${points.join('L')}`;
 }
 /** A move drawn on the board: the engine's choice or the move actually played. */
 export type BoardArrow = { from: number; to: number; tone: 'best' | 'played' };
@@ -78,6 +153,7 @@ export default function ChessBoard({
   captureEffects = true,
   arrows = [],
   marks = [],
+  onDeal,
 }: {
   board: Board;
   flipped?: boolean;
@@ -92,10 +168,15 @@ export default function ChessBoard({
   captureEffects?: boolean;
   arrows?: BoardArrow[];
   marks?: BoardMark[];
+  /** Called when a new set is dealt onto the board, to sound the pieces landing. */
+  onDeal?: () => void;
 }) {
   const signature = boardSignature(board);
   const { locale, t } = useLocale();
-  const trail = `trail-${useId().replace(/[^a-z0-9]/gi, '')}`;
+  const uid = useId().replace(/[^a-z0-9]/gi, ''),
+    trail = `trail-${uid}`,
+    glow = `glow-${uid}`;
+  const boardRef = useRef<HTMLFieldSetElement>(null);
   const [frame, setFrame] = useState<Frame>({
     sig: signature,
     board,
@@ -118,7 +199,10 @@ export default function ChessBoard({
       frame.context !== animationContext || frame.flipped !== flipped;
     const transition =
       animate && !fresh ? boardTransition(frame.board, board) : null;
-    const timing = pieceMotion(!!transition?.captured);
+    const style = transition
+      ? moveStyle(frame.board, transition.from, transition.to)
+      : 'glide';
+    const timing = pieceMotion(!!transition?.captured, style);
     const delay = timing.landMs;
     setFrame({
       sig: signature,
@@ -133,6 +217,15 @@ export default function ChessBoard({
             key: `${transition.piece.id}:${transition.from}:${transition.to}`,
             from: transition.from,
             to: transition.to,
+            style,
+            leg:
+              style === 'gallop'
+                ? gallopLeg(transition.from, transition.to)
+                : null,
+            screen:
+              style === 'leap'
+                ? cannonScreen(frame.board, transition.from, transition.to)
+                : null,
             timing,
             lean: leanAxis(transition.from, transition.to, flipped),
           }
@@ -144,7 +237,9 @@ export default function ChessBoard({
             at: transition.to,
             key: `${transition.piece.id}:${transition.from}:${transition.to}`,
             delay,
-            life: delay + 620,
+            life: delay + 950,
+            cut: cutAngle(transition.from, transition.to, flipped),
+            heavy: style === 'leap' || transition.captured.kind === 'r',
           }
         : null,
     });
@@ -162,9 +257,13 @@ export default function ChessBoard({
     );
     return () => clearTimeout(timer);
   }, [move]);
+  const shake = useEffectEvent((strength: number, delay: number) => {
+    if (captureEffects) jolt(boardRef.current, strength, delay);
+  });
   const ghost = frame.ghost;
   useEffect(() => {
     if (!ghost) return;
+    shake(ghost.heavy ? 6 : 3, ghost.delay);
     const timer = setTimeout(
       () =>
         setFrame((current) =>
@@ -175,14 +274,40 @@ export default function ChessBoard({
     return () => clearTimeout(timer);
   }, [ghost]);
   const deal = frame.deal;
+  const announceDeal = useEffectEvent(() => onDeal?.());
   useEffect(() => {
     if (!deal) return;
+    announceDeal();
     const timer = setTimeout(
       () => setFrame((current) => ({ ...current, deal: false })),
       dealDelay(0) + 700,
     );
     return () => clearTimeout(timer);
   }, [deal]);
+  const lines = useMemo(
+    () => (checkSide ? checkLines(board, checkSide) : null),
+    [board, checkSide],
+  );
+  // Only looked for while in check: finding no legal move is the costly part.
+  const mated = useMemo(
+    () => !!lines && !!checkSide && !hasLegalMove(board, checkSide),
+    [lines, board, checkSide],
+  );
+  const landMs = frame.move?.timing.landMs ?? 0;
+  // A new check (not a re-sent copy of the same position) jolts the board once.
+  const checkKey = lines ? `${signature}:${checkSide}` : null;
+  const onCheck = useEffectEvent(() => shake(mated ? 4 : 2.5, landMs));
+  useEffect(() => {
+    if (checkKey) onCheck();
+  }, [checkKey]);
+  const effectId = effect?.id;
+  const onStamp = useEffectEvent(() => {
+    if (effect?.kind === 'mate')
+      shake(8, stampDelay(landMs) + STAMP_TIMING.enterMs);
+  });
+  useEffect(() => {
+    if (effectId) onStamp();
+  }, [effectId]);
   const view = (n: number) => (flipped ? 89 - n : n);
   const point = (n: number) => {
     const v = view(n);
@@ -195,15 +320,37 @@ export default function ChessBoard({
       top: `${((Math.floor(pos / 9) + 0.5) / 10) * 100}%`,
     };
   };
+  /** Offset from one square to another in files and ranks, as the viewer sees them. */
+  const offset = (from: number, to: number) => ({
+    x: (view(from) % 9) - (view(to) % 9),
+    y: Math.floor(view(from) / 9) - Math.floor(view(to) / 9),
+  });
+  const ink: InkSplash | null =
+    ghost && captureEffects
+      ? {
+          key: ghost.key,
+          x: ((view(ghost.at) % 9) + 0.5) / 9,
+          y: (Math.floor(view(ghost.at) / 9) + 0.5) / 10,
+          delay: ghost.delay,
+          side: ghost.piece.side,
+          heavy: ghost.heavy,
+        }
+      : null;
+  const celebrate: Celebration | null =
+    effect && (effect.kind === 'mate' || effect.kind === 'result')
+      ? { key: effect.id, side: effect.side, mate: effect.kind === 'mate' }
+      : null;
+  const king = lines?.king ?? -1;
   return (
     <div className={`board-frame ${effect ? `fx-${effect.kind}` : ''}`}>
       <fieldset
-        className={`chess-board ${captureEffects ? '' : 'tactics-off'}`}
+        ref={boardRef}
+        className={`chess-board ${captureEffects ? '' : 'tactics-off'} ${mated ? 'mated' : ''}`}
         aria-label={t('board.label')}
         style={css({
           '--slide': `${PIECE_MOTION.slideMs}ms`,
           // The landing halo waits for the drop; jumps without a move show it at once.
-          '--land': `${frame.move?.timing.landMs ?? 0}ms`,
+          '--land': `${landMs}ms`,
           '--selection-lift': `${PIECE_MOTION.selectionMs}ms`,
         })}
       >
@@ -255,6 +402,12 @@ export default function ChessBoard({
             </text>
           </g>
         </svg>
+        {/* Light on the wood: the river runs, and the lamp's glow drifts slowly. */}
+        <div className="board-ambient" aria-hidden="true">
+          <i className="river-flow" />
+          <i className="lamp-sheen" />
+        </div>
+        {mated && <i className="mate-dusk" aria-hidden="true" />}
         {Array.from({ length: 90 }, (_, n) => {
           const p = board[n],
             possible = targets.includes(n);
@@ -293,17 +446,75 @@ export default function ChessBoard({
             </button>
           );
         })}
+        {lines &&
+          captureEffects && (
+            // Check: lightning cracks from each attacker to the general, then leaves a
+            // marching thread along the line of attack for as long as the check stands.
+            <svg
+              key={`check:${signature}`}
+              className="check-lines"
+              viewBox="0 0 900 1000"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              <defs>
+                <filter id={glow} x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="6" />
+                </filter>
+              </defs>
+              {lines.from.map((from) => {
+                const [x1, y1] = point(from),
+                  [x2, y2] = point(lines.king),
+                  d = bolt(x1, y1, x2, y2);
+                return (
+                  <g key={from}>
+                    <line
+                      className="check-thread"
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                      pathLength={1}
+                    />
+                    <path
+                      className="check-bolt halo"
+                      d={d}
+                      pathLength={1}
+                      filter={`url(#${glow})`}
+                    />
+                    <path className="check-bolt core" d={d} pathLength={1} />
+                  </g>
+                );
+              })}
+            </svg>
+          )}
+        {lines && captureEffects && (
+          <i
+            key={`vignette:${signature}`}
+            className={`check-vignette ${mated ? 'final' : ''}`}
+            aria-hidden="true"
+          />
+        )}
         {frame.move && (
           <svg
             key={frame.move.key}
-            className="move-trail"
+            className={`move-trail trail-${frame.move.style}`}
             viewBox="0 0 900 1000"
             preserveAspectRatio="none"
             aria-hidden="true"
+            style={css({ '--slide': `${frame.move.timing.slideMs}ms` })}
           >
             {(() => {
               const [x1, y1] = point(frame.move.from),
-                [x2, y2] = point(frame.move.to);
+                [x2, y2] = point(frame.move.to),
+                leg = frame.move.leg === null ? null : point(frame.move.leg),
+                d =
+                  frame.move.style === 'leap'
+                    ? // The cannon's arc, drawn as the viewer sees it rise off the board.
+                      `M${x1} ${y1}Q${(x1 + x2) / 2} ${(y1 + y2) / 2 - 150} ${x2} ${y2}`
+                    : leg
+                      ? `M${x1} ${y1}L${leg[0]} ${leg[1]}L${x2} ${y2}`
+                      : `M${x1} ${y1}L${x2} ${y2}`;
               return (
                 <>
                   <defs>
@@ -319,14 +530,23 @@ export default function ChessBoard({
                       <stop offset="1" stopOpacity="1" />
                     </linearGradient>
                   </defs>
-                  <line
-                    x1={x1}
-                    y1={y1}
-                    x2={x2}
-                    y2={y2}
-                    pathLength={1}
-                    stroke={`url(#${trail})`}
-                  />
+                  <path d={d} pathLength={1} stroke={`url(#${trail})`} />
+                  {frame.move.style === 'charge' &&
+                    // Wind torn along the chariot's flanks.
+                    [-1, 1].map((flank) => {
+                      const length = Math.hypot(x2 - x1, y2 - y1) || 1,
+                        nx = (-(y2 - y1) / length) * 30 * flank,
+                        ny = ((x2 - x1) / length) * 30 * flank;
+                      return (
+                        <path
+                          key={flank}
+                          className="trail-wind"
+                          d={d}
+                          pathLength={1}
+                          transform={`translate(${nx.toFixed(1)} ${ny.toFixed(1)})`}
+                        />
+                      );
+                    })}
                 </>
               );
             })()}
@@ -339,8 +559,28 @@ export default function ChessBoard({
         >
           {board.map((p, n) => {
             if (!p) return null;
-            const moved = frame.move?.id === p.id,
-              revived = frame.revived === p.id;
+            const travel = frame.move,
+              moved = travel?.id === p.id,
+              revived = frame.revived === p.id,
+              vaulted = travel?.screen === n,
+              fallen = mated && n === king;
+            const path =
+              moved && travel && travel.style !== 'glide'
+                ? (() => {
+                    const from = offset(travel.from, travel.to),
+                      leg =
+                        travel.leg === null
+                          ? from
+                          : offset(travel.leg, travel.to);
+                    return css({
+                      '--fx': from.x,
+                      '--fy': from.y,
+                      '--lx': leg.x,
+                      '--ly': leg.y,
+                      '--slide': `${travel.timing.slideMs}ms`,
+                    });
+                  })()
+                : {};
             return (
               <div
                 key={p.id}
@@ -352,18 +592,22 @@ export default function ChessBoard({
                     : {}),
                   ...(moved
                     ? css({
-                        '--hover': `${frame.move?.timing.hoverMs}ms`,
-                        '--drop': `${frame.move?.timing.dropMs}ms`,
-                        '--settle': `${frame.move?.timing.settleMs}ms`,
-                        '--lean-x': frame.move?.lean.x ?? 0,
-                        '--lean-y': frame.move?.lean.y ?? 1,
+                        '--hover': `${travel?.timing.hoverMs}ms`,
+                        '--drop': `${travel?.timing.dropMs}ms`,
+                        '--settle': `${travel?.timing.settleMs}ms`,
+                        '--lean-x': travel?.lean.x ?? 0,
+                        '--lean-y': travel?.lean.y ?? 1,
                       })
                     : {}),
+                  ...path,
+                  ...(vaulted && travel
+                    ? css({ '--vault': `${travel.timing.slideMs * 0.42}ms` })
+                    : {}),
                 }}
-                className={`piece-position ${selected === n ? 'selected' : ''} ${last?.to === n ? 'latest-piece' : ''} ${moved ? 'moving' : ''} ${revived ? 'revived' : ''}`}
+                className={`piece-position ${selected === n ? 'selected' : ''} ${last?.to === n ? 'latest-piece' : ''} ${moved ? `moving travel-${travel?.style}` : ''} ${revived ? 'revived' : ''} ${vaulted ? 'vaulted' : ''} ${fallen ? 'fallen' : ''}`}
               >
                 <span
-                  key={moved ? frame.move?.key : 'idle'}
+                  key={moved ? travel?.key : 'idle'}
                   className={`piece ${p.side} ${p.kind === 'k' && checkSide === p.side ? 'checked' : ''}`}
                   onAnimationEnd={(event) => {
                     if (event.animationName === 'piece-settle')
@@ -383,38 +627,49 @@ export default function ChessBoard({
                   <span>{label(p)}</span>
                 </span>
                 {moved && !ghost && (
-                  <i
-                    key={`ripple:${frame.move?.key}`}
-                    className="land-ripple"
-                  />
+                  <i key={`ripple:${travel?.key}`} className="land-ripple" />
                 )}
               </div>
             );
           })}
         </div>
-        {ghost && captureEffects && (
-          <div
-            key={ghost.key}
-            className="capture-ghost piece-position"
-            style={{
-              ...position(ghost.at),
-              ...css({ '--impact-delay': `${ghost.delay}ms` }),
-            }}
-            aria-hidden="true"
-          >
-            <span className={`piece ${ghost.piece.side}`}>
-              <span>{label(ghost.piece)}</span>
-            </span>
-            <i className="capture-impact" />
-            {SHARDS.map((i) => (
-              <i
-                key={i}
-                className="capture-shard"
-                style={css({ '--a': `${i * 45 + 22}deg`, '--i': i })}
-              />
-            ))}
-          </div>
-        )}
+        {ghost &&
+          captureEffects && (
+            // The taken piece waits under the attacker; at the blow a blade crosses it, it
+            // falls apart in two halves along the cut, and splinters of wood fly.
+            <div
+              key={ghost.key}
+              className={`capture-ghost piece-position ${ghost.heavy ? 'heavy' : ''}`}
+              style={{
+                ...position(ghost.at),
+                ...css({
+                  '--impact-delay': `${ghost.delay}ms`,
+                  '--cut': `${ghost.cut}deg`,
+                }),
+              }}
+              aria-hidden="true"
+            >
+              <span className={`piece ghost-whole ${ghost.piece.side}`}>
+                <span>{label(ghost.piece)}</span>
+              </span>
+              {[0, 1].map((half) => (
+                <span key={half} className={`ghost-half half-${half}`}>
+                  <span className={`piece ${ghost.piece.side}`}>
+                    <span>{label(ghost.piece)}</span>
+                  </span>
+                </span>
+              ))}
+              <i className="capture-slash" />
+              <i className="capture-impact" />
+              {SHARDS.map((i) => (
+                <i
+                  key={i}
+                  className="capture-shard"
+                  style={css({ '--a': `${i * 45 + 22}deg`, '--i': i })}
+                />
+              ))}
+            </div>
+          )}
         {arrows.length > 0 && (
           <svg
             className="board-arrows"
@@ -458,7 +713,8 @@ export default function ChessBoard({
             {mark.text && <b>{mark.text}</b>}
           </span>
         ))}
-        <BoardEffect effect={effect} />
+        <BoardFx ink={ink} celebrate={captureEffects ? celebrate : null} />
+        <BoardEffect effect={effect} landMs={landMs} />
       </fieldset>
     </div>
   );

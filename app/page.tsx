@@ -31,7 +31,8 @@ import { useAccount } from '@/lib/use-account';
 import EffectSettings from '@/components/effect-settings';
 import { useEffectSettings } from '@/lib/use-effect-settings';
 import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
-import { GameAudio, soundDelay, soundPan } from '@/lib/game-audio';
+import type { MoveStyle } from '@/lib/motion';
+import { feedbackSounds, GameAudio, soundPan } from '@/lib/game-audio';
 import {
   updateFeedback,
   branchFeedback,
@@ -216,8 +217,13 @@ export default function Home() {
     audioRef.current ??= new GameAudio();
     audioRef.current.unlock();
   }
-  function playSound(kind: SoundKind, delay = 0, pan = 0) {
-    if (soundRef.current) audioRef.current?.play(kind, delay, pan);
+  function playSound(
+    kind: SoundKind,
+    delay = 0,
+    pan = 0,
+    style: MoveStyle = 'glide',
+  ) {
+    if (soundRef.current) audioRef.current?.play(kind, delay, pan, style);
   }
   function update(r: PublicRoom) {
     if (!alive.current) return;
@@ -226,10 +232,11 @@ export default function Home() {
     clockOffset.current = r.serverNow - Date.now();
     if (prev?.id === r.id && prev.version !== r.version) {
       const feedback = updateFeedback(prev, r);
-      const pan = soundPan(r.history.at(-1)?.to, flippedRef.current);
-      feedback.sounds.forEach((kind, index) =>
-        playSound(kind, soundDelay(feedback.sounds, index), pan),
-      );
+      feedbackSounds(
+        feedback.sounds,
+        r.history.at(-1),
+        flippedRef.current,
+      ).forEach((sound) => playSound(...sound));
       if (feedback.reset) setBoardEffect(null);
       if (feedback.effect && viewModeRef.current === 'live')
         setBoardEffect(feedback.effect);
@@ -412,10 +419,11 @@ export default function Home() {
           `analysis:${Date.now()}`,
         );
         setBoardEffect(feedback.effect);
-        const pan = soundPan(n, flipped);
-        feedback.sounds.forEach((kind, index) =>
-          playSound(kind, soundDelay(feedback.sounds, index), pan),
-        );
+        feedbackSounds(
+          feedback.sounds,
+          { before: board, from: selected, to: n },
+          flipped,
+        ).forEach((sound) => playSound(...sound));
       } else void action('move', { from: selected, to: n });
       setSelected(null);
     } else if (board[n]?.side === turn) {
@@ -967,6 +975,7 @@ export default function Home() {
               <EffectSettings settings={settings} onChange={changeSetting} />
               <ChessBoard
                 board={board}
+                onDeal={() => playSound('deal')}
                 selected={selected}
                 targets={settings.hints ? targets : []}
                 last={last}

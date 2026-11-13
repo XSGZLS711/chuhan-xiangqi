@@ -6,6 +6,7 @@ import {
   initialBoard,
   moveBoard,
   opposite,
+  pseudoLegal,
   type Board,
   type Kind,
   type Piece,
@@ -30,6 +31,19 @@ export function capturedBy(board: Board, side: Side): CaptureGroup[] {
     const group = missing.filter((piece) => piece.kind === kind);
     return group.length ? [{ piece: group[0], count: group.length }] : [];
   });
+}
+
+/** The general of `side` and the pieces giving it check, for drawing the lines of attack. */
+export function checkLines(
+  board: Board,
+  side: Side,
+): { king: number; from: number[] } | null {
+  const king = board.findIndex((p) => p?.side === side && p.kind === 'k');
+  if (king < 0) return null;
+  const from = board.flatMap((p, i) =>
+    p && p.side !== side && pseudoLegal(board, i, king) ? [i] : [],
+  );
+  return from.length ? { king, from } : null;
 }
 
 /** Identity of every piece on every square; equal boards compare equal across polls. */
@@ -95,6 +109,7 @@ export const LOW_CLOCK_MS = 30_000;
 
 export type SoundKind =
   | 'select'
+  | 'deal'
   | 'move'
   | 'capture'
   | 'undo'
@@ -143,13 +158,25 @@ function stamp(
   const { title, detail } = stampWords(locale, base);
   return { ...base, title, detail };
 }
-export const STAMP_TIMING = { delayMs: 250, enterMs: 150, fadeMs: 400 };
+export const STAMP_TIMING = {
+  delayMs: 250,
+  enterMs: 150,
+  fadeMs: 400,
+  /** The most a slow landing (a cannon's vault) holds the stamp back. */
+  lateMs: 220,
+};
+/** The stamp lands with the blow: its usual delay, or just before a later landing. */
+export const stampDelay = (landMs: number) =>
+  Math.min(
+    STAMP_TIMING.delayMs + STAMP_TIMING.lateMs,
+    Math.max(STAMP_TIMING.delayMs, landMs - 20),
+  );
 /** Visible lifetime, after the stamp's delayed entrance. */
 export const stampDuration = (kind: BoardEffect['kind']) =>
   kind === 'mate' || kind === 'result' ? 1600 : 1400;
 /** Includes the entrance delay, so cleanup cannot cut the fade short. */
 export const effectDuration = (kind: BoardEffect['kind']) =>
-  STAMP_TIMING.delayMs + stampDuration(kind);
+  STAMP_TIMING.delayMs + STAMP_TIMING.lateMs + stampDuration(kind);
 export function captureEffect(
   id: string,
   side: Side,

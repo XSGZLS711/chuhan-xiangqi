@@ -1,6 +1,7 @@
 import { useId, type CSSProperties } from 'react';
 import {
   STAMP_TIMING,
+  stampDelay,
   stampDuration,
   stampWords,
   type BoardEffect as Effect,
@@ -31,11 +32,19 @@ const SPARKS = [
 /** Our own ink stamp for captures, checks and results: a brushed ring drawn around
  * a gilded word that lands out of a zoom blur, with a ripple and spatter on impact.
  */
-export default function BoardEffect({ effect }: { effect: Effect | null }) {
+export default function BoardEffect({
+  effect,
+  landMs = 0,
+}: {
+  effect: Effect | null;
+  /** When the move that brought this stamp lands; the stamp waits for it. */
+  landMs?: number;
+}) {
   const { locale, t } = useLocale();
   const brush = `brush-${useId().replace(/[^a-z0-9]/gi, '')}`;
   if (!effect) return null;
-  const duration = stampDuration(effect.kind);
+  const duration = stampDuration(effect.kind),
+    delay = stampDelay(landMs);
   const words = stampWords(locale, effect);
   const title = words.word;
   const tactical = effect.kind === 'capture' || effect.kind === 'check';
@@ -44,10 +53,10 @@ export default function BoardEffect({ effect }: { effect: Effect | null }) {
       key={effect.id}
       className={`board-effect effect-${effect.kind} ${effect.side ?? ''}`}
       style={vars({
-        '--stamp-delay': `${STAMP_TIMING.delayMs}ms`,
+        '--stamp-delay': `${delay}ms`,
         '--stamp-enter': `${STAMP_TIMING.enterMs}ms`,
         '--stamp-fade': `${STAMP_TIMING.fadeMs}ms`,
-        '--stamp-fade-at': `${STAMP_TIMING.delayMs + duration - STAMP_TIMING.fadeMs}ms`,
+        '--stamp-fade-at': `${delay + duration - STAMP_TIMING.fadeMs}ms`,
         // Latin words are longer than one brushed character: the stylesheet sizes them by this.
         '--word-len': title.length,
       })}
@@ -58,6 +67,7 @@ export default function BoardEffect({ effect }: { effect: Effect | null }) {
       }
     >
       <div className="ink-stamp" aria-hidden="true">
+        {!tactical && <i className="ink-rays" />}
         <i className="ink-glow" />
         {effect.kind === 'mate' && (
           <svg className="ink-slash" viewBox="0 0 300 300">

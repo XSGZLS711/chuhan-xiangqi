@@ -1,5 +1,11 @@
 import assert from 'node:assert/strict';
-import { GameAudio, soundDelay, soundPan } from '../lib/game-audio';
+import {
+  feedbackSounds,
+  GameAudio,
+  soundDelay,
+  soundPan,
+} from '../lib/game-audio';
+import { initialBoard } from '../lib/xiangqi';
 import { pieceMotion } from '../lib/motion';
 
 type Source = {
@@ -168,6 +174,38 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 60));
   assert.deepEqual(buzzes, [10], '静音必须取消未到的震动');
   felt.close();
+  // Each way of travelling lands at its own time, and the sound waits for it.
+  for (const style of ['gallop', 'leap', 'charge'] as const)
+    near(
+      soundDelay(['capture'], 0, false, style),
+      pieceMotion(true, style).landMs / 1000,
+    );
+  const opening = initialBoard();
+  const vault = feedbackSounds(
+    ['capture', 'check'],
+    { before: opening, from: 70, to: 7 },
+    false,
+  );
+  assert.deepEqual(
+    vault.map(([kind, , pan, style]) => [kind, pan, style]),
+    [
+      ['capture', 0.338, 'leap'],
+      ['check', 0.338, 'leap'],
+    ],
+  );
+  assert(vault[1][1] > vault[0][1], '将军声在落地之后');
+  // A cannon's flight starts before its landing; nothing sounds before the move.
+  sources.length = 0;
+  const flight = new GameAudio();
+  flight.unlock();
+  flight.play('capture', vault[0][1], 0, 'leap');
+  assert(sources.every((source) => source.start >= 10));
+  assert(sources.some((source) => source.start < 10 + vault[0][1] - 0.1));
+  // The deal knocks once for each of the 32 pieces (synthesized: two voices each).
+  sources.length = 0;
+  flight.play('deal');
+  assert.equal(sources.length, 64);
+  flight.close();
   assert.equal(soundDelay(['undo'], 0, false), 0);
   assert.equal(soundDelay(['result'], 0, false), 0);
   console.log(
