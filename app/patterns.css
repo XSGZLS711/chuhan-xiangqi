@@ -1,0 +1,591 @@
+/* Classic patterns on the board (components/pattern-reveal.tsx). Everything runs on one
+   clock: --reveal-delay is when the pattern is named, --reveal-life how long it stays. The
+   figure lies under the pieces; an opening's name is written on the wood across the river. */
+.pattern-reveal {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+@keyframes reveal-fade {
+  0% {
+    opacity: 0;
+  }
+  8%,
+  80% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.pattern-figure {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: visible;
+  animation: reveal-fade var(--reveal-life) linear var(--reveal-delay) both;
+}
+
+/* The pieces that made it glow, one after another. */
+.pattern-halo {
+  position: absolute;
+  z-index: 1;
+  width: 10.7%;
+  height: 9.6%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    #ffe2a0d0 0 40%,
+    #ffcf6a40 58%,
+    transparent 72%
+  );
+  opacity: 0;
+  animation: halo-pulse var(--reveal-life) ease-out
+    calc(var(--reveal-delay) + var(--i) * 90ms) both;
+}
+.reveal-mate .pattern-halo {
+  background: radial-gradient(
+    circle,
+    #ff9a6ad0 0 40%,
+    #ff5a3640 58%,
+    transparent 72%
+  );
+}
+@keyframes halo-pulse {
+  0% {
+    opacity: 0;
+    scale: 0.5;
+  }
+  14% {
+    opacity: 1;
+    scale: 1.4;
+  }
+  34% {
+    scale: 1.15;
+  }
+  80% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0;
+    scale: 1.2;
+  }
+}
+
+/* Lines of force: a soft glow with a bright current running along it. */
+.force-glow {
+  stroke: #ffcf6a;
+  stroke-width: 30;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+.force-core {
+  stroke: #fff6dc;
+  stroke-width: 6;
+  stroke-linecap: round;
+  stroke-dasharray: 0.05 0.035;
+  animation:
+    force-draw 0.28s cubic-bezier(0.3, 0, 0.2, 1)
+      calc(var(--reveal-delay) + var(--i) * 110ms) backwards,
+    force-flow 0.9s linear infinite;
+}
+.reveal-mate .force-glow {
+  stroke: #ff5a36;
+}
+.reveal-mate .force-core {
+  stroke: #ffe9dc;
+}
+@keyframes force-draw {
+  from {
+    stroke-dasharray: 0 1;
+  }
+  to {
+    stroke-dasharray: 1 0;
+  }
+}
+@keyframes force-flow {
+  to {
+    stroke-dashoffset: -0.085;
+  }
+}
+
+/* 当头炮: cross-hairs swing onto the general and lock. */
+.aim {
+  fill: none;
+  stroke: #ffcf6a;
+  stroke-width: 6;
+  stroke-linecap: round;
+  animation: aim-lock 0.42s cubic-bezier(0.2, 0.8, 0.2, 1)
+    calc(var(--reveal-delay) + 40ms) both;
+}
+.aim .aim-outer {
+  stroke-width: 3;
+  stroke-dasharray: 38 22;
+}
+@keyframes aim-lock {
+  from {
+    opacity: 0;
+    transform: scale(2.4) rotate(-120deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.9) rotate(8deg);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* 闷杀: the palace closes in on the general like four walls, and its cross burns. */
+.palace-wall {
+  fill: #5a120a26;
+  stroke: #b3281a;
+  stroke-width: 9;
+  stroke-linejoin: round;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: walls-close 0.7s cubic-bezier(0.3, 1.3, 0.5, 1)
+    calc(var(--reveal-delay) + 150ms) both;
+}
+.palace-cross {
+  fill: none;
+  stroke: #e0482e;
+  stroke-width: 7;
+  stroke-linecap: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  animation: cross-burn 0.5s ease-out calc(var(--reveal-delay) + 600ms) forwards;
+}
+@keyframes walls-close {
+  from {
+    opacity: 0;
+    transform: scale(1.7);
+  }
+}
+@keyframes cross-burn {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* 铁门栓: an iron bolt slides across the palace on the general's rank and drops home. */
+.pattern-bolt {
+  position: absolute;
+  z-index: 1;
+  left: 30%;
+  width: 40%;
+  height: 2.6cqw;
+  translate: 0 -50%;
+  border-radius: 1.3cqw;
+  background: linear-gradient(#9aa0a8, #555a62 42%, #24272c 58%, #62676f);
+  box-shadow:
+    inset 0 0.25cqw 0 #ffffff66,
+    0 0.7cqw 1.4cqw #000a;
+  animation:
+    reveal-fade var(--reveal-life) linear var(--reveal-delay) both,
+    bolt-slide 0.7s cubic-bezier(0.3, 1.35, 0.5, 1)
+      calc(var(--reveal-delay) + 120ms) both,
+    bolt-clank 0.26s ease-out calc(var(--reveal-delay) + 680ms);
+}
+.pattern-bolt::before,
+.pattern-bolt::after {
+  /* The staples the bolt runs through. */
+  content: '';
+  position: absolute;
+  top: -0.7cqw;
+  bottom: -0.7cqw;
+  width: 2.2cqw;
+  border: 0.55cqw solid #1b1d21;
+  border-radius: 0.5cqw;
+  box-shadow: inset 0 0.2cqw 0 #ffffff33;
+}
+.pattern-bolt::before {
+  left: 18%;
+}
+.pattern-bolt::after {
+  right: 18%;
+}
+.pattern-bolt b {
+  position: absolute;
+  right: -1.3cqw;
+  top: 50%;
+  width: 3cqw;
+  height: 3cqw;
+  translate: 0 -50%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #d4d9e0, #50555c 70%);
+  box-shadow: 0 0.4cqw 0.8cqw #0008;
+}
+@keyframes bolt-slide {
+  from {
+    transform: translateX(-80%) scaleX(0.6);
+  }
+}
+@keyframes bolt-clank {
+  30% {
+    transform: translateY(0.5cqw);
+  }
+  60% {
+    transform: translateY(-0.25cqw);
+  }
+}
+
+/* 屏风马: a folding screen of lattice panels opens behind each horse. */
+.pattern-screen {
+  position: absolute;
+  z-index: 1;
+  width: 17%;
+  height: 15%;
+  translate: -50% -60%;
+  display: flex;
+  gap: 3%;
+  perspective: 30cqw;
+  animation: reveal-fade var(--reveal-life) linear var(--reveal-delay) both;
+}
+.pattern-screen b {
+  --fold: 18deg;
+  flex: 1;
+  border-radius: 0.5cqw;
+  border: 0.25cqw solid #7a4a1e;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent 0 0.9cqw,
+      #7a4a1e55 0.9cqw 1.1cqw
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent 0 0.9cqw,
+      #7a4a1e55 0.9cqw 1.1cqw
+    ),
+    linear-gradient(#fbf0d6f0, #ecd5a4f0);
+  box-shadow:
+    inset 0 0 0 0.35cqw #f9e7bf,
+    0 0.6cqw 1.2cqw #3a200a44;
+  transform: rotateY(var(--fold));
+  animation: screen-unfold 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.2)
+    calc(var(--reveal-delay) + var(--i) * 120ms) backwards;
+}
+.pattern-screen b:nth-child(2) {
+  --fold: -18deg;
+  animation-delay: calc(var(--reveal-delay) + var(--i) * 120ms + 60ms);
+}
+.pattern-screen b:nth-child(3) {
+  animation-delay: calc(var(--reveal-delay) + var(--i) * 120ms + 120ms);
+}
+@keyframes screen-unfold {
+  from {
+    opacity: 0;
+    transform: rotateY(90deg);
+  }
+}
+
+/* An opening, written on the board itself: the name is flicked across the river in ink,
+   left to right as a hand would write it, a small seal is pressed beside it, and the ink
+   soaks into the wood. Under a second; it covers no piece and asks nothing. */
+.pattern-ink {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  top: 50%;
+  width: 84%;
+  translate: -50% -50%;
+  display: grid;
+  grid-template-columns: auto auto;
+  justify-content: center;
+  align-items: center;
+  column-gap: 1.6cqw;
+  row-gap: 0.4cqw;
+  color: #22160d;
+  mix-blend-mode: multiply;
+}
+.ink-name,
+.ink-seal {
+  font-family: 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
+  font-weight: 400;
+}
+.ink-name {
+  font-size: 7.6cqw;
+  line-height: 1.05;
+  letter-spacing: 0.6cqw;
+  white-space: nowrap;
+  text-shadow: 0 0 0.05em #22160d66;
+  /* Written left to right: a soft-edged mask slides off the word. */
+  -webkit-mask: linear-gradient(90deg, #000 40%, transparent 60%) 100% 0 / 260%
+    100% no-repeat;
+  mask: linear-gradient(90deg, #000 40%, transparent 60%) 100% 0 / 260% 100%
+    no-repeat;
+  animation:
+    ink-write var(--write) cubic-bezier(0.5, 0, 0.3, 1) var(--reveal-delay) both,
+    ink-soak var(--soak) ease-in calc(var(--reveal-delay) + var(--soak-at))
+      forwards;
+}
+@keyframes ink-write {
+  from {
+    -webkit-mask-position: 100% 0;
+    mask-position: 100% 0;
+  }
+  to {
+    -webkit-mask-position: 0 0;
+    mask-position: 0 0;
+  }
+}
+/* Soaking away: the strokes spread a little, blur and pale into the grain. */
+@keyframes ink-soak {
+  to {
+    opacity: 0;
+    scale: 1.04;
+    filter: blur(0.35cqw);
+  }
+}
+.ink-seal {
+  writing-mode: vertical-rl;
+  padding: 0.5cqw 0.35cqw;
+  border-radius: 0.45cqw;
+  font-size: 2.3cqw;
+  line-height: 1.05;
+  color: #fff3e6;
+  background: #b0261a;
+  box-shadow:
+    inset 0 0 0 0.28cqw #b0261a,
+    inset 0 0 0 0.42cqw #ffd8c899;
+  mix-blend-mode: normal;
+  animation:
+    seal-press 0.36s cubic-bezier(0.3, 1.6, 0.5, 1)
+      calc(var(--reveal-delay) + var(--write) * 0.8) both,
+    ink-soak var(--soak) ease-in calc(var(--reveal-delay) + var(--soak-at))
+      forwards;
+}
+@keyframes seal-press {
+  from {
+    opacity: 0;
+    transform: scale(1.9) rotate(-14deg);
+  }
+}
+/* A named mate's stamp (components/board-effect.tsx): the name is the word, sized to fit
+   the ring, with 绝杀 pressed above it as a small seal at the moment of impact. */
+.effect-mate .ink-word {
+  font-size: min(22cqw, calc(46cqw / var(--word-len, 2)));
+}
+.ink-kicker {
+  position: relative;
+  z-index: 5;
+  padding: 0.5cqw 1.4cqw 0.7cqw;
+  border-radius: 0.6cqw;
+  font-family: 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
+  font-size: 5cqw;
+  line-height: 1;
+  letter-spacing: 0.6cqw;
+  color: #fff3e6;
+  background: #b0261a;
+  box-shadow:
+    inset 0 0 0 0.4cqw #b0261a,
+    inset 0 0 0 0.6cqw #ffd8c8aa,
+    0 0.6cqw 1.4cqw #5a0f0866;
+  rotate: -4deg;
+  animation: seal-press 0.42s cubic-bezier(0.3, 1.6, 0.5, 1)
+    calc(var(--impact) - 40ms) both;
+}
+html:not(:lang(zh)) .ink-kicker {
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 3.4cqw;
+  letter-spacing: 0.08em;
+}
+
+/* In the record, a move that made a classic carries its name as a seal on its corner. */
+.record-move-cell {
+  position: relative;
+}
+.record-seal {
+  position: absolute;
+  z-index: 1;
+  left: -3px;
+  top: -5px;
+  padding: 1px 3px 2px;
+  border-radius: 3px;
+  font-family: 'Chuhan Pieces', 'Kaiti SC', 'STKaiti', 'KaiTi', serif;
+  font-size: 10px;
+  line-height: 1;
+  white-space: nowrap;
+  color: #fff3e6;
+  background: var(--primary);
+  box-shadow:
+    inset 0 0 0 1px var(--primary),
+    inset 0 0 0 1.5px #ffd8c899;
+  rotate: -6deg;
+  pointer-events: none;
+  animation: seal-press 0.4s cubic-bezier(0.3, 1.6, 0.5, 1) 0.15s both;
+}
+/* Latin names are longer than three brushed characters: smaller, and cut short if need be
+   (the full name is its tooltip). */
+html:not(:lang(zh)) .record-seal {
+  max-width: calc(100% + 3px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* ---- Pressure: check and mate bear down on the board (components/board-effect.tsx). ---- */
+/* The world closes in: the edges of the board go dark as the stamp falls, and stay heavy
+   while it stands. */
+.stamp-pressure {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    ellipse 75% 70% at 50% 50%,
+    transparent 22%,
+    #1c0502a8 70%,
+    #0e0201e6 100%
+  );
+  opacity: 0;
+  animation: press-in 0.5s cubic-bezier(0.3, 0, 0.2, 1) var(--stamp-delay) both;
+}
+.effect-check .stamp-pressure {
+  --press: 0.72;
+}
+.effect-mate .stamp-pressure {
+  --press: 1;
+}
+@keyframes press-in {
+  to {
+    opacity: var(--press);
+  }
+}
+/* The blow itself: one red-white flash. */
+.stamp-flash {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    circle at 50% 50%,
+    #fff4e0e6 0,
+    #ff4a2a99 30%,
+    #9c180c33 60%,
+    transparent 80%
+  );
+  opacity: 0;
+  animation: blow-flash 0.38s ease-out var(--impact);
+}
+@keyframes blow-flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+/* Shock rings run out from the stamp past the edges of the board. */
+.stamp-shock {
+  position: absolute;
+  width: 34%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 1.1cqw solid #ff5a36;
+  box-shadow:
+    0 0 2.4cqw #ff3b1f,
+    inset 0 0 2.4cqw #ff3b1f;
+  opacity: 0;
+  animation: shock-out 0.75s cubic-bezier(0.1, 0.7, 0.3, 1) var(--impact);
+}
+.stamp-shock.late {
+  border-width: 0.5cqw;
+  animation-delay: calc(var(--impact) + 110ms);
+  animation-duration: 0.95s;
+}
+.effect-mate .stamp-shock {
+  border-color: #ffb36a;
+}
+@keyframes shock-out {
+  from {
+    opacity: 1;
+    scale: 0.4;
+  }
+  to {
+    opacity: 0;
+    scale: 4.2;
+  }
+}
+/* The word falls from high above and hits: it accelerates into the board instead of
+   easing onto it, and bounces once. */
+.effect-check .ink-word,
+.effect-mate .ink-word {
+  animation:
+    glyph-slam var(--stamp-enter) cubic-bezier(0.7, 0, 0.9, 0.5)
+      var(--stamp-delay) both,
+    glyph-settle 260ms cubic-bezier(0.3, 1.8, 0.5, 1) var(--impact) both;
+}
+@keyframes glyph-slam {
+  from {
+    opacity: 0;
+    scale: 3.4;
+    filter: blur(1.6cqw);
+  }
+  40% {
+    opacity: 1;
+  }
+  to {
+    opacity: 1;
+    scale: 0.95;
+    filter: blur(0);
+  }
+}
+
+/* The check's lightning cuts through a band of dark red, so it reads as a blade drawn across
+   the board rather than a spark, and its white core is heavier. */
+.check-bolt.umbra {
+  stroke: #3a0603b0;
+  stroke-width: 54;
+  opacity: 0;
+}
+.check-bolt.core {
+  stroke-width: 7;
+}
+.check-bolt.halo {
+  stroke-width: 28;
+}
+
+/* In check: the board's edges beat red, two beats and a rest, until the check is answered. */
+.check-heartbeat {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse 80% 75% at 50% 50%,
+    transparent 46%,
+    #c4281a73 80%,
+    #9c180cc7 100%
+  );
+  opacity: 0;
+  animation: heartbeat 1.5s ease-out calc(var(--land) + 1.2s) infinite;
+}
+@keyframes heartbeat {
+  0%,
+  42%,
+  100% {
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  18% {
+    opacity: 0.25;
+  }
+  26% {
+    opacity: 0.85;
+  }
+}
+
+/* The names are a show; anyone who asked for less motion gets the game without them. */
+@media (prefers-reduced-motion: reduce) {
+  .pattern-reveal {
+    display: none;
+  }
+}

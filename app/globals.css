@@ -2,7 +2,15 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @custom-variant dark (&:is(.dark *));
-.ai-entry { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; width: 100%; text-decoration: none; }
+.ai-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  width: 100%;
+  text-decoration: none;
+}
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -390,8 +398,7 @@ button:not(:disabled):active {
   position: relative;
   background:
     linear-gradient(135deg, #ffffff26 0%, transparent 38%, #00000030 100%),
-    var(--grain),
-    linear-gradient(125deg, #7b5537, #4e3525 58%, #7e583a);
+    var(--grain), linear-gradient(125deg, #7b5537, #4e3525 58%, #7e583a);
   background-blend-mode: soft-light, multiply, normal;
   border: 1px solid #3a2619;
   border-radius: 9px;
@@ -553,12 +560,53 @@ button:not(:disabled):active {
 .piece.black {
   color: var(--piece-black);
 }
+/* Where the lifted piece may go: a jade bead on an empty point, a vermilion ring around a
+   piece it can take. They open outwards from the piece, nearest first (--reach). */
 .move-dot,
 .capture-target {
-  width: 20%;
-  height: 20%;
   border-radius: 50%;
-  background: rgba(120, 180, 80, 0.55);
+  pointer-events: none;
+  animation: target-in 0.28s var(--ease-spring) calc(var(--reach, 1) * 26ms)
+    backwards;
+}
+.move-dot {
+  width: 22%;
+  height: 22%;
+  background: radial-gradient(
+    circle at 36% 30%,
+    #e6f5d6 0,
+    #86bd6a 42%,
+    #4d8a3c 100%
+  );
+  box-shadow:
+    0 1px 1.5px #2a451a66,
+    0 0 0 0.6cqw #7db86a2e;
+}
+.capture-target {
+  width: 92%;
+  height: 92%;
+  box-shadow:
+    0 0 0 0.45cqw #fffaf0e6,
+    0 0 0 0.9cqw #c8432fd9,
+    0 0 1.6cqw 0.5cqw #c8432f66;
+  animation:
+    target-in 0.28s var(--ease-spring) calc(var(--reach, 1) * 26ms) backwards,
+    target-breathe 1.3s ease-in-out calc(var(--reach, 1) * 26ms + 0.28s)
+      infinite alternate;
+}
+@keyframes target-in {
+  from {
+    opacity: 0;
+    scale: 0.2;
+  }
+}
+@keyframes target-breathe {
+  to {
+    box-shadow:
+      0 0 0 0.45cqw #fffaf0b3,
+      0 0 0 0.6cqw #c8432f99,
+      0 0 2.4cqw 0.9cqw #c8432f40;
+  }
 }
 .intersection.last-to::after,
 .intersection.last-from::after {
@@ -600,7 +648,20 @@ button:not(:disabled):active {
 .piece.checked {
   outline: 3px solid #d83a27;
   outline-offset: 3px;
-  animation: check-pulse 1.1s ease-in-out infinite;
+  animation:
+    check-shake 0.5s ease-in-out var(--land, 0ms),
+    check-pulse 1.1s ease-in-out infinite;
+}
+/* The general flinches as the check lands. */
+@keyframes check-shake {
+  15%,
+  55% {
+    translate: -4% 0;
+  }
+  35%,
+  75% {
+    translate: 4% 0;
+  }
 }
 @keyframes check-pulse {
   0%,
@@ -1994,8 +2055,101 @@ p {
     z-index: 7;
   }
 }
-.capture-ghost .piece {
-  animation: captured-piece 520ms var(--ease-out) var(--impact-delay) both;
+/* Until the blow the taken piece lies whole under the attacker... */
+.capture-ghost .ghost-whole {
+  grid-area: 1 / 1;
+  animation: ghost-vanish 1ms linear calc(var(--impact-delay) + 50ms) forwards;
+}
+@keyframes ghost-vanish {
+  to {
+    opacity: 0;
+  }
+}
+/* ...then the blade passes and it falls apart in two halves along the cut. Each half is
+   the piece clipped to one side of a line at --cut; the halves part across that line. */
+.ghost-half {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  rotate: var(--cut);
+  opacity: 0;
+  animation: half-part 700ms cubic-bezier(0.2, 0.7, 0.3, 1)
+    calc(var(--impact-delay) + 50ms) both;
+}
+.ghost-half.half-0 {
+  clip-path: inset(-20% -20% 50% -20%);
+  --part: -1;
+}
+.ghost-half.half-1 {
+  clip-path: inset(50% -20% -20% -20%);
+  --part: 1;
+}
+.ghost-half > .piece {
+  rotate: calc(var(--cut) * -1);
+  box-shadow:
+    var(--piece-rest),
+    0 0 0 0.3cqw #fff3c8;
+}
+@keyframes half-part {
+  0% {
+    opacity: 1;
+    transform: none;
+    filter: brightness(1.6);
+  }
+  12% {
+    filter: brightness(1);
+  }
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(calc(var(--part) * 42%))
+      rotate(calc(var(--part) * 16deg)) scale(0.9);
+    filter: blur(1.5px) brightness(0.85);
+  }
+}
+/* The blade: a streak of white-hot steel drawn across the piece at the moment of the blow. */
+.capture-slash {
+  position: absolute;
+  left: -55%;
+  right: -55%;
+  top: calc(50% - 0.6cqw);
+  height: 1.2cqw;
+  border-radius: 50%;
+  rotate: var(--cut);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #ffc978 18%,
+    #fff8e6 45%,
+    #ffffff 50%,
+    #fff8e6 55%,
+    #ffc978 82%,
+    transparent
+  );
+  box-shadow:
+    0 0 1.2cqw 0.3cqw #ffd88acc,
+    0 0 4cqw 1cqw #ff9a4a55;
+  opacity: 0;
+  z-index: 2;
+  animation: slash-sweep 340ms cubic-bezier(0.2, 0.8, 0.3, 1)
+    calc(var(--impact-delay) - 30ms) both;
+}
+@keyframes slash-sweep {
+  0% {
+    opacity: 1;
+    transform: translateX(-35%) scaleX(0.1);
+  }
+  40% {
+    opacity: 1;
+    transform: translateX(0) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(30%) scaleX(1.15) scaleY(0.3);
+  }
 }
 .capture-impact {
   position: absolute;
@@ -2011,43 +2165,16 @@ p {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 8%;
-  height: 26%;
-  margin: -13% 0 0 -4%;
-  border-radius: 3px;
-  background: linear-gradient(#fff3c8, #e0a24e);
-  box-shadow: 0 0 6px #ffd98a99;
+  width: 7%;
+  height: 22%;
+  margin: -11% 0 0 -3.5%;
+  border-radius: 40% 40% 2px 2px;
+  /* Splinters of the piece's own wood, lit on the side the blow came from. */
+  background: linear-gradient(90deg, #f7e2b4, #d9a663 55%, #9c6a33);
+  box-shadow: 0 0 5px #ffd98a88;
   transform-origin: 50% 50%;
   opacity: 0;
   animation: capture-shard 520ms var(--ease-out) var(--impact-delay) both;
-}
-@keyframes captured-piece {
-  0% {
-    opacity: 1;
-    scale: 1;
-    rotate: 0deg;
-    translate: 0 0;
-    filter: blur(0);
-  }
-  16% {
-    opacity: 1;
-    scale: 0.9;
-    rotate: -3deg;
-  }
-  42% {
-    opacity: 0.88;
-    scale: 1.18;
-    rotate: 7deg;
-    translate: 0 -4%;
-    filter: blur(0);
-  }
-  100% {
-    opacity: 0;
-    scale: 1.6;
-    rotate: 16deg;
-    translate: 0 -12%;
-    filter: blur(3px);
-  }
 }
 @keyframes capture-ring {
   0% {
@@ -2077,6 +2204,544 @@ p {
     opacity: 0;
     transform: rotate(var(--a)) translateY(-170%) scaleY(1);
   }
+}
+
+/* The wake of a travelling piece: a soft streak drawn behind it as it glides, which then
+   draws itself in after the piece and is gone by the time it settles. */
+.move-trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--board-ink) 60%, #fff3d0);
+  filter: blur(0.35cqw);
+}
+.move-trail stop {
+  stop-color: currentColor;
+}
+.move-trail path {
+  stroke-width: 34;
+  stroke-linecap: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: -1;
+  opacity: 0.55;
+  animation:
+    trail-draw var(--slide) var(--ease-slide),
+    trail-fade calc(var(--land) + 160ms) ease-in var(--slide);
+}
+@keyframes trail-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes trail-fade {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -1;
+    opacity: 0;
+  }
+}
+/* The knock travels through the board as a faint ring of light from under the piece. */
+.land-ripple {
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 0.35cqw #fff6dacc,
+    0 0 1.4cqw 0.3cqw #7a4a1a33;
+  opacity: 0;
+  animation: land-ripple 0.5s var(--ease-out)
+    calc(var(--hover) + var(--drop) - 10ms);
+}
+@keyframes land-ripple {
+  from {
+    opacity: 0.9;
+    scale: 0.9;
+  }
+  to {
+    opacity: 0;
+    scale: 1.55;
+  }
+}
+/* A lifted piece floats: it drifts up and down a little, and its shadow follows. */
+.piece-position.selected .piece:not(.checked) {
+  animation: piece-float 1.6s ease-in-out var(--selection-lift) infinite
+    alternate;
+}
+@keyframes piece-float {
+  to {
+    transform: translateY(-2.5%);
+    box-shadow:
+      inset 0 1.5px 1px #fffbe6,
+      inset 0 -3px 4px #9c6a3059,
+      0 calc(var(--pt) * 0.6) 0 #9a6c3a,
+      0 calc(var(--pt) * 0.6 + 1px) 0 #6f4622,
+      1.4cqw 2.8cqw 2.3cqw #3a200a4d;
+  }
+}
+/* A new game: the set is laid out rank by rank, each piece set down with a small knock. */
+.pieces-layer.dealing .piece-position:not(.moving) .piece {
+  animation: piece-deal 0.46s var(--deal, 0ms) backwards;
+}
+@keyframes piece-deal {
+  from {
+    opacity: 0;
+    translate: 0 -22%;
+    scale: 1.28;
+    box-shadow: var(--piece-lift);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
+  }
+  30% {
+    opacity: 1;
+  }
+  62% {
+    translate: 0 0;
+    scale: 1;
+    box-shadow: var(--piece-rest);
+    animation-timing-function: var(--ease-out);
+  }
+  78% {
+    scale: 0.96 0.94;
+  }
+  to {
+    scale: 1;
+  }
+}
+
+/* Each piece travels in its own way (lib/motion.ts). Off the straight glide, the position
+   jumps to the target at once and `translate` carries the piece over from where it was:
+   --fx/--fy is the start and --lx/--ly the horse's leg point, in files and ranks (one file
+   is 103.84% of a point's width, one rank 104.17% of its height). */
+.animate-pieces
+  .piece-position.moving:is(.travel-gallop, .travel-leap, .travel-charge) {
+  transition: none;
+}
+.piece-position.travel-charge {
+  animation: path-straight var(--slide) cubic-bezier(0.55, 0, 0.12, 1) both;
+}
+.piece-position.travel-leap {
+  z-index: 9;
+  animation: path-straight var(--slide) cubic-bezier(0.4, 0.05, 0.55, 1) both;
+}
+.piece-position.travel-gallop {
+  animation: path-gallop var(--slide) linear both;
+}
+@keyframes path-straight {
+  from {
+    translate: calc(var(--fx) * 103.84%) calc(var(--fy) * 104.17%);
+  }
+  to {
+    translate: 0 0;
+  }
+}
+@keyframes path-gallop {
+  from {
+    translate: calc(var(--fx) * 103.84%) calc(var(--fy) * 104.17%);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+  50% {
+    translate: calc(var(--lx) * 103.84%) calc(var(--ly) * 104.17%);
+    animation-timing-function: cubic-bezier(0.45, 0, 0.55, 1);
+  }
+  to {
+    translate: 0 0;
+  }
+}
+/* The flight is listed last so it wins over the set-down, which waits (--hover) until the
+   flight is over and starts from the same lifted pose the flight ends in. */
+.piece-position.moving.travel-gallop .piece {
+  animation:
+    piece-hop var(--drop) linear var(--hover) backwards,
+    piece-settle var(--settle) ease-out calc(var(--hover) + var(--drop)),
+    piece-gallop var(--slide) linear;
+}
+.piece-position.moving.travel-leap .piece {
+  animation:
+    piece-hop var(--drop) linear var(--hover) backwards,
+    piece-settle var(--settle) ease-out calc(var(--hover) + var(--drop)),
+    piece-leap var(--slide) linear;
+}
+.chess-board {
+  --piece-soar:
+    inset 0 1.5px 1px #fffbe6, inset 0 -3px 4px #9c6a3059,
+    0 calc(var(--pt) * 0.4) 0 #9a6c3a, 0 calc(var(--pt) * 0.4 + 1px) 0 #6f4622,
+    3.2cqw 6.5cqw 3.6cqw #3a200a33;
+}
+/* The horse touches down on its leg point between two bounds. */
+@keyframes piece-gallop {
+  0%,
+  100% {
+    translate: 0 -3%;
+    scale: 1.3;
+    box-shadow: var(--piece-lift);
+  }
+  0%,
+  50% {
+    animation-timing-function: cubic-bezier(0.2, 0.5, 0.5, 1);
+  }
+  25%,
+  75% {
+    translate: 0 -17%;
+    scale: 1.42;
+    box-shadow: var(--piece-soar);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.8, 0.5);
+  }
+  50% {
+    translate: 0 -1%;
+    scale: 1.16;
+    box-shadow: var(--piece-tip);
+  }
+}
+/* A capturing cannon vaults its screen: up into a high arc with one full turn, and down. */
+@keyframes piece-leap {
+  0% {
+    translate: 0 -3%;
+    scale: 1.3;
+    rotate: 0 0 1 0deg;
+    box-shadow: var(--piece-lift);
+    animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1);
+  }
+  50% {
+    translate: 0 -70%;
+    scale: 1.8;
+    box-shadow: var(--piece-soar);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.8, 0.4);
+  }
+  100% {
+    translate: 0 -3%;
+    scale: 1.3;
+    rotate: 0 0 1 360deg;
+    box-shadow: var(--piece-lift);
+  }
+}
+/* The screen ducks as the cannon passes over it, catching the light. */
+.piece-position.vaulted .piece {
+  animation: screen-duck 0.34s ease-out var(--vault) both;
+}
+@keyframes screen-duck {
+  35% {
+    scale: 0.88;
+    box-shadow:
+      var(--piece-rest),
+      0 0 0 0.5cqw #ffe6a3,
+      0 0 2.2cqw 0.6cqw #ffb84a99;
+  }
+}
+/* A heavy blow (a cannon's landing, a chariot taken) splits wider and throws more. */
+.capture-ghost.heavy .capture-impact {
+  border-width: 3px;
+  animation-duration: 720ms;
+}
+.capture-ghost.heavy .capture-shard {
+  height: 30%;
+}
+.trail-leap {
+  color: #ff9a3c;
+  filter: blur(0.25cqw) drop-shadow(0 0 1cqw #ffb45c);
+}
+.trail-leap path {
+  stroke-width: 16;
+  opacity: 0.7;
+}
+.trail-charge path {
+  stroke-width: 30;
+  opacity: 0.4;
+}
+.trail-charge path.trail-wind {
+  stroke: color-mix(in srgb, var(--board-ink) 40%, #fff6dc);
+  stroke-width: 3;
+  opacity: 0.55;
+  animation:
+    trail-draw calc(var(--slide) * 0.8) var(--ease-slide),
+    trail-fade calc(var(--land) + 60ms) ease-in calc(var(--slide) * 0.8);
+}
+
+/* Check: lightning cracks from the attacker to the general, flickers out, and leaves a
+   marching thread on the line of attack. The board's edge flushes red once. */
+.check-lines {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+.check-bolt {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  opacity: 0;
+  animation:
+    bolt-strike 150ms ease-out var(--land) forwards,
+    bolt-flicker 1s linear var(--land) forwards;
+}
+.check-bolt.halo {
+  stroke: #ff4a26;
+  stroke-width: 22;
+}
+.check-bolt.core {
+  stroke: #fff6e6;
+  stroke-width: 5;
+}
+@keyframes bolt-strike {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes bolt-flicker {
+  0%,
+  16%,
+  30%,
+  46% {
+    opacity: 1;
+  }
+  10%,
+  24% {
+    opacity: 0.25;
+  }
+  38% {
+    opacity: 0.5;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.check-thread {
+  stroke: #c8432f;
+  stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 0.018 0.022;
+  opacity: 0;
+  animation:
+    thread-in 0.5s ease-out calc(var(--land) + 700ms) forwards,
+    thread-march 1.4s linear infinite;
+}
+@keyframes thread-in {
+  to {
+    opacity: 0.65;
+  }
+}
+@keyframes thread-march {
+  to {
+    stroke-dashoffset: -0.08;
+  }
+}
+.check-vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 50%,
+    transparent 50%,
+    #c4281a40 82%,
+    #9c180c80 100%
+  );
+  opacity: 0;
+  animation: vignette-flush 1.4s ease-out var(--land) both;
+}
+.check-vignette.final {
+  animation-duration: 2.4s;
+}
+@keyframes vignette-flush {
+  18% {
+    opacity: 1;
+  }
+}
+
+/* Mate: the board falls into dusk around the pieces, and the beaten general topples. */
+.mate-dusk {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% 50%, transparent 26%, #2a140685 100%),
+    #5a3a1a24;
+  animation: dusk-fall 1.8s ease calc(var(--land) + 300ms) both;
+}
+@keyframes dusk-fall {
+  from {
+    opacity: 0;
+  }
+}
+.piece-position.fallen {
+  z-index: 3;
+  perspective: 22cqw;
+}
+.piece-position.fallen .piece.checked {
+  outline-color: #d83a2766;
+  animation: king-fall 1.3s cubic-bezier(0.5, 0, 0.3, 1)
+    calc(var(--land) + 450ms) both;
+}
+@keyframes king-fall {
+  0% {
+    translate: 0 0;
+    rotate: 1 0.3 0 0deg;
+  }
+  10% {
+    translate: -3% 0;
+  }
+  20% {
+    translate: 3% 0;
+  }
+  30% {
+    translate: -1.5% 0;
+    rotate: 1 0.3 0 0deg;
+    filter: none;
+  }
+  72% {
+    translate: 0 9%;
+    rotate: 1 0.3 0 66deg;
+    filter: brightness(0.8) saturate(0.6);
+  }
+  84% {
+    rotate: 1 0.3 0 56deg;
+  }
+  100% {
+    translate: 0 9%;
+    rotate: 1 0.3 0 62deg;
+    filter: brightness(0.76) saturate(0.55);
+  }
+}
+
+/* Light on the wood. The river between the camps runs with a slow shimmer, and the glow
+   of a lamp drifts across the board as if the room's air moved it. */
+.board-ambient {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.river-flow {
+  position: absolute;
+  left: 5.6%;
+  width: 88.8%;
+  top: 45.5%;
+  height: 9%;
+  overflow: hidden;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 12% 88%, transparent);
+  mask: linear-gradient(90deg, transparent, #000 12% 88%, transparent);
+  opacity: 0.7;
+}
+.river-flow::before,
+.river-flow::after {
+  content: '';
+  position: absolute;
+  inset: 0 -40cqw 0 0;
+  /* Glints on moving water: long, thin flecks of light, tiled and drifting downstream. */
+  background:
+    radial-gradient(ellipse 2.6cqw 0.32cqw at 22% 28%, #fff8e4c0, transparent),
+    radial-gradient(ellipse 3.6cqw 0.36cqw at 70% 66%, #fff8e4a0, transparent),
+    radial-gradient(ellipse 1.6cqw 0.26cqw at 46% 82%, #fff8e490, transparent);
+  background-size: 14cqw 100%;
+  animation: river-run 18s linear infinite;
+}
+.river-flow::after {
+  background:
+    radial-gradient(ellipse 3cqw 0.3cqw at 35% 50%, #fff4d6a0, transparent),
+    radial-gradient(ellipse 2cqw 0.24cqw at 80% 20%, #fff4d680, transparent);
+  background-size: 19cqw 100%;
+  animation-name: river-run-slow;
+  animation-duration: 33s;
+}
+@keyframes river-run {
+  to {
+    transform: translateX(-28cqw);
+  }
+}
+@keyframes river-run-slow {
+  to {
+    transform: translateX(-38cqw);
+  }
+}
+.lamp-sheen {
+  position: absolute;
+  left: -30%;
+  top: -30%;
+  width: 90%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff8e2 0, #fff1d000 62%);
+  opacity: 0.32;
+  mix-blend-mode: soft-light;
+  animation: lamp-drift 38s ease-in-out infinite alternate;
+}
+@keyframes lamp-drift {
+  50% {
+    transform: translate(45%, 40%);
+  }
+  to {
+    transform: translate(80%, 90%);
+  }
+}
+
+/* A lifted piece stands in a slowly turning ring of gold light. */
+.piece-position.selected::before {
+  content: '';
+  position: absolute;
+  inset: -12%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    #ffe2a0dd 12%,
+    transparent 30%,
+    #ffcf7a99 55%,
+    transparent 72%,
+    #fff1c8cc 88%,
+    transparent
+  );
+  -webkit-mask: radial-gradient(
+    circle,
+    transparent 62%,
+    #000 64% 69%,
+    transparent 72%
+  );
+  mask: radial-gradient(circle, transparent 62%, #000 64% 69%, transparent 72%);
+  filter: blur(0.15cqw) drop-shadow(0 0 0.6cqw #ffd27a);
+  animation:
+    aura-in 0.3s var(--ease-out) var(--selection-lift) both,
+    aura-turn 2.6s linear infinite;
+}
+@keyframes aura-in {
+  from {
+    opacity: 0;
+    scale: 0.7;
+  }
+}
+@keyframes aura-turn {
+  to {
+    rotate: 360deg;
+  }
+}
+
+/* Paint layers over the board: ink under the pieces, the end-of-game shower above them. */
+.board-ink,
+.board-shower {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.board-ink {
+  z-index: 1;
+}
+.board-shower {
+  z-index: 7;
 }
 
 /* Each tray belongs to the player immediately above it, even after flipping. */
@@ -2146,7 +2811,7 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  animation: capture-count 220ms ease-out;
+  animation: capture-count 0.42s var(--ease-spring);
 }
 .mini-piece {
   display: grid;
@@ -2171,14 +2836,15 @@ p {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
+/* A taken piece drops into its owner's tray. */
 @keyframes capture-count {
   from {
-    opacity: 0.3;
-    transform: translateY(3px);
+    opacity: 0;
+    transform: translateY(-7px) scale(0.5) rotate(-20deg);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -2236,6 +2902,38 @@ p {
   border-radius: 50%;
   background: radial-gradient(circle, var(--glow) 0, transparent 64%);
   animation: glow-bloom 900ms var(--ease-out) var(--stamp-delay) both;
+}
+/* The end of a game: rays of light turn slowly behind the stamp, like a sun breaking out. */
+.ink-rays {
+  inset: -60%;
+  border-radius: 50%;
+  background: repeating-conic-gradient(
+    from 0deg,
+    #ffd88a00 0deg,
+    #ffd88a8c 4deg,
+    #ffd88a00 9deg,
+    #ffd88a00 15deg
+  );
+  -webkit-mask: radial-gradient(circle, #000 12%, transparent 66%);
+  mask: radial-gradient(circle, #000 12%, transparent 66%);
+  animation:
+    rays-open 900ms var(--ease-out) var(--impact) both,
+    aura-turn 24s linear infinite;
+}
+.effect-mate .ink-rays {
+  background: repeating-conic-gradient(
+    from 0deg,
+    #ff8a4a00 0deg,
+    #ffb26a99 4deg,
+    #ff8a4a00 9deg,
+    #ff8a4a00 15deg
+  );
+}
+@keyframes rays-open {
+  from {
+    opacity: 0;
+    scale: 0.3;
+  }
 }
 .ink-ring,
 .ink-slash {
@@ -2327,7 +3025,8 @@ p {
   line-height: 1.1;
   font-weight: 400;
   white-space: nowrap;
-  animation: glyph-arrive var(--stamp-enter) cubic-bezier(0.3, 0, 0.2, 1)
+  animation:
+    glyph-arrive var(--stamp-enter) cubic-bezier(0.3, 0, 0.2, 1)
       var(--stamp-delay) both,
     glyph-settle 180ms var(--ease-out) var(--impact) both;
 }
@@ -2383,8 +3082,7 @@ p {
   background: #fff3d9ed;
   border-radius: 4px;
   padding: 0.2cqw 1.4cqw;
-  animation: glyph-echo-in 220ms var(--ease-out) calc(var(--impact) + 80ms)
-    both;
+  animation: glyph-echo-in 220ms var(--ease-out) calc(var(--impact) + 80ms) both;
 }
 @keyframes glyph-arrive {
   from {
@@ -2541,7 +3239,10 @@ p {
   }
 }
 @keyframes fade-rise {
-  from { opacity: 0; transform: translateY(0.9cqw); }
+  from {
+    opacity: 0;
+    transform: translateY(0.9cqw);
+  }
 }
 
 .mobile-game-actions,
@@ -3219,7 +3920,9 @@ html {
 }
 
 /* The board stays full size while the keyboard and chat overlay cover it. */
-@media (max-width: 660px), (max-height: 500px) and (pointer: coarse), (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
+@media (max-width: 660px),
+  (max-height: 500px) and (pointer: coarse),
+  (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
   html:has(.app-shell.in-room),
   body:has(.app-shell.in-room) {
     overflow: hidden;
@@ -3826,7 +4529,8 @@ html {
     margin-inline: 0;
     padding-inline: 12px 14px;
     border-color: color-mix(in srgb, var(--ring) 35%, var(--border));
-    background: linear-gradient(
+    background:
+      linear-gradient(
         90deg,
         color-mix(in srgb, var(--accent) 90%, transparent),
         transparent 75%
@@ -4324,7 +5028,9 @@ html {
   accent-color: var(--emphasis);
 }
 /* The phone's game menu carries these switches, so the board has no button on a phone. */
-@media (max-width: 660px), (max-height: 500px) and (pointer: coarse), (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
+@media (max-width: 660px),
+  (max-height: 500px) and (pointer: coarse),
+  (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
   .effect-settings {
     display: none;
   }
@@ -4455,7 +5161,9 @@ html {
 /* Free play from the lobby has no opponent and no room: drop the empty seats and
    the record, put the two ways out side by side, and give the board the rest of
    one screen, sized the same way as a room. */
-@media (max-width: 660px), (max-height: 500px) and (pointer: coarse), (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
+@media (max-width: 660px),
+  (max-height: 500px) and (pointer: coarse),
+  (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
   html:has(.app-shell.is-analysis:not(.in-room)),
   body:has(.app-shell.is-analysis:not(.in-room)) {
     overflow: hidden;

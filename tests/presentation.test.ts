@@ -1,15 +1,24 @@
 import assert from 'node:assert/strict';
 import './effect-settings.test';
-import { pieceMotion } from '../lib/motion';
+import './patterns.test';
+import {
+  cannonScreen,
+  dealDelay,
+  gallopLeg,
+  moveStyle,
+  pieceMotion,
+} from '../lib/motion';
 import {
   capturedBy,
   boardSignature,
   boardTransition,
   branchFeedback,
+  checkLines,
   effectDuration,
   updateFeedback,
   resultEffect,
   STAMP_TIMING,
+  stampDelay,
   stampDuration,
 } from '../lib/presentation';
 import {
@@ -67,6 +76,60 @@ test('吃子仅延长悬停，保持同样的平移与落地节奏', () => {
   assert.equal(capture.durationMs, capture.landMs + capture.settleMs);
 });
 
+test('每种棋子各有走法：马踏日、炮翻山、车冲锋，其余滑行', () => {
+  // 82 is red's left horse (row 9, file 1); 65 is two ranks up and one file across.
+  assert.equal(moveStyle(initial, 82, 65), 'gallop');
+  assert.equal(gallopLeg(82, 65), 73);
+  // Two ranks forward: the leg is the point ahead; two files across: the point beside.
+  assert.equal(gallopLeg(82, 63), 73);
+  assert.equal(gallopLeg(82, 75), 83);
+  // The red cannon on file 7 takes the black horse over the black cannon.
+  assert.equal(moveStyle(initial, 70, 7), 'leap');
+  assert.equal(cannonScreen(initial, 70, 7), 25);
+  // A cannon that only moves glides; so do short chariot moves.
+  assert.equal(moveStyle(initial, 70, 67), 'glide');
+  assert.equal(moveStyle(initial, 81, 72), 'glide');
+  assert.equal(moveStyle(moveBoard(initial, 54, 45), 81, 63), 'glide');
+  assert.equal(moveStyle(moveBoard(initial, 27, 36), 0, 27), 'charge');
+  assert.equal(moveStyle(initial, 58, 49), 'glide');
+  // Every flight lands after it ends and before the stamp's slowest wait.
+  for (const style of ['glide', 'charge', 'gallop', 'leap'] as const)
+    for (const capture of [false, true]) {
+      const timing = pieceMotion(capture, style);
+      assert.equal(timing.landMs, timing.hoverMs + timing.dropMs);
+      assert(timing.landMs >= timing.slideMs);
+      assert.equal(timing.durationMs, timing.landMs + timing.settleMs);
+    }
+  // Gallops and leaps finish their flight before the set-down begins.
+  assert.equal(
+    pieceMotion(false, 'gallop').hoverMs,
+    pieceMotion().slideMs + 140,
+  );
+  assert.equal(
+    pieceMotion(true, 'leap').hoverMs,
+    pieceMotion(true, 'leap').slideMs,
+  );
+});
+test('开局从河界向外摆子，两边次序相同', () => {
+  // Soldiers stand one rank from the river, so the middle soldier is set down first.
+  assert.equal(dealDelay(27 + 4), 55);
+  assert.equal(
+    Math.min(...initial.flatMap((p, n) => (p ? [dealDelay(n)] : []))),
+    55,
+  );
+  assert(dealDelay(54) > dealDelay(58));
+  assert(dealDelay(81) > dealDelay(54));
+  for (let n = 0; n < 90; n++) assert.equal(dealDelay(n), dealDelay(89 - n));
+});
+test('将军连线：找出所有将军的子', () => {
+  assert.equal(checkLines(initial, 'black'), null);
+  // The cannon takes the centre soldier with a black advisor as its screen.
+  let b = moveBoard(initial, 70, 67);
+  b = moveBoard(b, 3, 13);
+  b = moveBoard(b, 67, 31);
+  assert.deepEqual(checkLines(b, 'black'), { king: 4, from: [31] });
+  assert.equal(checkLines(b, 'red'), null);
+});
 test('开局双方吃子栏为空', () => {
   assert.deepEqual(capturedBy(initial, 'red'), []);
   assert.deepEqual(capturedBy(initial, 'black'), []);
@@ -196,8 +259,19 @@ test('印章在 250ms 出现，400ms 成形，保留完整淡出时间', () => {
   assert.equal(stampDuration('mate'), 1600);
   assert.equal(
     effectDuration('capture'),
-    STAMP_TIMING.delayMs + stampDuration('capture'),
+    STAMP_TIMING.delayMs + STAMP_TIMING.lateMs + stampDuration('capture'),
   );
+  // A stamp waits for the blow: never before 250ms, never before the slowest landing.
+  assert.equal(stampDelay(0), 250);
+  assert.equal(stampDelay(pieceMotion(true).landMs), 250);
+  const vault = pieceMotion(true, 'leap').landMs;
+  assert.equal(stampDelay(vault), vault - 20);
+  assert(stampDelay(vault) <= STAMP_TIMING.delayMs + STAMP_TIMING.lateMs);
+  for (const style of ['glide', 'charge', 'gallop', 'leap'] as const)
+    assert(
+      pieceMotion(true, style).landMs - 20 <=
+        STAMP_TIMING.delayMs + STAMP_TIMING.lateMs,
+    );
 });
 test('聊天与在线状态更新不重复播放音效', () => {
   const r = fresh();

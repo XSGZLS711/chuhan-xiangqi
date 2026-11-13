@@ -1,6 +1,7 @@
 import { useId, type CSSProperties } from 'react';
 import {
   STAMP_TIMING,
+  stampDelay,
   stampDuration,
   stampWords,
   type BoardEffect as Effect,
@@ -31,11 +32,19 @@ const SPARKS = [
 /** Our own ink stamp for captures, checks and results: a brushed ring drawn around
  * a gilded word that lands out of a zoom blur, with a ripple and spatter on impact.
  */
-export default function BoardEffect({ effect }: { effect: Effect | null }) {
+export default function BoardEffect({
+  effect,
+  landMs = 0,
+}: {
+  effect: Effect | null;
+  /** When the move that brought this stamp lands; the stamp waits for it. */
+  landMs?: number;
+}) {
   const { locale, t } = useLocale();
   const brush = `brush-${useId().replace(/[^a-z0-9]/gi, '')}`;
   if (!effect) return null;
-  const duration = stampDuration(effect.kind);
+  const duration = stampDuration(effect.kind),
+    delay = stampDelay(landMs);
   const words = stampWords(locale, effect);
   const title = words.word;
   const tactical = effect.kind === 'capture' || effect.kind === 'check';
@@ -44,20 +53,34 @@ export default function BoardEffect({ effect }: { effect: Effect | null }) {
       key={effect.id}
       className={`board-effect effect-${effect.kind} ${effect.side ?? ''}`}
       style={vars({
-        '--stamp-delay': `${STAMP_TIMING.delayMs}ms`,
+        '--stamp-delay': `${delay}ms`,
         '--stamp-enter': `${STAMP_TIMING.enterMs}ms`,
         '--stamp-fade': `${STAMP_TIMING.fadeMs}ms`,
-        '--stamp-fade-at': `${STAMP_TIMING.delayMs + duration - STAMP_TIMING.fadeMs}ms`,
+        '--stamp-fade-at': `${delay + duration - STAMP_TIMING.fadeMs}ms`,
         // Latin words are longer than one brushed character: the stylesheet sizes them by this.
         '--word-len': title.length,
       })}
       aria-live="polite"
       aria-label={
         (effect.analysis ? t('effect.analysis.prefix') : '') +
-        `${words.title} · ${words.detail}`
+        // A named mate reads as 绝杀, then its name, then who won.
+        (words.kicker
+          ? `${words.kicker} · ${words.word} · ${words.detail}`
+          : `${words.title} · ${words.detail}`)
       }
     >
+      {(effect.kind === 'check' || effect.kind === 'mate') && (
+        // Check and mate press on the whole board: it darkens from the edges, flashes red
+        // at the blow, and shock rings run out across it.
+        <>
+          <i className="stamp-pressure" aria-hidden="true" />
+          <i className="stamp-flash" aria-hidden="true" />
+          <i className="stamp-shock" aria-hidden="true" />
+          <i className="stamp-shock late" aria-hidden="true" />
+        </>
+      )}
       <div className="ink-stamp" aria-hidden="true">
+        {!tactical && <i className="ink-rays" />}
         <i className="ink-glow" />
         {effect.kind === 'mate' && (
           <svg className="ink-slash" viewBox="0 0 300 300">
@@ -145,8 +168,14 @@ export default function BoardEffect({ effect }: { effect: Effect | null }) {
               })}
             />
           ))}
-        {!tactical && effect.analysis && (
-          <span className="ink-stamp-context">{t('effect.context')}</span>
+        {words.kicker ? (
+          // A named mate: 绝杀 is pressed above the name as a small seal.
+          <span className="ink-kicker">{words.kicker}</span>
+        ) : (
+          !tactical &&
+          effect.analysis && (
+            <span className="ink-stamp-context">{t('effect.context')}</span>
+          )
         )}
         <span className="ink-word">
           <span className="ink-outline">{title}</span>

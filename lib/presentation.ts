@@ -13,6 +13,10 @@ import {
   type Side,
 } from './xiangqi';
 import type { PublicRoom } from './game';
+import { movePattern, type PatternId } from './patterns';
+
+/** Shared with the board and the patterns: kept here so existing imports keep working. */
+export { checkLines } from './patterns';
 
 const originalPieces = initialBoard().filter(
   (piece): piece is Piece => !!piece,
@@ -94,6 +98,9 @@ export type FeedbackRoom = Pick<
 export const LOW_CLOCK_MS = 30_000;
 
 export type SoundKind =
+  | 'select'
+  | 'deal'
+  | 'pattern'
   | 'move'
   | 'capture'
   | 'undo'
@@ -107,6 +114,8 @@ export type StampText = {
   detail: MessageKey;
   side?: Side;
   reason?: string;
+  /** A named mate (lib/patterns.ts): its name becomes the stamp's word, under 绝杀. */
+  pattern?: PatternId;
 };
 export type BoardEffect = {
   id: string;
@@ -121,12 +130,18 @@ export type BoardEffect = {
 export function stampWords(
   locale: Locale,
   effect: Pick<BoardEffect, 'text' | 'analysis'>,
-): { title: string; detail: string; word: string } {
+): { title: string; detail: string; word: string; kicker: string } {
   const { text } = effect;
   const title = t(locale, text.title);
   return {
     title,
-    word: text.title === 'stamp.check' ? t(locale, 'stamp.check.word') : title,
+    word: text.pattern
+      ? t(locale, `pattern.${text.pattern}` as MessageKey)
+      : text.title === 'stamp.check'
+        ? t(locale, 'stamp.check.word')
+        : title,
+    // A named mate keeps 绝杀 as a small seal above its name.
+    kicker: text.pattern ? title : '',
     detail:
       (effect.analysis ? t(locale, 'stamp.exploring') : '') +
       t(locale, text.detail, {
@@ -142,13 +157,25 @@ function stamp(
   const { title, detail } = stampWords(locale, base);
   return { ...base, title, detail };
 }
-export const STAMP_TIMING = { delayMs: 250, enterMs: 150, fadeMs: 400 };
+export const STAMP_TIMING = {
+  delayMs: 250,
+  enterMs: 150,
+  fadeMs: 400,
+  /** The most a slow landing (a cannon's vault) holds the stamp back. */
+  lateMs: 220,
+};
+/** The stamp lands with the blow: its usual delay, or just before a later landing. */
+export const stampDelay = (landMs: number) =>
+  Math.min(
+    STAMP_TIMING.delayMs + STAMP_TIMING.lateMs,
+    Math.max(STAMP_TIMING.delayMs, landMs - 20),
+  );
 /** Visible lifetime, after the stamp's delayed entrance. */
 export const stampDuration = (kind: BoardEffect['kind']) =>
   kind === 'mate' || kind === 'result' ? 1600 : 1400;
 /** Includes the entrance delay, so cleanup cannot cut the fade short. */
 export const effectDuration = (kind: BoardEffect['kind']) =>
-  STAMP_TIMING.delayMs + stampDuration(kind);
+  STAMP_TIMING.delayMs + STAMP_TIMING.lateMs + stampDuration(kind);
 export function captureEffect(
   id: string,
   side: Side,
@@ -184,6 +211,7 @@ export function resultEffect(
   id: string,
   analysis = false,
   locale: Locale = 'zh',
+  pattern?: PatternId,
 ): BoardEffect {
   const mate = result.reason === REASON.mate;
   // Name how the game ended, not who won: both players and spectators see this stamp.
@@ -199,10 +227,18 @@ export function resultEffect(
           result.winner === 'draw' ? 'result.reasonOnly' : 'result.withReason',
         side: result.winner === 'draw' ? undefined : result.winner,
         reason: result.reason,
+        ...(mate && pattern ? { pattern } : {}),
       },
     },
     locale,
   );
+}
+/** The classic mate the last move gave, if it was one the board knows by name. */
+function mateName(
+  move: { before: Board; from: number; to: number } | undefined,
+): PatternId | undefined {
+  const hit = move && movePattern(move.before, move.from, move.to);
+  return hit?.kind === 'mate' ? hit.id : undefined;
 }
 
 export function updateFeedback<T extends FeedbackRoom>(
@@ -247,6 +283,9 @@ export function updateFeedback<T extends FeedbackRoom>(
     effect = resultEffect(
       next.result,
       `${next.id}:${next.round}:${next.version}`,
+      false,
+      'zh',
+      moved ? mateName(next.history[next.history.length - 1]) : undefined,
     );
     sounds.push(effect.kind === 'mate' ? 'mate' : 'result');
   }
@@ -272,6 +311,8 @@ export function branchFeedback(
       },
       id,
       true,
+      'zh',
+      mateName({ before: board, from, to }),
     );
     sounds.push(effect.kind === 'mate' ? 'mate' : 'result');
     return { sounds, effect };

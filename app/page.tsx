@@ -1,5 +1,6 @@
 'use client';
 import './lobby.css';
+import './classics.css';
 import { useEffect, useRef, useState } from 'react';
 import { apiError, invitationUrl, type ApiError } from '@/lib/client-api';
 import {
@@ -21,6 +22,7 @@ import ChatLog from '@/components/chat-log';
 import GameSheet from '@/components/game-sheet';
 import MobileDock from '@/components/mobile-dock';
 import GameLobby from '@/components/game-lobby';
+import Classics from '@/components/classics';
 import { canPlayLive, rematchControl, recentChat } from '@/lib/mobile-game';
 import { useGameViewport } from '@/lib/use-game-viewport';
 import { useAutoArchive } from '@/lib/use-auto-archive';
@@ -31,7 +33,8 @@ import { useAccount } from '@/lib/use-account';
 import EffectSettings from '@/components/effect-settings';
 import { useEffectSettings } from '@/lib/use-effect-settings';
 import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
-import { GameAudio, soundDelay } from '@/lib/game-audio';
+import type { MoveStyle } from '@/lib/motion';
+import { feedbackSounds, GameAudio, soundPan } from '@/lib/game-audio';
 import {
   updateFeedback,
   branchFeedback,
@@ -158,7 +161,8 @@ export default function Home() {
     [analysis, setAnalysis] = useState<Analysis | null>(null),
     [chat, setChat] = useState(''),
     [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null),
-    [sheet, setSheet] = useState<'record' | null>(null);
+    [sheet, setSheet] = useState<'record' | null>(null),
+    [classics, setClassics] = useState(false);
   const archiveFailed = useAutoArchive(
     room,
     room ? `friend:${room.id}:${room.round}` : null,
@@ -174,6 +178,7 @@ export default function Home() {
     soundRef = useRef(sound),
     audioRef = useRef<GameAudio | null>(null),
     viewModeRef = useRef<'live' | 'review' | 'analysis'>('live'),
+    flippedRef = useRef(flipped),
     locked = useRef(false),
     orientationRoom = useRef(''),
     syncRef = useRef<RoomSync | null>(null),
@@ -185,6 +190,9 @@ export default function Home() {
     soundRef.current = sound;
     if (!sound) audioRef.current?.silence();
   }, [sound]);
+  useEffect(() => {
+    flippedRef.current = flipped;
+  }, [flipped]);
   useEffect(() => {
     viewModeRef.current = analysis
       ? 'analysis'
@@ -212,8 +220,13 @@ export default function Home() {
     audioRef.current ??= new GameAudio();
     audioRef.current.unlock();
   }
-  function playSound(kind: SoundKind, delay = 0) {
-    if (soundRef.current) audioRef.current?.play(kind, delay);
+  function playSound(
+    kind: SoundKind,
+    delay = 0,
+    pan = 0,
+    style: MoveStyle = 'glide',
+  ) {
+    if (soundRef.current) audioRef.current?.play(kind, delay, pan, style);
   }
   function update(r: PublicRoom) {
     if (!alive.current) return;
@@ -222,9 +235,11 @@ export default function Home() {
     clockOffset.current = r.serverNow - Date.now();
     if (prev?.id === r.id && prev.version !== r.version) {
       const feedback = updateFeedback(prev, r);
-      feedback.sounds.forEach((kind, index) =>
-        playSound(kind, soundDelay(feedback.sounds, index)),
-      );
+      feedbackSounds(
+        feedback.sounds,
+        r.history.at(-1),
+        flippedRef.current,
+      ).forEach((sound) => playSound(...sound));
       if (feedback.reset) setBoardEffect(null);
       if (feedback.effect && viewModeRef.current === 'live')
         setBoardEffect(feedback.effect);
@@ -407,12 +422,15 @@ export default function Home() {
           `analysis:${Date.now()}`,
         );
         setBoardEffect(feedback.effect);
-        feedback.sounds.forEach((kind, index) =>
-          playSound(kind, soundDelay(feedback.sounds, index)),
-        );
+        feedbackSounds(
+          feedback.sounds,
+          { before: board, from: selected, to: n },
+          flipped,
+        ).forEach((sound) => playSound(...sound));
       } else void action('move', { from: selected, to: n });
       setSelected(null);
     } else if (board[n]?.side === turn) {
+      if (n !== selected) playSound('select', 0, soundPan(n, flipped));
       setSelected(n === selected ? null : n);
       setMessage(null);
     } else if (selected !== null) setMessage(note('play.illegal'));
@@ -936,12 +954,16 @@ export default function Home() {
           </button>
         </div>
       )}
+      {lobby && classics && (
+        <Classics onClose={() => setClassics(false)} playSound={playSound} />
+      )}
       {lobby ? (
         <GameLobby
           signedIn={!!account.user}
           friendDisabled={busy}
           onCreate={() => setModal('create')}
           onExplore={startAnalysis}
+          onClassics={() => setClassics(true)}
         />
       ) : (
         <div className="workspace">
@@ -960,6 +982,8 @@ export default function Home() {
               <EffectSettings settings={settings} onChange={changeSetting} />
               <ChessBoard
                 board={board}
+                onDeal={() => playSound('deal')}
+                onPattern={(_, delay) => playSound('pattern', delay / 1000)}
                 selected={selected}
                 targets={settings.hints ? targets : []}
                 last={last}
