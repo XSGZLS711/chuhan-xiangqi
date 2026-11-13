@@ -24,6 +24,7 @@ import {
   checkLines,
   STAMP_TIMING,
   stampDelay,
+  stampDuration,
   type BoardEffect as Effect,
 } from '@/lib/presentation';
 import BoardEffect from '@/components/board-effect';
@@ -31,6 +32,8 @@ import BoardFx, {
   type Celebration,
   type InkSplash,
 } from '@/components/board-fx';
+import PatternReveal, { REVEAL_MS } from '@/components/pattern-reveal';
+import { movePattern, type PatternHit } from '@/lib/patterns';
 import {
   cannonScreen,
   dealDelay,
@@ -62,6 +65,8 @@ type Frame = {
   } | null;
   /** A fresh set laid out on the opening position: the pieces are dealt onto the board. */
   deal: boolean;
+  /** A classic opening or mate the last move completed, named on the board after `delay`. */
+  pattern: { hit: PatternHit; key: string; delay: number } | null;
   /** Restored by an undo; fades back in once the mover has left its square. */
   revived: string | null;
   ghost: {
@@ -154,6 +159,7 @@ export default function ChessBoard({
   arrows = [],
   marks = [],
   onDeal,
+  onPattern,
 }: {
   board: Board;
   flipped?: boolean;
@@ -170,6 +176,8 @@ export default function ChessBoard({
   marks?: BoardMark[];
   /** Called when a new set is dealt onto the board, to sound the pieces landing. */
   onDeal?: () => void;
+  /** Called when a move completes a classic pattern, with the delay before it is named. */
+  onPattern?: (hit: PatternHit, delayMs: number) => void;
 }) {
   const signature = boardSignature(board);
   const { locale, t } = useLocale();
@@ -183,6 +191,7 @@ export default function ChessBoard({
     context: animationContext,
     flipped,
     deal: animate && signature === OPENING,
+    pattern: null,
     move: null,
     revived: null,
     ghost: null,
@@ -204,6 +213,11 @@ export default function ChessBoard({
       : 'glide';
     const timing = pieceMotion(!!transition?.captured, style);
     const delay = timing.landMs;
+    // Undoing a move plays it backwards; that names nothing.
+    const named =
+      transition && !transition.revived
+        ? movePattern(frame.board, transition.from, transition.to)
+        : null;
     setFrame({
       sig: signature,
       board,
@@ -211,6 +225,18 @@ export default function ChessBoard({
       flipped,
       // Only a newly laid-out board is dealt; undoing back to the opening is not.
       deal: animate && fresh && signature === OPENING,
+      // An opening is named as the piece lands; a mate once its stamp has faded.
+      pattern:
+        named && transition
+          ? {
+              hit: named,
+              key: `${transition.piece.id}:${transition.from}:${transition.to}`,
+              delay:
+                named.kind === 'opening'
+                  ? delay + 120
+                  : stampDelay(delay) + stampDuration('mate') - 150,
+            }
+          : null,
       move: transition
         ? {
             id: transition.piece.id,
@@ -273,6 +299,22 @@ export default function ChessBoard({
     );
     return () => clearTimeout(timer);
   }, [ghost]);
+  const pattern = frame.pattern;
+  const announcePattern = useEffectEvent((hit: PatternHit, delay: number) => {
+    if (captureEffects) onPattern?.(hit, delay);
+  });
+  useEffect(() => {
+    if (!pattern) return;
+    announcePattern(pattern.hit, pattern.delay);
+    const timer = setTimeout(
+      () =>
+        setFrame((current) =>
+          current.pattern === pattern ? { ...current, pattern: null } : current,
+        ),
+      pattern.delay + REVEAL_MS[pattern.hit.kind],
+    );
+    return () => clearTimeout(timer);
+  }, [pattern]);
   const deal = frame.deal;
   const announceDeal = useEffectEvent(() => onDeal?.());
   useEffect(() => {
@@ -497,7 +539,7 @@ export default function ChessBoard({
         )}
         {frame.move && (
           <svg
-            key={frame.move.key}
+            key={`trail:${frame.move.key}`}
             className={`move-trail trail-${frame.move.style}`}
             viewBox="0 0 900 1000"
             preserveAspectRatio="none"
@@ -638,7 +680,7 @@ export default function ChessBoard({
             // The taken piece waits under the attacker; at the blow a blade crosses it, it
             // falls apart in two halves along the cut, and splinters of wood fly.
             <div
-              key={ghost.key}
+              key={`ghost:${ghost.key}`}
               className={`capture-ghost piece-position ${ghost.heavy ? 'heavy' : ''}`}
               style={{
                 ...position(ghost.at),
@@ -713,6 +755,14 @@ export default function ChessBoard({
             {mark.text && <b>{mark.text}</b>}
           </span>
         ))}
+        {pattern && captureEffects && (
+          <PatternReveal
+            key={`pattern:${pattern.key}`}
+            hit={pattern.hit}
+            delay={pattern.delay}
+            flipped={flipped}
+          />
+        )}
         <BoardFx ink={ink} celebrate={captureEffects ? celebrate : null} />
         <BoardEffect effect={effect} landMs={landMs} />
       </fieldset>

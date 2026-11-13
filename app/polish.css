@@ -1,0 +1,62 @@
+/* Finish shared by every page. */
+
+/* A drop of ink at the point of a press (lib/ink-touch.ts). */
+.ink-touch {
+  position: fixed;
+  z-index: 2147483000;
+  width: 14px;
+  height: 14px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--primary) 38%, transparent) 0 35%,
+    color-mix(in srgb, var(--primary) 14%, transparent) 60%,
+    transparent 72%
+  );
+  animation: ink-touch 0.6s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+@keyframes ink-touch {
+  from {
+    opacity: 0.95;
+    scale: 0.6;
+  }
+  to {
+    opacity: 0;
+    scale: 7;
+  }
+}
+
+/* Whose turn it is: a ring of gold light turns slowly around their seal. */
+.active-player .avatar::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  pointer-events: none;
+  background: conic-gradient(
+    from 0deg,
+    transparent,
+    color-mix(in srgb, var(--ring) 85%, #ffd27a) 18%,
+    transparent 36%,
+    transparent 50%,
+    color-mix(in srgb, var(--ring) 60%, #ffd27a) 68%,
+    transparent 86%
+  );
+  -webkit-mask: radial-gradient(
+    circle,
+    transparent 66%,
+    #000 68% 74%,
+    transparent 77%
+  );
+  mask: radial-gradient(circle, transparent 66%, #000 68% 74%, transparent 77%);
+  animation: aura-turn 3.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ink-touch,
+  .active-player .avatar::after {
+    display: none;
+  }
+}

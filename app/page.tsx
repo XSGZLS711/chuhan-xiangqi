@@ -1,5 +1,6 @@
 'use client';
 import './lobby.css';
+import './classics.css';
 import { useEffect, useRef, useState } from 'react';
 import { apiError, invitationUrl, type ApiError } from '@/lib/client-api';
 import {
@@ -21,6 +22,7 @@ import ChatLog from '@/components/chat-log';
 import GameSheet from '@/components/game-sheet';
 import MobileDock from '@/components/mobile-dock';
 import GameLobby from '@/components/game-lobby';
+import Classics from '@/components/classics';
 import { canPlayLive, rematchControl, recentChat } from '@/lib/mobile-game';
 import { useGameViewport } from '@/lib/use-game-viewport';
 import { useAutoArchive } from '@/lib/use-auto-archive';
@@ -159,7 +161,8 @@ export default function Home() {
     [analysis, setAnalysis] = useState<Analysis | null>(null),
     [chat, setChat] = useState(''),
     [boardEffect, setBoardEffect] = useState<BoardEffect | null>(null),
-    [sheet, setSheet] = useState<'record' | null>(null);
+    [sheet, setSheet] = useState<'record' | null>(null),
+    [classics, setClassics] = useState(false);
   const archiveFailed = useAutoArchive(
     room,
     room ? `friend:${room.id}:${room.round}` : null,
@@ -951,12 +954,16 @@ export default function Home() {
           </button>
         </div>
       )}
+      {lobby && classics && (
+        <Classics onClose={() => setClassics(false)} playSound={playSound} />
+      )}
       {lobby ? (
         <GameLobby
           signedIn={!!account.user}
           friendDisabled={busy}
           onCreate={() => setModal('create')}
           onExplore={startAnalysis}
+          onClassics={() => setClassics(true)}
         />
       ) : (
         <div className="workspace">
@@ -976,6 +983,12 @@ export default function Home() {
               <ChessBoard
                 board={board}
                 onDeal={() => playSound('deal')}
+                onPattern={(hit, delay) =>
+                  playSound(
+                    hit.kind === 'mate' ? 'pattern-mate' : 'pattern',
+                    delay / 1000,
+                  )
+                }
                 selected={selected}
                 targets={settings.hints ? targets : []}
                 last={last}

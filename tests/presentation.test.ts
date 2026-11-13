@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import './effect-settings.test';
+import './patterns.test';
 import {
   cannonScreen,
   dealDelay,

@@ -634,6 +634,59 @@ const messages: Record<MessageKey, string> = {
     'Nước này không trực tiếp mất quân, nhưng máy thấy thế cờ chuyển từ {from} sang {to}. Khác biệt chủ yếu nằm ở vị trí quân và thế cờ lâu dài.',
   'explain.prefers':
     'Máy thích {move} hơn. Đánh giá sau đó: {score}; biến chính: {line}.',
+  // Classic moves: the openings and mates the board names, and their gallery
+  'classics.title': 'Nước cờ kinh điển',
+  'classics.openings': 'Khai cuộc',
+  'classics.mates': 'Đòn sát',
+  'classics.replay': 'Xem lại',
+  'classics.board': 'Minh họa nước cờ kinh điển',
+  'pattern.central-cannon': 'Pháo đầu',
+  'pattern.central-cannon.gloss':
+    'Pháo vào lộ giữa, nhắm thẳng vào tướng. Khai cuộc phổ biến nhất.',
+  'pattern.corner-cannon': 'Sĩ giác pháo',
+  'pattern.corner-cannon.gloss':
+    'Pháo sang góc sĩ cùng bên: chắc chắn mà vẫn sẵn sàng.',
+  'pattern.cross-cannon': 'Quá cung pháo',
+  'pattern.cross-cannon.gloss':
+    'Pháo đi ngang trước cung, sang góc sĩ phía bên kia.',
+  'pattern.pawn-opening': 'Tiên nhân chỉ lộ',
+  'pattern.pawn-opening.gloss':
+    'Tốt lộ ba hoặc lộ bảy tiến trước, dò ý đối phương.',
+  'pattern.elephant-opening': 'Phi tượng cục',
+  'pattern.elephant-opening.gloss':
+    'Tượng bay vào giữa trước: giữ chắc trung lộ, lấy tĩnh chế động.',
+  'pattern.horse-opening': 'Khởi mã cục',
+  'pattern.horse-opening.gloss': 'Nhảy mã trước, ra quân linh hoạt.',
+  'pattern.same-cannons': 'Thuận pháo',
+  'pattern.same-cannons.gloss':
+    'Đáp pháo đầu bằng pháo cùng cánh: đối đầu trực diện.',
+  'pattern.opposite-cannons': 'Nghịch pháo',
+  'pattern.opposite-cannons.gloss':
+    'Đáp pháo đầu bằng pháo cánh kia: hai bên cùng công.',
+  'pattern.screen-horses': 'Bình phong mã',
+  'pattern.screen-horses.gloss':
+    'Hai mã đứng như tấm bình phong che cung: cách đáp kinh điển trước pháo đầu.',
+  'pattern.iron-bolt': 'Thiết môn xuyên',
+  'pattern.iron-bolt.gloss':
+    'Pháo giữ lộ giữa, xe chiếu ở lộ sườn: cửa đã cài then.',
+  'pattern.smothered': 'Muộn sát',
+  'pattern.smothered.gloss':
+    'Tướng bị chính sĩ và mã của mình chặn lối, một phát pháo là hết.',
+  'pattern.double-cannon': 'Trùng pháo',
+  'pattern.double-cannon.gloss':
+    'Hai pháo cùng một đường: pháo sau lấy pháo trước làm ngòi.',
+  'pattern.horse-cannon': 'Mã hậu pháo',
+  'pattern.horse-cannon.gloss':
+    'Mã khóa hai bên tướng, pháo đứng sau lấy mã làm ngòi.',
+  'pattern.double-chariot': 'Song xa thác',
+  'pattern.double-chariot.gloss':
+    'Một xe khóa đường, xe kia chiếu ở đường bên cạnh.',
+  'pattern.crouching-horse': 'Ngọa tào mã',
+  'pattern.crouching-horse.gloss':
+    'Mã chiếu từ ô tào cạnh cung, xe chặn đường thoát.',
+  'pattern.corner-horse': 'Quải giác mã',
+  'pattern.corner-horse.gloss':
+    'Mã chiếu từ góc sĩ; hai sĩ của chính tướng vây tướng lại.',
 };
 
 export const vi: LocaleBundle = {

@@ -57,11 +57,14 @@ const HAPTICS: Partial<Record<SoundKind, number | number[]>> = {
   check: [12, 70, 12],
   mate: [28, 60, 70],
   result: 20,
+  'pattern-mate': [12, 50, 30],
 };
 /** How much of each sound reaches the room: a knock stays close, the end rings out. */
 const ROOM: Record<SoundKind, number> = {
   select: 0.05,
   deal: 0.1,
+  pattern: 0.38,
+  'pattern-mate': 0.5,
   move: 0.12,
   capture: 0.2,
   undo: 0.18,
@@ -445,9 +448,44 @@ export class GameAudio {
       if (style === 'gallop' && this.knock && leg >= 0)
         recorded(leg, 0.45, 1.2);
     };
+    // A temple bell: partials that do not sit on one harmonic series, the high ones dying
+    // first, so it rings rather than sings.
+    const bell = (frequency: number, at: number, volume: number, ring = 2.6) =>
+      [
+        [1, 1],
+        [2.01, 0.55],
+        [2.76, 0.42],
+        [4.07, 0.22],
+        [5.43, 0.14],
+      ].forEach(([ratio, level], i) =>
+        tone(
+          frequency * ratio,
+          ring / (1 + i * 0.7),
+          volume * level,
+          at,
+          frequency * ratio * 0.998,
+          0.05,
+        ),
+      );
+    // A loaded brush dragged across paper.
+    const swish = (at: number, length: number, volume: number) =>
+      noise(1100, 5200, length, volume, at, true);
     // Levels follow recordings of a wooden set: about half the energy in the
     // body below 300 Hz, a third in the 3–8 kHz click, the rest in the wood.
     switch (kind) {
+      case 'pattern':
+        // An opening named: the brush stroke, a bright bell, a high string.
+        swish(0, 0.32, 0.14);
+        bell(523.25, 0.24, 0.03);
+        pluck(1046.5, 0.42, 0.02, 1.4);
+        break;
+      case 'pattern-mate':
+        // A mate named: a drum, the scroll unrolling, then a deep bell under a high one.
+        taiko(0, 0.6);
+        noise(600, 300, 0.8, 0.08, 0.2, false, 0.6);
+        bell(130.81, 0.9, 0.06, 3.4);
+        bell(392, 1.25, 0.022, 2.2);
+        break;
       case 'select':
         // The fingertip lifts a piece: felt brushing wood, a faint high tick.
         noise(5200, 4600, 0.035, 0.26, 0, false, 0.018);

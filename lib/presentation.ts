@@ -110,6 +110,8 @@ export const LOW_CLOCK_MS = 30_000;
 export type SoundKind =
   | 'select'
   | 'deal'
+  | 'pattern'
+  | 'pattern-mate'
   | 'move'
   | 'capture'
   | 'undo'

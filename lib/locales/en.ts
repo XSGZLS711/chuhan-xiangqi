@@ -638,6 +638,60 @@ const messages: Record<MessageKey, string> = {
     'This move does not lose material directly, but the engine sees the position going from {from} to {to}. The difference lies mostly in piece placement and the longer-term outlook.',
   'explain.prefers':
     'The engine prefers {move}. Evaluation afterwards: {score}; main line: {line}.',
+  // Classic moves: the openings and mates the board names, and their gallery
+  'classics.title': 'Classic moves',
+  'classics.openings': 'Openings',
+  'classics.mates': 'Mates',
+  'classics.replay': 'Watch again',
+  'classics.board': 'Classic move demonstration',
+  'pattern.central-cannon': 'Central Cannon',
+  'pattern.central-cannon.gloss':
+    'The cannon takes the central file and aims straight at the general. The most common opening.',
+  'pattern.corner-cannon': 'Palace Corner Cannon',
+  'pattern.corner-cannon.gloss':
+    'The cannon steps to the advisor’s corner on its own side: quiet, and ready.',
+  'pattern.cross-cannon': 'Cross-Palace Cannon',
+  'pattern.cross-cannon.gloss':
+    'The cannon crosses in front of the palace to the far advisor’s corner.',
+  'pattern.pawn-opening': 'Immortal Points the Way',
+  'pattern.pawn-opening.gloss':
+    'A soldier on the third or seventh file steps out first, testing the reply.',
+  'pattern.elephant-opening': 'Elephant Opening',
+  'pattern.elephant-opening.gloss':
+    'An elephant flies to the centre first: a solid, waiting game.',
+  'pattern.horse-opening': 'Horse Opening',
+  'pattern.horse-opening.gloss':
+    'A horse jumps out first, keeping every plan open.',
+  'pattern.same-cannons': 'Same-Side Cannons',
+  'pattern.same-cannons.gloss':
+    'Central cannon answered from the same flank: point against point.',
+  'pattern.opposite-cannons': 'Opposite-Side Cannons',
+  'pattern.opposite-cannons.gloss':
+    'Central cannon answered from the other flank: sharp play on both sides.',
+  'pattern.screen-horses': 'Screen Horses',
+  'pattern.screen-horses.gloss':
+    'Two horses stand like a folding screen before the palace: the classic answer to the central cannon.',
+  'pattern.iron-bolt': 'Iron Bolt',
+  'pattern.iron-bolt.gloss':
+    'A cannon holds the central file and a chariot checks down the flank: the door is bolted.',
+  'pattern.smothered': 'Smothered Mate',
+  'pattern.smothered.gloss':
+    'The general is walled in by its own advisors and horse; one cannon shot ends it.',
+  'pattern.double-cannon': 'Double Cannon',
+  'pattern.double-cannon.gloss':
+    'Two cannons on one line: the rear one fires through the front one.',
+  'pattern.horse-cannon': 'Cannon Behind Horse',
+  'pattern.horse-cannon.gloss':
+    'The horse guards the general’s sides; the cannon behind it uses it as a screen.',
+  'pattern.double-chariot': 'Alternating Chariots',
+  'pattern.double-chariot.gloss':
+    'One chariot seals a line, the other checks on the next.',
+  'pattern.crouching-horse': 'Crouching Horse',
+  'pattern.crouching-horse.gloss':
+    'The horse checks from the trough beside the palace while a chariot seals the way out.',
+  'pattern.corner-horse': 'Corner Horse',
+  'pattern.corner-horse.gloss':
+    'The horse checks from the advisor’s corner; the general’s own advisors hem it in.',
 };
 
 export const en: LocaleBundle = {

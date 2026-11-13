@@ -286,7 +286,7 @@
 .lobby-mode > svg {
   flex-shrink: 0;
 }
-.lobby-explore {
+:is(.lobby-explore, .lobby-classics) {
   justify-self: center;
   display: flex;
   align-items: center;
@@ -298,11 +298,11 @@
   color: var(--muted-foreground);
   font-size: 13px;
 }
-.lobby-explore {
+:is(.lobby-explore, .lobby-classics) {
   border-radius: 20px;
   padding-inline: 14px;
 }
-.lobby-explore:hover {
+:is(.lobby-explore, .lobby-classics):hover {
   color: var(--primary);
   background: color-mix(in srgb, var(--accent) 70%, transparent);
 }
@@ -500,7 +500,7 @@
     width: 36px;
     height: 36px;
   }
-  .lobby-explore {
+  :is(.lobby-explore, .lobby-classics) {
     min-height: 32px;
   }
 }
@@ -529,7 +529,7 @@
     width: 50px;
     height: 50px;
   }
-  .lobby-explore {
+  :is(.lobby-explore, .lobby-classics) {
     font-size: 15px;
   }
 }
@@ -629,4 +629,192 @@
 }
 .site-links a:hover {
   color: var(--primary);
+}
+
+/* ---- The lobby, alive. Same composition; light, depth and ink on top. ---- */
+.lobby-extras {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 2px 8px;
+}
+/* The art leans towards the pointer (set in components/game-lobby.tsx), its layers at
+   different depths. --lean is 0 at rest, so the axis only needs to be non-zero. */
+.lobby-welcome {
+  perspective: 900px;
+}
+.lobby-art {
+  rotate: calc(var(--py, 0) * -1 + 0.0001) var(--px, 0) 0 var(--lean, 0deg);
+  transform-style: preserve-3d;
+  transition: rotate 0.8s var(--ease-out);
+}
+.lobby-grid,
+.lobby-river {
+  translate: calc(var(--px, 0) * -5px) calc(var(--py, 0) * -4px);
+  transition: translate 0.8s var(--ease-out);
+}
+.lobby-piece {
+  --depth: 1;
+  translate: calc(var(--px, 0) * var(--depth) * 10px)
+    calc(var(--py, 0) * var(--depth) * 8px);
+  transition:
+    translate 0.8s var(--ease-out),
+    scale 0.35s var(--ease-spring);
+  /* Each piece is set down on the board as the lobby opens, like the deal of a game. */
+  animation:
+    lobby-piece-drop 0.75s cubic-bezier(0.3, 1.45, 0.5, 1) var(--drop-at, 0.3s)
+      backwards,
+    piece-float 6s ease-in-out var(--float-at, 0s) infinite;
+}
+.lobby-piece-back {
+  --depth: 0.6;
+  --drop-at: 0.38s;
+  --float-at: -1.2s;
+}
+.lobby-piece-black {
+  --depth: 1.1;
+  --drop-at: 0.5s;
+  --float-at: -3.4s;
+}
+.lobby-piece-red {
+  --depth: 1.6;
+  --drop-at: 0.62s;
+  --float-at: -2.2s;
+}
+.lobby-piece:hover {
+  scale: 1.07;
+}
+@keyframes lobby-piece-drop {
+  from {
+    opacity: 0;
+    scale: 1.7;
+    filter: blur(3px);
+  }
+  55% {
+    opacity: 1;
+    scale: 0.94;
+    filter: none;
+  }
+}
+/* Light passes over the little board now and then, as over a polished table. */
+.lobby-grid {
+  overflow: hidden;
+}
+.lobby-grid::after {
+  content: '';
+  position: absolute;
+  inset: -20% -60%;
+  background: linear-gradient(
+    100deg,
+    transparent 40%,
+    #fff8e866 50%,
+    transparent 60%
+  );
+  transform: translateX(-60%);
+  animation: lobby-sheen 7s ease-in-out 1.6s infinite;
+}
+@keyframes lobby-sheen {
+  0%,
+  70% {
+    transform: translateX(-60%);
+  }
+  100% {
+    transform: translateX(60%);
+  }
+}
+/* The question is inked in a character at a time. */
+.lobby-intro h1 span {
+  animation: title-ink 0.9s ease-out calc(0.45s + var(--i) * 55ms) backwards;
+}
+@keyframes title-ink {
+  from {
+    color: transparent;
+    text-shadow: 0 0 0.45em
+      color-mix(in srgb, var(--foreground) 55%, transparent);
+  }
+}
+/* The seal is pressed on as the page opens. */
+.is-lobby .brand-seal {
+  animation: seal-press 0.8s cubic-bezier(0.3, 1.5, 0.45, 1) 0.1s backwards;
+}
+@keyframes seal-press {
+  from {
+    opacity: 0;
+    scale: 1.9;
+    rotate: -14deg;
+    filter: blur(2px);
+  }
+  55% {
+    opacity: 1;
+    scale: 0.92;
+    rotate: 2deg;
+    filter: none;
+  }
+}
+/* The two ways to play carry a soft light where the pointer is. */
+.lobby-mode > * {
+  position: relative;
+  z-index: 1;
+}
+.lobby-mode::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    260px circle at var(--mx, 50%) var(--my, 50%),
+    #ffffff33,
+    transparent 65%
+  );
+  opacity: 0;
+  transition: opacity 0.35s;
+}
+.lobby-mode-ai::before {
+  background: radial-gradient(
+    260px circle at var(--mx, 50%) var(--my, 50%),
+    color-mix(in srgb, var(--primary) 14%, transparent),
+    transparent 65%
+  );
+}
+.lobby-mode:not(:disabled):hover::before {
+  opacity: 1;
+}
+/* Behind it all, warm clouds of light drift very slowly across the paper. */
+.game-lobby::before {
+  content: '';
+  position: fixed;
+  inset: -10%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      36% 30% at 18% 32%,
+      color-mix(in srgb, var(--board-start) 24%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      30% 26% at 82% 72%,
+      color-mix(in srgb, var(--primary) 8%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      26% 22% at 70% 18%,
+      color-mix(in srgb, var(--board-center) 20%, transparent),
+      transparent 70%
+    );
+  animation: clouds-drift 46s ease-in-out infinite alternate;
+}
+@keyframes clouds-drift {
+  to {
+    transform: translate(4%, -3%) rotate(2deg) scale(1.05);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lobby-art,
+  .lobby-piece,
+  .lobby-grid,
+  .lobby-river {
+    rotate: none;
+    translate: none;
+  }
 }
