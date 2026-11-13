@@ -73,7 +73,7 @@ import { useAccount } from '@/lib/use-account';
 import EffectSettings, { EffectMenuItems } from '@/components/effect-settings';
 import { useEffectSettings } from '@/lib/use-effect-settings';
 import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
-import { GameAudio, soundDelay } from '@/lib/game-audio';
+import { GameAudio, soundDelay, soundPan } from '@/lib/game-audio';
 import {
   branchFeedback,
   effectDuration,
@@ -243,8 +243,8 @@ export default function AiGame() {
     audioRef.current ??= new GameAudio();
     audioRef.current.unlock();
   }
-  function playSound(kind: SoundKind, delay = 0) {
-    if (soundRef.current) audioRef.current?.play(kind, delay);
+  function playSound(kind: SoundKind, delay = 0, pan = 0) {
+    if (soundRef.current) audioRef.current?.play(kind, delay, pan);
   }
   function changeSetting(key: SettingKey, value: boolean) {
     setSetting(key, value);
@@ -292,8 +292,9 @@ export default function AiGame() {
     feedbackRef.current = current;
     if (!previous) return;
     const feedback = updateFeedback(previous, current);
+    const pan = soundPan(next.history.at(-1)?.to, match.human === 'black');
     feedback.sounds.forEach((kind, order) =>
-      playSound(kind, soundDelay(feedback.sounds, order)),
+      playSound(kind, soundDelay(feedback.sounds, order), pan),
     );
     if (feedback.reset) setBoardEffect(null);
     if (feedback.effect && viewRef.current.live)
@@ -508,12 +509,17 @@ export default function AiGame() {
           `branch:${branch.moves.length}:${Date.now()}`,
         );
         setBoardEffect(feedback.effect);
+        const pan = soundPan(n, match.human === 'black');
         feedback.sounds.forEach((kind, index) =>
-          playSound(kind, soundDelay(feedback.sounds, index)),
+          playSound(kind, soundDelay(feedback.sounds, index), pan),
         );
       } else setMatch((current) => playAiMove(current, selected, n));
       setSelected(null);
-    } else if (board[n]?.side === turn) setSelected(n === selected ? null : n);
+    } else if (board[n]?.side === turn) {
+      if (n !== selected)
+        playSound('select', 0, soundPan(n, match.human === 'black'));
+      setSelected(n === selected ? null : n);
+    }
   }
   const redShare =
     info?.mate !== undefined
@@ -841,7 +847,8 @@ export default function AiGame() {
                   ? 'ai-branch'
                   : review !== null
                     ? 'ai-review'
-                    : `ai-live-${room.round}`
+                    : // The set is laid out when the game starts, not behind the setup dialog.
+                      `ai-live-${room.round}${started ? '' : '-setup'}`
               }
             />
           </div>

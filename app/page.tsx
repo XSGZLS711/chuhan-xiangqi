@@ -31,7 +31,7 @@ import { useAccount } from '@/lib/use-account';
 import EffectSettings from '@/components/effect-settings';
 import { useEffectSettings } from '@/lib/use-effect-settings';
 import { visibleEffect, type SettingKey } from '@/lib/effect-settings';
-import { GameAudio, soundDelay } from '@/lib/game-audio';
+import { GameAudio, soundDelay, soundPan } from '@/lib/game-audio';
 import {
   updateFeedback,
   branchFeedback,
@@ -174,6 +174,7 @@ export default function Home() {
     soundRef = useRef(sound),
     audioRef = useRef<GameAudio | null>(null),
     viewModeRef = useRef<'live' | 'review' | 'analysis'>('live'),
+    flippedRef = useRef(flipped),
     locked = useRef(false),
     orientationRoom = useRef(''),
     syncRef = useRef<RoomSync | null>(null),
@@ -185,6 +186,9 @@ export default function Home() {
     soundRef.current = sound;
     if (!sound) audioRef.current?.silence();
   }, [sound]);
+  useEffect(() => {
+    flippedRef.current = flipped;
+  }, [flipped]);
   useEffect(() => {
     viewModeRef.current = analysis
       ? 'analysis'
@@ -212,8 +216,8 @@ export default function Home() {
     audioRef.current ??= new GameAudio();
     audioRef.current.unlock();
   }
-  function playSound(kind: SoundKind, delay = 0) {
-    if (soundRef.current) audioRef.current?.play(kind, delay);
+  function playSound(kind: SoundKind, delay = 0, pan = 0) {
+    if (soundRef.current) audioRef.current?.play(kind, delay, pan);
   }
   function update(r: PublicRoom) {
     if (!alive.current) return;
@@ -222,8 +226,9 @@ export default function Home() {
     clockOffset.current = r.serverNow - Date.now();
     if (prev?.id === r.id && prev.version !== r.version) {
       const feedback = updateFeedback(prev, r);
+      const pan = soundPan(r.history.at(-1)?.to, flippedRef.current);
       feedback.sounds.forEach((kind, index) =>
-        playSound(kind, soundDelay(feedback.sounds, index)),
+        playSound(kind, soundDelay(feedback.sounds, index), pan),
       );
       if (feedback.reset) setBoardEffect(null);
       if (feedback.effect && viewModeRef.current === 'live')
@@ -407,12 +412,14 @@ export default function Home() {
           `analysis:${Date.now()}`,
         );
         setBoardEffect(feedback.effect);
+        const pan = soundPan(n, flipped);
         feedback.sounds.forEach((kind, index) =>
-          playSound(kind, soundDelay(feedback.sounds, index)),
+          playSound(kind, soundDelay(feedback.sounds, index), pan),
         );
       } else void action('move', { from: selected, to: n });
       setSelected(null);
     } else if (board[n]?.side === turn) {
+      if (n !== selected) playSound('select', 0, soundPan(n, flipped));
       setSelected(n === selected ? null : n);
       setMessage(null);
     } else if (selected !== null) setMessage(note('play.illegal'));

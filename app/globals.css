@@ -2,7 +2,15 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @custom-variant dark (&:is(.dark *));
-.ai-entry { display: flex; align-items: center; justify-content: center; gap: 8px; margin-top: 10px; width: 100%; text-decoration: none; }
+.ai-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 10px;
+  width: 100%;
+  text-decoration: none;
+}
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -390,8 +398,7 @@ button:not(:disabled):active {
   position: relative;
   background:
     linear-gradient(135deg, #ffffff26 0%, transparent 38%, #00000030 100%),
-    var(--grain),
-    linear-gradient(125deg, #7b5537, #4e3525 58%, #7e583a);
+    var(--grain), linear-gradient(125deg, #7b5537, #4e3525 58%, #7e583a);
   background-blend-mode: soft-light, multiply, normal;
   border: 1px solid #3a2619;
   border-radius: 9px;
@@ -553,12 +560,53 @@ button:not(:disabled):active {
 .piece.black {
   color: var(--piece-black);
 }
+/* Where the lifted piece may go: a jade bead on an empty point, a vermilion ring around a
+   piece it can take. They open outwards from the piece, nearest first (--reach). */
 .move-dot,
 .capture-target {
-  width: 20%;
-  height: 20%;
   border-radius: 50%;
-  background: rgba(120, 180, 80, 0.55);
+  pointer-events: none;
+  animation: target-in 0.28s var(--ease-spring) calc(var(--reach, 1) * 26ms)
+    backwards;
+}
+.move-dot {
+  width: 22%;
+  height: 22%;
+  background: radial-gradient(
+    circle at 36% 30%,
+    #e6f5d6 0,
+    #86bd6a 42%,
+    #4d8a3c 100%
+  );
+  box-shadow:
+    0 1px 1.5px #2a451a66,
+    0 0 0 0.6cqw #7db86a2e;
+}
+.capture-target {
+  width: 92%;
+  height: 92%;
+  box-shadow:
+    0 0 0 0.45cqw #fffaf0e6,
+    0 0 0 0.9cqw #c8432fd9,
+    0 0 1.6cqw 0.5cqw #c8432f66;
+  animation:
+    target-in 0.28s var(--ease-spring) calc(var(--reach, 1) * 26ms) backwards,
+    target-breathe 1.3s ease-in-out calc(var(--reach, 1) * 26ms + 0.28s)
+      infinite alternate;
+}
+@keyframes target-in {
+  from {
+    opacity: 0;
+    scale: 0.2;
+  }
+}
+@keyframes target-breathe {
+  to {
+    box-shadow:
+      0 0 0 0.45cqw #fffaf0b3,
+      0 0 0 0.6cqw #c8432f99,
+      0 0 2.4cqw 0.9cqw #c8432f40;
+  }
 }
 .intersection.last-to::after,
 .intersection.last-from::after {
@@ -2079,6 +2127,116 @@ p {
   }
 }
 
+/* The wake of a travelling piece: a soft streak drawn behind it as it glides, which then
+   draws itself in after the piece and is gone by the time it settles. */
+.move-trail {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+  color: color-mix(in srgb, var(--board-ink) 60%, #fff3d0);
+  filter: blur(0.35cqw);
+}
+.move-trail stop {
+  stop-color: currentColor;
+}
+.move-trail line {
+  stroke-width: 34;
+  stroke-linecap: round;
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: -1;
+  opacity: 0.55;
+  animation:
+    trail-draw var(--slide) var(--ease-slide),
+    trail-fade calc(var(--land) + 160ms) ease-in var(--slide);
+}
+@keyframes trail-draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes trail-fade {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -1;
+    opacity: 0;
+  }
+}
+/* The knock travels through the board as a faint ring of light from under the piece. */
+.land-ripple {
+  position: absolute;
+  inset: 4%;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow:
+    0 0 0 0.35cqw #fff6dacc,
+    0 0 1.4cqw 0.3cqw #7a4a1a33;
+  opacity: 0;
+  animation: land-ripple 0.5s var(--ease-out)
+    calc(var(--hover) + var(--drop) - 10ms);
+}
+@keyframes land-ripple {
+  from {
+    opacity: 0.9;
+    scale: 0.9;
+  }
+  to {
+    opacity: 0;
+    scale: 1.55;
+  }
+}
+/* A lifted piece floats: it drifts up and down a little, and its shadow follows. */
+.piece-position.selected .piece:not(.checked) {
+  animation: piece-float 1.6s ease-in-out var(--selection-lift) infinite
+    alternate;
+}
+@keyframes piece-float {
+  to {
+    transform: translateY(-2.5%);
+    box-shadow:
+      inset 0 1.5px 1px #fffbe6,
+      inset 0 -3px 4px #9c6a3059,
+      0 calc(var(--pt) * 0.6) 0 #9a6c3a,
+      0 calc(var(--pt) * 0.6 + 1px) 0 #6f4622,
+      1.4cqw 2.8cqw 2.3cqw #3a200a4d;
+  }
+}
+/* A new game: the set is laid out rank by rank, each piece set down with a small knock. */
+.pieces-layer.dealing .piece-position:not(.moving) .piece {
+  animation: piece-deal 0.46s var(--deal, 0ms) backwards;
+}
+@keyframes piece-deal {
+  from {
+    opacity: 0;
+    translate: 0 -22%;
+    scale: 1.28;
+    box-shadow: var(--piece-lift);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.75, 0.4);
+  }
+  30% {
+    opacity: 1;
+  }
+  62% {
+    translate: 0 0;
+    scale: 1;
+    box-shadow: var(--piece-rest);
+    animation-timing-function: var(--ease-out);
+  }
+  78% {
+    scale: 0.96 0.94;
+  }
+  to {
+    scale: 1;
+  }
+}
+
 /* Each tray belongs to the player immediately above it, even after flipping. */
 .player-seat {
   padding: 5px 0 8px;
@@ -2146,7 +2304,7 @@ p {
   display: inline-flex;
   align-items: center;
   gap: 2px;
-  animation: capture-count 220ms ease-out;
+  animation: capture-count 0.42s var(--ease-spring);
 }
 .mini-piece {
   display: grid;
@@ -2171,14 +2329,15 @@ p {
   font-size: 10px;
   font-variant-numeric: tabular-nums;
 }
+/* A taken piece drops into its owner's tray. */
 @keyframes capture-count {
   from {
-    opacity: 0.3;
-    transform: translateY(3px);
+    opacity: 0;
+    transform: translateY(-7px) scale(0.5) rotate(-20deg);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    transform: none;
   }
 }
 
@@ -2327,7 +2486,8 @@ p {
   line-height: 1.1;
   font-weight: 400;
   white-space: nowrap;
-  animation: glyph-arrive var(--stamp-enter) cubic-bezier(0.3, 0, 0.2, 1)
+  animation:
+    glyph-arrive var(--stamp-enter) cubic-bezier(0.3, 0, 0.2, 1)
       var(--stamp-delay) both,
     glyph-settle 180ms var(--ease-out) var(--impact) both;
 }
@@ -2383,8 +2543,7 @@ p {
   background: #fff3d9ed;
   border-radius: 4px;
   padding: 0.2cqw 1.4cqw;
-  animation: glyph-echo-in 220ms var(--ease-out) calc(var(--impact) + 80ms)
-    both;
+  animation: glyph-echo-in 220ms var(--ease-out) calc(var(--impact) + 80ms) both;
 }
 @keyframes glyph-arrive {
   from {
@@ -2541,7 +2700,10 @@ p {
   }
 }
 @keyframes fade-rise {
-  from { opacity: 0; transform: translateY(0.9cqw); }
+  from {
+    opacity: 0;
+    transform: translateY(0.9cqw);
+  }
 }
 
 .mobile-game-actions,
@@ -3219,7 +3381,9 @@ html {
 }
 
 /* The board stays full size while the keyboard and chat overlay cover it. */
-@media (max-width: 660px), (max-height: 500px) and (pointer: coarse), (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
+@media (max-width: 660px),
+  (max-height: 500px) and (pointer: coarse),
+  (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
   html:has(.app-shell.in-room),
   body:has(.app-shell.in-room) {
     overflow: hidden;
@@ -3826,7 +3990,8 @@ html {
     margin-inline: 0;
     padding-inline: 12px 14px;
     border-color: color-mix(in srgb, var(--ring) 35%, var(--border));
-    background: linear-gradient(
+    background:
+      linear-gradient(
         90deg,
         color-mix(in srgb, var(--accent) 90%, transparent),
         transparent 75%
@@ -4324,7 +4489,9 @@ html {
   accent-color: var(--emphasis);
 }
 /* The phone's game menu carries these switches, so the board has no button on a phone. */
-@media (max-width: 660px), (max-height: 500px) and (pointer: coarse), (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
+@media (max-width: 660px),
+  (max-height: 500px) and (pointer: coarse),
+  (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
   .effect-settings {
     display: none;
   }
@@ -4455,7 +4622,9 @@ html {
 /* Free play from the lobby has no opponent and no room: drop the empty seats and
    the record, put the two ways out side by side, and give the board the rest of
    one screen, sized the same way as a room. */
-@media (max-width: 660px), (max-height: 500px) and (pointer: coarse), (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
+@media (max-width: 660px),
+  (max-height: 500px) and (pointer: coarse),
+  (min-width: 661px) and (max-aspect-ratio: 22999/20000) {
   html:has(.app-shell.is-analysis:not(.in-room)),
   body:has(.app-shell.is-analysis:not(.in-room)) {
     overflow: hidden;

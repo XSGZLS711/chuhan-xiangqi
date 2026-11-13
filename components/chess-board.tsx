@@ -1,6 +1,6 @@
 'use client';
-import { useEffect, useState, type CSSProperties } from 'react';
-import { Board, label, Side, type Piece } from '@/lib/xiangqi';
+import { useEffect, useId, useState, type CSSProperties } from 'react';
+import { Board, initialBoard, label, Side, type Piece } from '@/lib/xiangqi';
 import { sidePieceName } from '@/lib/i18n';
 import { useLocale } from '@/lib/use-locale';
 import {
@@ -20,10 +20,14 @@ type Frame = {
   move: {
     id: string;
     key: string;
+    from: number;
+    to: number;
     timing: ReturnType<typeof pieceMotion>;
     /** Axis the piece tips about as it is set down, leading edge first. */
     lean: { x: number; y: number };
   } | null;
+  /** A fresh set laid out on the opening position: the pieces are dealt onto the board. */
+  deal: boolean;
   /** Restored by an undo; fades back in once the mover has left its square. */
   revived: string | null;
   ghost: {
@@ -35,6 +39,15 @@ type Frame = {
   } | null;
 };
 const SHARDS = [0, 1, 2, 3, 4, 5, 6, 7];
+const OPENING = boardSignature(initialBoard());
+/** The deal runs from the river outwards, soldiers first and the back rank last, each rank
+ * from the middle file to the edges: the order a player sets up a real board.
+ */
+function dealDelay(view: number) {
+  const row = Math.floor(view / 9),
+    rank = row < 5 ? 4 - row : row - 5;
+  return rank * 55 + Math.abs((view % 9) - 4) * 24;
+}
 /** A piece set down after travelling tips its leading edge into the board first:
  * rotating about (−dy, dx) on screen sends that edge away from the viewer.
  */
@@ -82,11 +95,13 @@ export default function ChessBoard({
 }) {
   const signature = boardSignature(board);
   const { locale, t } = useLocale();
+  const trail = `trail-${useId().replace(/[^a-z0-9]/gi, '')}`;
   const [frame, setFrame] = useState<Frame>({
     sig: signature,
     board,
     context: animationContext,
     flipped,
+    deal: animate && signature === OPENING,
     move: null,
     revived: null,
     ghost: null,
@@ -99,10 +114,10 @@ export default function ChessBoard({
     frame.context !== animationContext ||
     frame.flipped !== flipped
   ) {
+    const fresh =
+      frame.context !== animationContext || frame.flipped !== flipped;
     const transition =
-      animate && frame.context === animationContext && frame.flipped === flipped
-        ? boardTransition(frame.board, board)
-        : null;
+      animate && !fresh ? boardTransition(frame.board, board) : null;
     const timing = pieceMotion(!!transition?.captured);
     const delay = timing.landMs;
     setFrame({
@@ -110,10 +125,14 @@ export default function ChessBoard({
       board,
       context: animationContext,
       flipped,
+      // Only a newly laid-out board is dealt; undoing back to the opening is not.
+      deal: animate && fresh && signature === OPENING,
       move: transition
         ? {
             id: transition.piece.id,
             key: `${transition.piece.id}:${transition.from}:${transition.to}`,
+            from: transition.from,
+            to: transition.to,
             timing,
             lean: leanAxis(transition.from, transition.to, flipped),
           }
@@ -155,7 +174,20 @@ export default function ChessBoard({
     );
     return () => clearTimeout(timer);
   }, [ghost]);
+  const deal = frame.deal;
+  useEffect(() => {
+    if (!deal) return;
+    const timer = setTimeout(
+      () => setFrame((current) => ({ ...current, deal: false })),
+      dealDelay(0) + 700,
+    );
+    return () => clearTimeout(timer);
+  }, [deal]);
   const view = (n: number) => (flipped ? 89 - n : n);
+  const point = (n: number) => {
+    const v = view(n);
+    return [50 + (v % 9) * 100, 50 + Math.floor(v / 9) * 100];
+  };
   const position = (n: number) => {
     const pos = view(n);
     return {
@@ -240,17 +272,68 @@ export default function ChessBoard({
               })}
               aria-pressed={selected === n}
             >
-              {possible &&
-                (p ? (
-                  <span className="capture-target" />
-                ) : (
-                  <span className="move-dot" />
-                ))}
+              {possible && (
+                // Markers open outwards from the lifted piece, nearest first.
+                <span
+                  className={p ? 'capture-target' : 'move-dot'}
+                  style={
+                    selected === null
+                      ? undefined
+                      : css({
+                          '--reach': Math.max(
+                            Math.abs(
+                              Math.floor(n / 9) - Math.floor(selected / 9),
+                            ),
+                            Math.abs((n % 9) - (selected % 9)),
+                          ),
+                        })
+                  }
+                />
+              )}
             </button>
           );
         })}
+        {frame.move && (
+          <svg
+            key={frame.move.key}
+            className="move-trail"
+            viewBox="0 0 900 1000"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {(() => {
+              const [x1, y1] = point(frame.move.from),
+                [x2, y2] = point(frame.move.to);
+              return (
+                <>
+                  <defs>
+                    <linearGradient
+                      id={trail}
+                      gradientUnits="userSpaceOnUse"
+                      x1={x1}
+                      y1={y1}
+                      x2={x2}
+                      y2={y2}
+                    >
+                      <stop offset="0" stopOpacity="0" />
+                      <stop offset="1" stopOpacity="1" />
+                    </linearGradient>
+                  </defs>
+                  <line
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    pathLength={1}
+                    stroke={`url(#${trail})`}
+                  />
+                </>
+              );
+            })()}
+          </svg>
+        )}
         <div
-          className={`pieces-layer ${animate ? 'animate-pieces' : ''}`}
+          className={`pieces-layer ${animate ? 'animate-pieces' : ''} ${frame.deal ? 'dealing' : ''}`}
           key={`${animationContext}:${flipped}`}
           aria-hidden="true"
         >
@@ -264,6 +347,9 @@ export default function ChessBoard({
                 data-piece-id={p.id}
                 style={{
                   ...position(n),
+                  ...(frame.deal
+                    ? css({ '--deal': `${dealDelay(view(n))}ms` })
+                    : {}),
                   ...(moved
                     ? css({
                         '--hover': `${frame.move?.timing.hoverMs}ms`,
@@ -296,6 +382,12 @@ export default function ChessBoard({
                 >
                   <span>{label(p)}</span>
                 </span>
+                {moved && !ghost && (
+                  <i
+                    key={`ripple:${frame.move?.key}`}
+                    className="land-ripple"
+                  />
+                )}
               </div>
             );
           })}
@@ -331,11 +423,7 @@ export default function ChessBoard({
             aria-hidden="true"
           >
             {arrows.map((arrow) => {
-              const point = (n: number) => {
-                  const v = view(n);
-                  return [50 + (v % 9) * 100, 50 + Math.floor(v / 9) * 100];
-                },
-                [x1, y1] = point(arrow.from),
+              const [x1, y1] = point(arrow.from),
                 [x2, y2] = point(arrow.to),
                 length = Math.hypot(x2 - x1, y2 - y1),
                 ux = (x2 - x1) / length,

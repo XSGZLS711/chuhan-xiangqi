@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { GameAudio, soundDelay } from '../lib/game-audio';
+import { GameAudio, soundDelay, soundPan } from '../lib/game-audio';
 import { pieceMotion } from '../lib/motion';
 
 type Source = {
@@ -8,6 +8,8 @@ type Source = {
   stops: number[];
 };
 const sources: Source[] = [];
+const pans: number[] = [];
+let rooms = 0;
 const param = (set: (value: number) => void = () => {}) => ({
   setValueAtTime: set,
   exponentialRampToValueAtTime() {},
@@ -49,6 +51,34 @@ class AudioContextStub {
   }
   createBuffer(_channels: number, length: number) {
     return { getChannelData: () => new Float32Array(length) };
+  }
+  createDynamicsCompressor() {
+    const value = () => ({ value: 0 });
+    return {
+      ...connection,
+      threshold: value(),
+      knee: value(),
+      ratio: value(),
+      attack: value(),
+      release: value(),
+    };
+  }
+  createConvolver() {
+    rooms++;
+    return { ...connection, buffer: null };
+  }
+  createStereoPanner() {
+    const pan = { value: 0 };
+    let wired = false;
+    return {
+      ...connection,
+      pan,
+      // Record the placement once it is set, on the panner's first connection.
+      connect() {
+        if (!wired) pans.push(pan.value);
+        wired = true;
+      },
+    };
   }
 }
 const near = (actual: number, expected: number) =>
@@ -103,9 +133,46 @@ try {
     );
     reduced.close();
   }
+  // Placement follows the file as the player sees it, and stays inside the middle half.
+  assert.equal(soundPan(4), 0);
+  assert.equal(soundPan(null), 0);
+  assert.equal(soundPan(9 * 9), -0.45);
+  assert.equal(soundPan(9 * 9, true), 0.45);
+  assert.equal(soundPan(0, true), 0.45);
+  // Every sound shares one room and limiter; a placed one goes through its panner.
+  sources.length = 0;
+  pans.length = 0;
+  rooms = 0;
+  const placed = new GameAudio();
+  placed.unlock();
+  for (const kind of ['select', 'undo', 'check', 'mate', 'result'] as const)
+    placed.play(kind, 0, soundPan(80));
+  assert.equal(rooms, 1, '整局共用一个房间混响');
+  assert.deepEqual(pans, [0.45, 0.45, 0.45, 0.45, 0.45]);
+  assert(sources.every((source) => source.start >= 10));
+  placed.close();
+  // Phones buzz on the beat; muting cancels a buzz that has not come yet.
+  const buzzes: unknown[] = [];
+  Object.defineProperty(globalThis.navigator, 'vibrate', {
+    value: (pattern: unknown) => buzzes.push(pattern),
+    configurable: true,
+  });
+  const felt = new GameAudio();
+  felt.unlock();
+  felt.play('select');
+  felt.play('move');
+  felt.play('capture', 0.05);
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(buzzes, [10], '选子不震，落子轻震');
+  felt.silence();
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  assert.deepEqual(buzzes, [10], '静音必须取消未到的震动');
+  felt.close();
   assert.equal(soundDelay(['undo'], 0, false), 0);
   assert.equal(soundDelay(['result'], 0, false), 0);
-  console.log('✓ 音效落地调度、双击间隔、减少动态效果和静音取消');
+  console.log(
+    '✓ 音效落地调度、双击间隔、减少动态效果、静音取消、声像、混响和震动',
+  );
 } finally {
   globalThis.AudioContext = original;
 }
